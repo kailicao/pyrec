@@ -68,7 +68,8 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
         dl = hd[im]
         fpl = fp[im]
         ftl = ft[im]
-        # 9/22/26 MHP: the MHD equation of state is removed.
+        # The Debye-Hueckel correction, if chosen; the MHD equation of state is
+        # removed (9/22/26 MHP via Claude).
         if nmlpar_mod.ldh:
             debhu_mod.xxdh = hcomp[1, im]
             debhu_mod.yydh = hcomp[2, im] + hcomp[4, im]
@@ -109,7 +110,7 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
         scrtch_mod.so[im] = o
         temp_mod.cp[im] = qcp
         temp_mod.sqdt[im] = qdt
-        # JVS 10/13: always want SVEL.
+        # SVEL (the convective velocity) is always kept (JVS 10/13).
         scrtch_mod.svel[im] = vel
     # label 30
     # Thermometric diffusivity and kinematic viscosity.

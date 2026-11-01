@@ -88,8 +88,8 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
                 break  # GO TO 5
             else:
                 lcc[i] = True
-        # (MHP 1/95: a variant using a fraction of the peak luminosity is
-        # commented out.)
+        # A variant using a fraction of the peak luminosity is commented out in
+        # the Fortran (MHP 1/95).
     else:
         for j in range(1, m + 1):
             lcc[j] = lc[j]
@@ -121,7 +121,7 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
         rates(dl, tl, x, y, xhe3, xc12, xc13, xn14, xo16, xo18, i,
               hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8, hr9, hr10, hr11,
               hr12, hr13, hf1, hf2)
-        # MHP 5/02: the deuterium burning rate.
+        # The deuterium burning rate (MHP 5/02).
         if xh2test > 1.0e-11:
             deutrate(dl, tl, x, i, itlvl)
         else:
@@ -233,7 +233,7 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
         iounits_mod.write(iounits_mod.ishort,
                           " ZONES MIXED IN ORDER--" + zones)  # format 110
 
-    # Microscopic diffusion (MHP 12/89, Bahcall and Loeb).
+    # Microscopic diffusion (Bahcall and Loeb) (MHP 12/89).
     if nml.ldify:
         _settle(delts, hcomp, hd, hp, hr, hs, hs1, hstot, ht, lc, m, jenv)
 
@@ -244,12 +244,12 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
             hcomp[j, i] = min(hcomp[j, i], 1.0)
         hcomp[3, i] = min(hcomp[3, i], 1.0 - hcomp[1, i] - hcomp[4, i])
         hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
-    # MHP 1/95: reset JENV, JCORE for deep mixing, with the true flags.
+    # Reset JENV, JCORE for deep mixing, with the true flags (MHP 1/95).
     if nml.dpenv < 1.0 and itlvl > 1:
         jcore, jenv, nrzone, nzone, nzone0 = convec(
             hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
             jcore, jenv, nrzone, nzone, nzone0)
-    # MHP 5/02: deuterium burning.
+    # Deuterium burning (MHP 5/02).
     if nml.lexcom:
         dt = ddage * 1.0e-9
         done = False
@@ -287,7 +287,7 @@ def _settle(delts, hcomp, hd, hp, hr, hs, hs1, hstot, ht, lc, m, jenv):
     # The outer boundary: the surface convection zone, or the first point
     # (inward from JENV) where Y exceeds YMIN.
     if not lc[m]:
-        # DBG 2/92: a warning only.
+        # A warning only (DBG 2/92).
         iounits_mod.write(iounits_mod.ishort,
                           " NO SURFACE CZ - DIFFUSION NOT MEANINGFUL")
         return

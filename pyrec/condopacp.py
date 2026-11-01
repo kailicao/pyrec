@@ -67,7 +67,7 @@ def condopacp(zion, tlg, rlg, ck, drk, dtk):
                     akap[it, ir, iz] = vals[it]
         iounits_mod.close(ip)
         krun = 12345
-        # KC 2025-05-30: INT(MAXZ/2.)+1, the same as MAXZ/2+1.
+        # The middle of the table: INT(MAXZ/2.)+1, the same as MAXZ/2+1 (KC 2025-05-30).
         iz = int(MAXZ / 2.0) + 1
         it = int(MAXT / 2.0) + 1
         ir = int(MAXR / 2.0) + 1

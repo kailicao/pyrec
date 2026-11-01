@@ -281,7 +281,7 @@ def coefft(delts, m, hd, hha, hhb, hhc, hl, hmax, hp, hpp, hr, hs, hs1,
             s.sfxion[j, im] = fxion[j]
         s.svel[im] = vel
         s.scp[im] = qcp
-        # Gamma_1, always (JVS 01/11).
+        # Gamma_1, always (for the sound speed and pulsation output) (JVS 01/11).
         chrh = 1.0 / qdp
         cht = -chrh * qdt
         cv = qcp - math.exp(c.cln * (hp[im] - hd[im] - ht[im])) * cht**2 / chrh

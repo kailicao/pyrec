@@ -34,7 +34,7 @@ def altabinit():
     a2.tefflmax = a1.teffls[nteff] + (a1.teffls[nteff] - a1.teffls[nteff - 1])
 
     # The first and last valid entries (above -998) of each row. Possible
-    # bug (update-findings.md, batch 14): a row with none keeps its earlier
+    # bug (see the page): a row with none keeps its earlier
     # values (0 at first), and the loop below then reads GLs out of bounds
     # (here gls[0] and, through index -1, the array's last element).
     for i in range(1, nteff + 1):

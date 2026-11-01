@@ -43,8 +43,8 @@ def eqbound06(t, dl, fac, ltab, lramp):
         lramp = False
 
         # Ramps at the easy borders, linear in T6 and rho.
-        # Question (see the page): linear, where the 1995 and 2001
-        # versions ramp in log rho.
+        # Question (see the page): linear, where the older OPAL tables
+        # ramped in log rho.
         if t6 > t6a[2]:
             trampf = (t6 - t6a[1]) / (t6a[2] - t6a[1])
             lramp = True

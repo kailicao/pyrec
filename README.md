@@ -6,11 +6,11 @@ PyREC (the package `pyrec`) is a Python version of [YREC](https://github.com/yre
 
 ## What it is
 
-A translation that keeps YREC's current structure: one Python file per Fortran file (`pyrec/amcalc.py` for `src/amcalc.f`) and one function per routine, made from YREC's development branch at 09c3b9b (Oct 20, 2026). It follows YREC as YREC changes. Its structure will change only once the whole translation has been checked; the new structure planned for it is drafted, with Python stubs, on its [documentation site](https://github.com/kailicao/pyrec-map).
+A translation that keeps YREC's current structure: one Python file per Fortran file (`pyrec/amcalc.py` for `src/amcalc.f`) and one function per routine, made from YREC's development branch at 09c3b9b (Oct 20, 2026), and brought to a8a5950 (Oct 30, 2026) in the eight source files changed between the two. It follows YREC at the commit Kaili Cao chooses (a8a5950 since Oct 31, 2026), moved only when the work needs a later one. Its structure will change only once the whole translation has been checked; the new structure planned for it is drafted, with Python stubs, on its [documentation site](https://github.com/kailicao/pyrec-map).
 
 ## Status
 
-Every one of YREC's 284 source files at 09c3b9b is translated (Oct 27, 2026), and the calls agree with what each routine returns (checked by script). Nothing has been run: the translation is checked only by compiling it, and is to be tested routine by routine against the Fortran.
+Every one of YREC's 284 source files is translated (at 09c3b9b, Oct 27, 2026; the eight files a8a5950 changed since updated), and the calls agree with what each routine returns (checked by script). Nothing has been run: the translation is checked only by compiling it, and is to be tested routine by routine against the Fortran.
 
 ## Conventions (provisional)
 

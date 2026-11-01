@@ -15,7 +15,7 @@ SAHAT = np.array([0.0, 59630., 69450., 88710., 91330., 94570., 130630.,
 SAHET0 = 285270.
 SAHET1 = 631370.
 # DATA SAHAU: the constant u_i of each Saha equation (13 values: the 11
-# species, then He and He+). Double precision since 09c3b9b.
+# species, then He and He+), in double precision.
 SAHAU = np.array([0.0, -.01, -.47, .60, .49, .08, .11, .0, -.04, .64, .99,
                   1.03, .6, .0])
 NZ = 11

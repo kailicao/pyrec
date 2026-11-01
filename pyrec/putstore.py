@@ -134,7 +134,7 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
                           '*** YREC7 input file, flags, etc., have been '
                           'defaulted.  ***')
 
-    # JvS 09/25: the stitched format, or the old one, not both.
+    # The stitched format, or the old one, not both (JvS 09/25).
     if n.lstch:
         if ccout_mod.lphhd:
             iounits_mod.write(istor, _FMT1013)

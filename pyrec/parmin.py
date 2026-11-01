@@ -1,4 +1,4 @@
-"""Python version of parmin.f (YREC development, 09c3b9b): a run's
+"""Python version of parmin.f (YREC development, a8a5950): a run's
 parameters, its input and output files, and its run cards."""
 
 import math
@@ -36,7 +36,7 @@ aid = ['', 'HE3', 'C12', 'C13', 'N14', 'N15', 'O16', 'O17', 'O18', 'H2',
        'LI6', 'LI7', 'BE9']
 anewcp = ''
 atmp = ''
-# MHP 10/24: the CNO mixture and isotope sets. AMIXT lists the preset
+# The CNO mixture and isotope sets (MHP 10/24). AMIXT lists the preset
 # mixtures, each with its Z/X and C, N, O fractions of the metals: GS98,
 # Asplund et al. 2021, and Magg et al. (met, phot).
 # Question (see the page): the year of the Magg et al. mixtures.
@@ -49,7 +49,7 @@ frac_nt = np.array([0.0, 0.050426, 0.050344, 0.059012, 0.058716])
 frac_ot = np.array([0.0, 0.468195, 0.416592, 0.415631, 0.413545])
 alfa = 1.5          # the old wind law's index
 fk = 1.0            # its fudge factor
-wmax_sun = 1000.0   # MHP 8/17: saturation threshold in solar units
+wmax_sun = 1000.0   # saturation threshold in solar units (MHP 8/17)
 awind = 'K97'       # the Matt et al. presets: 'K97', 'V13' or 'CUS'
 fsound = 'Csound.dat'
 descrip = ['', '', '']
@@ -96,7 +96,8 @@ _CONTROL = (
     ('nml', 'xlstol'), ('nml', 'zenv0a'), ('nml', 'zopal951'),
     ('loc', 'fcondopacp'), ('loc', 'fopale06'), ('arg', 'falex06'),
     ('nml', 'lalex06'), ('nml', 'end_dcen'), ('nml', 'end_xcen'),
-    ('nml', 'end_ycen'), ('byp', 'isetmix'), ('byp', 'isetiso'),
+    ('nml', 'end_ycen'), ('nml', 'l_zerodt_prems'), ('byp', 'isetmix'),
+    ('byp', 'isetiso'),
     ('loc', 'amix'), ('loc', 'aiso'), ('nml', 'frac_c'), ('nml', 'frac_n'),
     ('nml', 'frac_o'), ('nml', 'r12_13'), ('byp', 'r14_15'),
     ('byp', 'r16_17'), ('nml', 'r16_18'), ('byp', 'zxmix'),
@@ -355,7 +356,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     mixtures, settling switches), write the settings to the .short file,
     and interpret the run cards.
 
-    Translates: parmin.f#PARMIN (09c3b9b)
+    Translates: parmin.f#PARMIN (a8a5950)
 
     Arguments: the 12 table file names (set from the CONTROL namelist; any
     value), and yrecver, githash, the code's version and git hash.
@@ -415,7 +416,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     # VERFMT, the version line (format built at run time, 315).
     verline = f"# YREC v{yrecver.rstrip()} ({githash.rstrip()})"
 
-    # JVS 02/11: the namelist files from the command line, or the defaults.
+    # The namelist files from the command line, or the defaults (JVS 02/11).
     # Question (see the page): GETARG is a compiler extension.
     yrec1 = sys.argv[1] if len(sys.argv) > 1 else ''
     if yrec1[:2].strip() == '':
@@ -429,9 +430,9 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     # OPEN, READ(NML=...) and CLOSE of ISTAND and IRUN.
     _read_namelist(yrec1, 'CONTROL', _CONTROL, owners)
     _read_namelist(yrec2, 'PHYSICS', _PHYSICS, owners)
-    # MHP 8/14: map the newer inputs onto the vectors the code uses.
+    # Map the newer inputs onto the vectors the code uses (MHP 8/14).
     remap()
-    # MHP 06/13: remember the original atmosphere choice.
+    # Remember the original atmosphere choice (SURFBC may switch it) (MHP 06/13).
     nml.kttau0 = nml.kttau
     nml.lttau = False
 
@@ -461,11 +462,11 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     print(' ')
     os.system(cmd)
 
-    # JVS 02/11: the acoustic-depth output, named after the .short file.
+    # The acoustic-depth output, named after the .short file (JVS 02/11).
     if acdpth_mod.lacout:
         io.iclcd = 91
         mrk = me.fshort.find('short') + 1      # INDEX: 0 if absent
-        # Possible bug (update-findings.md): no 'short' in FSHORT gives
+        # Possible bug (see the page): no 'short' in FSHORT gives
         # plain 'calcad' in the current folder.
         fcalcad = me.fshort[:max(mrk - 1, 0)] + 'calcad'
         io.open(io.iclcd, fcalcad, status='UNKNOWN')
@@ -475,8 +476,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         io.write(io.iclcd, ' age (Gyr),radius(cm),1/sound speed(s/cm),'
                  'radius (CZ), 1/cs (CZ)       delad,gamma1,P, T, X')
 
-    # G Somers 6/14: Li/Be cross sections given by the user, as factors on
-    # the defaults (Li6 5.5 MeV b; Li7 52 keV b; Be9 1.1, 15000, 15000 keV b).
+    # Li/Be cross sections given by the user, as factors on the defaults (Li6
+    # 5.5 MeV b; Li7 52 keV b; Be9 1.1, 15000, 15000 keV b) (G Somers 6/14).
     if byp.lxli6:
         nml.sli6 = byp.xsli6 / 5.5e3
     if byp.lxli7:
@@ -495,7 +496,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     io.open(io.istor, me.fstor, status='UNKNOWN')
     io.rewind(io.istor)
     if nml.lstore:
-        # JvS 08/25: stitched interior and envelope option.
+        # The stitched interior and envelope option (JvS 08/25).
         if nml.lstch:
             ccout_mod.lphhd = True
         else:
@@ -551,7 +552,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
             nml.walpcz = -2.0
         if nml.walpcz > 0.0:
             nml.walpcz = 0.0
-        # JNT 09/2025: LSOLID overrides IMPJMOD.
+        # LSOLID overrides IMPJMOD (JNT 09/2025).
         if nml.lsolid:
             nml.impjmod = 1
         if not nml.lmwind:
@@ -570,7 +571,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
             # AWIND ('CUS' keeps the namelist's), give the exponents.
             if me.awind == 'K97':
                 byp.pmmm = me.alfa / 3.0
-                # MHP 8/17: the default for A is 2, not 0.
+                # The default for A is 2, not 0 (MHP 8/17).
                 byp.pmma = 2.0
                 byp.pmmb = 1.0
                 byp.pmmc = 2.0
@@ -585,10 +586,10 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                 nml.lbscale = True
             nml.exw = (1.0 + byp.pmma - 2.0 * byp.pmma * byp.pmmm
                        + 4.0 * byp.pmmm * byp.pmmb)
-            # G Somers 8/17: the tau_cz term is now in MWIND/MCOWIND.
+            # The tau_cz term is applied in MWIND/MCOWIND, not here (G Somers 8/17).
             nml.extau = 0.0
-            # JvS 09/25 "removed typo". Question (see the page): the
-            # comment's derivation gives another exponent.
+            # EXR with the typo removed (JvS 09/25). Question (see the page):
+            # the Fortran comment's derivation gives another exponent.
             nml.exr = 2.0 + 5.0 * byp.pmmm - 4.0 * byp.pmmm * byp.pmmc
             nml.exm = -byp.pmmm
             nml.exl = 1.0 - 2.0 * byp.pmmm
@@ -620,8 +621,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                      f"ELEMENT\n RESCALING NOT PERFORMED")
         # label 30
 
-    # MHP 10/24: the CNO mixture (ISETMIX) and the isotope ratios and
-    # light-element abundances (ISETISO) of the starting model.
+    # The CNO mixture (ISETMIX) and the isotope ratios and light-element
+    # abundances (ISETISO) of the starting model (MHP 10/24).
     nml.lmixture = False
     nml.lisotope = False
     to_606 = True        # False where the Fortran jumps to label 602
@@ -693,12 +694,12 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
               f"{nml.xh2_ini:12.4E} HE3 {nml.xhe3_ini:12.4E} LI6 "
               f"{nml.xli6_ini:12.4E} LI7 {nml.xli7_ini:12.4E} BE9 "
               f"{nml.xbe9_ini:12.4E} APPLIED TO STARTING MODEL.")  # 605
-    # label 603: the settling switches. DBG 12/95: Z diffusion needs Y
-    # diffusion and Thoul's coefficients.
+    # label 603: the settling switches. Z diffusion needs Y diffusion and
+    # Thoul's coefficients (DBG 12/95).
     if nml.ldifz:
         nml.ldify = True
         nml.lthoul = True
-    # G Somers 04/15: light-element diffusion.
+    # Light-element diffusion (G Somers 04/15).
     if nml.ldifli:
         nml.lnewdif = True
         nml.ldify = True
@@ -720,8 +721,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     _write_namelist(io.ishort, 'CONTROL', _CONTROL, owners)
     _write_namelist(io.ishort, 'DERIVED', _DERIVED, owners)
 
-    # 10/15/26: every mixing length the run uses must be positive. Under
-    # solar calibration only CMIXLA(1) comes from the namelist.
+    # Every mixing length the run uses must be positive (10/15/26). Under solar
+    # calibration only CMIXLA(1) comes from the namelist.
     if nml.lcals:
         ncmxck = 1
     else:
@@ -775,8 +776,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     for nkind in range(1, nml.numrun + 1):
         rl.iresca[nkind] = kindrn[nkind]
         if kindrn[nkind] == 1:
-            # Evolve card. MHP 10/24: stop at an age, or at a central D, X
-            # or Y.
+            # Evolve card: stop at an age, or at a central D, X or Y (MHP
+            # 10/24).
             if (nml.endage[nkind] > 0.0 or nml.end_dcen[nkind] > 0.0
                     or nml.end_xcen[nkind] > 0.0
                     or nml.end_ycen[nkind] > 0.0):
@@ -861,7 +862,7 @@ def expand_value(nml_var):
     {YREC_START} or {YREC_OUTPUT}, by the environment variable of that
     name, or by its default if it is not set.
 
-    Translates: parmin.f#EXPAND_VALUE (09c3b9b)
+    Translates: parmin.f#EXPAND_VALUE (a8a5950)
 
     Arguments: nml_var, the file name.
 

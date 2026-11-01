@@ -275,7 +275,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     hko[1] = hcomp[1, 1]
     hfo[1] = hcomp[3, 1]
     hlmax = hl[m]
-    # JVS 04/14: Teff saved; JVS 05/25: the number of points saved
+    # Teff saved, and the number of points saved (JVS 04/14, 05/25)
     oldmod_mod.tefflo = teffl
     # Question (see the page): MO is the old number of points.
     oldmod_mod.mo = m
@@ -466,7 +466,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         for j in range(1, mnew + 1):
             arr[j] = oldmod_mod.hto[j]
 
-    # 7/91 the entropy terms (loops 904-914)
+    # The entropy terms (loops 904-914) (7/91)
     interpolate(entrop_mod.htt0)
     interpolate(entrop_mod.hpp0)
     interpolate(entrop_mod.hll0)
@@ -482,7 +482,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     for i in range(1, 8):
         interpolate(burn_mod.hcompm[ID[i]])
 
-    # MHP 05/02: the deuterium burning rates, if surface D >= 1e-14
+    # The deuterium burning rates, if surface D >= 1e-14 (MHP 05/02)
     if nmlpar_mod.lexcom and hcomp[12, m] >= 1.0e-14:
         interpolate(deuter_mod.drate0)
 
@@ -553,9 +553,9 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             ft[j] = ftx[j]
             eta2[j] = oldrot_mod.eta2x[j]
             r0[j] = oldrot_mod.r0x[j]
-    # MHP 6/00: the energy generation at the start of the step. Note that
-    # HS already holds the new points here (loop 1000), while SESUM and SEG
-    # are on the old ones.
+    # The energy generation at the start of the step (MHP 6/00). Note that HS
+    # already holds the new points here (loop 1000), while SESUM and SEG are on
+    # the old ones.
     if nmlpar_mod.lrot or (nmlpar_mod.lexcom and nmlpar_mod.lovste):
         osplin(oldmod_mod.hss, oldphy_mod.esumo, hs, scrtch_mod.sesum, ntab,
                ntot)
@@ -587,7 +587,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         # Overshoot
         nrzone, nzone = ovrot(hcomp, hd, hp, hr, hs, ht, lc, m, lcz, mrzone,
                               mxzone, 0, 0)
-        # JNT 2025/09/03: the moment of inertia again before the rotation.
+        # The moment of inertia again, on the new points, before the rotation (JNT 2025/09/03).
         # Question (see the page): is this extra call still needed?
         momi(eta2, hr, hs, hs2, 1, m, omega, r0, hi, qiw)
         # Omega from the specific angular momentum HJM
@@ -639,7 +639,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             oldphy_mod.thdifo[im] = temp_mod.thdif[im]
             oldrot2_mod.ddelm[im] = oldphy_mod.delao[im] - oldphy_mod.delo[im]
             dwmax_mod.qwrmx0[im] = dwmax_mod.qwrmax[im]
-        # MHP 06/02: the time evolution of the angular velocity
+        # The time evolution of the angular velocity (MHP 06/02)
         cln = constants_mod.cln
         for i in range(2, m + 1):
             dr = math.exp(cln * hr[i]) - math.exp(cln * hr[i - 1])

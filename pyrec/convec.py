@@ -54,7 +54,7 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
         break  # GOTO 12
     # label 12
 
-    # MHP 5/91: no convection zone.
+    # No convection zone (MHP 5/91).
     if j == 1:
         jcore = 1
         jenv = m

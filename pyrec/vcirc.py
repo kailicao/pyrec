@@ -133,7 +133,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
 
     # Meridional circulation.
     if n.ies == 2:
-        # Kippenhahn & Moellenhoff (1974), restored MHP 4/26.
+        # Kippenhahn & Moellenhoff (1974), restored (MHP 4/26).
         for i in range(imin, imax + 1):  # label 30
             if lcz[i] and lcz[i - 1]:
                 continue
@@ -174,7 +174,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             if not n.ldifad:
                 ves[i] = abs(rat[i] * ves[i] - tk.fes3[i] * qw)
             else:
-                # MHP 06/02: the d theta/dt term; MHP 05/02: factor 1/5.
+                # The d theta/dt term, and the factor 1/5 (MHP 06/02, 05/02).
                 o2.thn[i] = o2.festime[i] * (o2.thm[i] * qw - o2.thp[i]) / dt
                 d2.vesa[i] = 0.2 * (rat[i] * ves[i] + o2.thn[i])
                 q1 = vf.fact7[i] * wm[i]**2
@@ -191,8 +191,8 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
 
     # Inhibition by mu gradients.
     if n.imu == 3:
-        # Kippenhahn & Moellenhoff (1974): fictitious mu currents that
-        # oppose the circulation, restored MHP 4/26.
+        # Kippenhahn & Moellenhoff (1974): fictitious mu currents that oppose
+        # the circulation, restored (MHP 4/26).
         for i in range(imin, imax + 1):
             if lcz[i] and lcz[i - 1]:
                 continue  # GOTO 32
@@ -248,7 +248,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             if abs(qwlnr[i]) < qwrmx:
                 vgsf[i] = 0.0
                 continue
-            # MHP 05/02: tests to avoid dividing by zero.
+            # Tests to avoid dividing by zero (MHP 05/02).
             qq = 1.0e-2 * qwlnr[i]
             if abs(qwrmx) < abs(qq):
                 fxx2 = 1.0
@@ -307,7 +307,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
                   f" WBOT{omega[i - 1]:11.3E} LIMIT{wmin:11.3E}")  # 9911
             continue
         # Secular shear: the maximum gradient it allows, with the square
-        # root of the Prandtl number (MHP 3/92); velocity from Zahn 1991.
+        # root of the Prandtl number; velocity from Zahn 1991 (MHP 3/92).
         qwrmx = math.sqrt(viscmi[i] / thdifmi[i] * 1.25e-1 * n.rcrit) \
             * qwrmax[i]
         if abs(qwlnr[i]) > qwrmx:
@@ -366,8 +366,8 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             d2.vesd[i] = abs(n.fes * d2.vesd[i])
             d2.vesa[i] = n.fes * d2.vesa[i]
     if n.ldifad:
-        # MHP 05/02: the GSF and shear velocities, times r, join the
-        # diffusive part.
+        # The GSF and shear velocities, times r, join the diffusive part (MHP
+        # 05/02).
         for i in range(imin, imax + 1):
             d2.vesd[i] = d2.vesd[i] + rm[i] * (abs(vgsf[i]) + abs(vss[i]))
             d3.dss[i] = rm[i] * abs(vss[i])
@@ -390,8 +390,8 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
         if hv[i] > 0.0:
             ldo = True
 
-    # 9/93: no transport in the core (L(r)/L < 0.99), to avoid numerical
-    # problems in the H-burning shell.
+    # No transport in the core (L(r)/L < 0.99), to avoid numerical problems in
+    # the H-burning shell (9/93).
     # Question (see the page): the threshold is hard-coded.
     if n.lnoj:
         for i in range(imin, imax + 1):

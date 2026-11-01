@@ -41,7 +41,7 @@ def mdot(delts, hcomp, hd, hjm, hp, hr, hs, hs1, hs2, hstot,
     """
     c = constants_mod
     senvold = hs[m] - hstot
-    # MHP 8/10: check for scaled solar wind mass loss (inert: DMWSUN = 0).
+    # Scaled solar wind mass loss (inert: DMWSUN = 0) (MHP 8/10).
     if nmlpar_mod.lsolwind and nmlpar_mod.lrot and DMWSUN > 0.0:
         f1 = (omega[m] / DMWSUN)**2
         f2 = (DMWMAX / DMWSUN)**2
@@ -71,7 +71,7 @@ def mdot(delts, hcomp, hd, hjm, hp, hr, hs, hs1, hs2, hstot,
         print(f" TIMESTEP REDUCED FOR MASS LOSS - OLD,NEW"
               f"{delts:12.3E}{dtmax:12.3E}")  # format 10
         delts = dtmax
-    # MHP 8/10: turn accretion off once the disk is exhausted.
+    # Turn accretion off once the disk is exhausted (MHP 8/10).
     if nmlpar_mod.ldisk and dmdt > 0.0:
         test = disk_mod.sage + 1.0e-9 * delts / c.csecyr
         if test > nmlpar_mod.tdisk:

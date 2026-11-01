@@ -84,5 +84,5 @@ def mixcz(hcomp, hs2, lcz, m):
         # Question (see the page): the oxygen floor.
         hcomp[9, i] = max(hcomp[9, i],
                           0.99e-3 * (hcomp[3, i] - comp_mod.zenvm))
-    # The convective turnover time once computed here is commented out
-    # (G. Somers 3/17: it now comes from OVRTRN_MOD).
+    # The convective turnover time is not computed here: it comes from
+    # OVRTRN_MOD (G. Somers 3/17).

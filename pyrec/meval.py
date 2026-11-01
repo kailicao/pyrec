@@ -89,7 +89,7 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
     goto_200 = (nume == 1) and (end != nume)
     if not goto_200:
         # The interval of the first in-range point. Possible bug (see
-        # update-findings.md): if every point lies below xtab[1], start is
+        # the page): if every point lies below xtab[1], start is
         # nume + 1 and the Fortran reads XVAL(NUME+1) here.
         lcn, fnd = search(xtab, num, xval[start], 0, 0)
         lcn1 = lcn + 1

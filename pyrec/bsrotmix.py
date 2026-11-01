@@ -10,7 +10,7 @@ from pyrec import dimensions_mod
 _JSON = dimensions_mod.json
 
 # Local arrays and scalars kept between calls by the Fortran's blanket SAVE
-# (the tableau HCOMPI, HCOMPA, HCOMPE was COMMON/BSBURN/ until 09c3b9b).
+# (among them the tableau HCOMPI, HCOMPA, HCOMPE of the extrapolation).
 # Index 0 of every dimension is unused.
 _hcompi = np.zeros((12, 16, _JSON + 1))
 _hcompa = np.zeros((16, _JSON + 1))

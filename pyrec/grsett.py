@@ -18,9 +18,8 @@ from pyrec.tridiag_gs import tridiag_gs
 
 JSON = dimensions_mod.json
 
-# GRSETT has SAVE: its local arrays are module-level. COD1Z..QCOD2Z were the
-# COMMON block /GRAVSZ/ until rp_1; GRSETT now owns them, SETUP_GRSETT fills
-# them and MODEL_TO_EQUAL reads them.
+# GRSETT has SAVE: its local arrays are module-level. GRSETT owns
+# COD1Z..QCOD2Z; SETUP_GRSETT fills them and MODEL_TO_EQUAL reads them.
 cod1z = np.zeros(JSON + 1)
 cod2z = np.zeros(JSON + 1)
 qcod1z = np.zeros(JSON + 1)

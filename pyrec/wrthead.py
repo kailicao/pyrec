@@ -8,8 +8,8 @@ from pyrec import runloop_mod
 
 _RUN_KIND = {1: 'EVOLVE  ', 2: 'RESCALE ', 3: 'RESCALE&EVOLVE '}
 
-# FORMAT 1504 (ITRVER = 0, G. Somers 11/14): one line of column names,
-# 16 records of the Fortran joined into one; it does not start with '#'.
+# FORMAT 1504 (ITRVER = 0): one line of column names, 16 records of the Fortran
+# joined into one; it does not start with '#' (G. Somers 11/14).
 _COLUMNS_1504 = (
     '     Step    Shls         Age_gyr       LogL_lsun       LogR_rsun           Log_g'
     '        log_Teff        Mco_core         Mco_env     Rco_env     Tco_env     Dco_env'

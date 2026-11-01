@@ -1,4 +1,4 @@
-"""Python version of starin.f (YREC 09c3b9b): the starting model of a run,
+"""Python version of starin.f (YREC a8a5950): the starting model of a run,
 read from file or kept, and prepared for evolution."""
 
 import math
@@ -83,7 +83,7 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
     the rotation quantities, the surface composition, and the first
     physics, convection zones and overturn time.
 
-    Translates: starin.f#STARIN (09c3b9b)
+    Translates: starin.f#STARIN (a8a5950)
 
     Arguments: the model (hs, hr, hl, hp, ht, hd, hcomp[species, shell],
     lc, omega, m points, index 0 unused) and its rotation arrays (eta2, fp,
@@ -196,7 +196,7 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
                 ft[i] = 1.0
         iounits_mod.rewind(iread)
 
-        # MHP 10/24: change the mixture, only of a homogeneous model.
+        # Change the mixture, only of a homogeneous model (MHP 10/24).
         testmix = np.zeros(16)
         homogeneous = True
         if nml.lmixture or nml.lisotope:
@@ -271,7 +271,7 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
         # label 602
 
     # label 3000
-    # MHP 9/98, 9/14: extend the model inward by MCORE points.
+    # Extend the model inward by MCORE points (MHP 9/98, 9/14).
     if nml.lcore and nml.lfirst[nk]:
         nml.mcore = int(math.log10(nml.fcore) / nml.hpttol[2]) + 1
         nml.fcore = float(nml.mcore) * nml.hpttol[2]  # now a log offset
@@ -413,7 +413,7 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
     physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl)
     nrzone, nzone = ovrot(hcomp, hd, hp, hr, hs, ht, lc, m, lcz, mrzone,
                           mxzone, 0, 0)
-    # Possible bug (update-findings, batch 12): the module array ENVR is
+    # Possible bug (see the page): the module array ENVR is
     # passed as GETTAU's scalar RBCZ, so ENVR(1) receives the base's radius.
     es.envr[1] = gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl, hstot,
                         bl, m, lc, es.envr[1], cmixl)
@@ -444,7 +444,11 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
         ce.senv0 = -1.0e-12
     comp_mod.senv = hs[m] - hstot
     senv1 = comp_mod.senv
-    if comp_mod.senv == ce.senv0:
+    # Leave the fitting point alone when the request matches the current
+    # one to within roundoff (SENV is a difference of two log masses near
+    # 33): 100 ulps of HSTOT, Fortran's EPSILON for REAL*8.
+    senvtol = 1.0e2 * np.finfo(np.float64).eps * abs(hstot)
+    if abs(comp_mod.senv - ce.senv0) <= senvtol:
         return m, lnew, qdt, qdp, vel  # GOTO 599
     jend = 11
     if nml.lexcom:
@@ -486,8 +490,7 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
             lc[m] = False
         else:
             # Between a convective and a radiative shell: let the physics
-            # decide. (Since 09c3b9b EQSTAT is always called; it used to be
-            # called only with the MHD equation of state.)
+            # decide (EQSTAT is always called for such a shell).
             lderiv = False
             latmo = True
             ksaha = 0
@@ -545,7 +548,7 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
         if nml.ldh:
             _set_debhu(hcomp, m)
         idum = 0
-        # G Somers 10/14: for spotted stars, the ambient temperature.
+        # For spotted stars, the ambient temperature (G Somers 10/14).
         if jenv == m and nml.spotf != 0.0 and nml.spotx != 1.0:
             ateffl = teffl - 0.25 * math.log10(
                 nml.spotf * nml.spotx**4.0 + 1.0 - nml.spotf)

@@ -10,8 +10,8 @@ from pyrec import oldmod_mod
 from pyrec.simeqc import simeqc
 
 # KEMCOM has SAVE: its work arrays are module-level. A(1..49) holds the
-# Jacobian column by column, A(50..56) the residuals (the B of rp_1's
-# EQUIVALENCE), which SIMEQC replaces by the Newton correction.
+# Jacobian column by column, A(50..56) the residuals (once a separate
+# array B, EQUIVALENCEd to it), which SIMEQC replaces by the Newton correction.
 a = np.zeros(57)
 w = np.zeros(8)
 xsum = np.zeros(12)

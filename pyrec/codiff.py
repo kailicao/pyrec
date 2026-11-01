@@ -66,7 +66,7 @@ def codiff(hru, m, rmid, cod, cod2, vfc):
                 cod[i] = con1 * (t2.ves[i] + t2.vgsf[i] + t2.vss[i]) * rmid[i]
                 cod2[i] = cod[i] * vfc[i]
                 cod[i] = cod[i] + con1 * nml.codm
-    # No angular-momentum transport (MHP 9/93).
+    # LNOJ: no angular-momentum transport, so zero coefficients (MHP 9/93).
     if nml.lnoj:
         for i in range(2, m + 1):
             cod[i] = 0.0

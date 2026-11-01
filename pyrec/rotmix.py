@@ -139,7 +139,7 @@ def _settle(delts, hcomp, ht, m, mrzone, mxzone, nrzone, nzone,
         print(" " + text)
         iounits_mod.write(iounits_mod.ishort, " " + text)
         raise SystemExit(text)
-    # MHP 7/92: exit if overshoot makes the star fully convective.
+    # Exit if overshoot makes the star fully convective (MHP 7/92).
     if mxzone[nzone, 1] <= 2 and mxzone[nzone, 2] == m:
         return
     jmax = mrzone[nrzone, 2]
@@ -148,7 +148,7 @@ def _settle(delts, hcomp, ht, m, mrzone, mxzone, nrzone, nzone,
             break                                   # go to 150
     else:
         return                  # Y < YMIN for the whole star
-    # label 150. Possible bug (update-findings.md, batch 10): the loop
+    # label 150. Possible bug (see the page): the loop
     # above moves J, not JMAX, so JMAX stays the top of the last radiative
     # zone and the first shell with Y > YMIN is never used.
     stot = math.exp(c.cln * hstot)
@@ -157,7 +157,7 @@ def _settle(delts, hcomp, ht, m, mrzone, mxzone, nrzone, nzone,
         sdel[2, i] = mdphy_mod.delm[i]
         hqpr[i] = -math.exp(c.cln * (hd[i] + c.cgl + hs[i]
                                      - 2.0 * hr[i] - hp[i]))
-    # BC 6/92: only check for timestep cutting if JMAX is large.
+    # Only check for timestep cutting if JMAX is large (BC 6/92).
     if jmax >= 2:
         # FM is the mass fraction above the outer point.
         fm = (stot - hs1[jmax]) / stot

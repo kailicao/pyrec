@@ -1,7 +1,7 @@
-"""Python version of nmlpar_mod.f (YREC 09c3b9b): the settings of the
+"""Python version of nmlpar_mod.f (YREC a8a5950): the settings of the
 CONTROL and PHYSICS namelists read by the physics, formerly COMMON/NMLPAR/.
 
-Translates: nmlpar_mod.f#NMLPAR_MOD (09c3b9b)
+Translates: nmlpar_mod.f#NMLPAR_MOD (a8a5950)
 
 Module-level names, as in the Fortran module, in lower case and in its
 order, with its initializers (the namelists' defaults; parmin reads the
@@ -234,6 +234,9 @@ setdt = np.full(51, 0.0)  # index 0 unused
 end_dcen = np.full(51, 0.0)  # index 0 unused
 end_xcen = np.full(51, 0.0)  # index 0 unused
 end_ycen = np.full(51, 0.0)  # index 0 unused
+# CONTROL: with it, a rescale card (KINDRN = 2) relaxes a pre-main-sequence
+# model without ageing it (read in main).
+l_zerodt_prems = False
 lvfc = False
 ldifad = False
 fw = 1.0

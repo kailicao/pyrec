@@ -21,7 +21,7 @@ def setcal(facage, lsol):
     n = nmlpar_mod
     r = runloop_mod
     # Question (see the page): the comment says two runs and 24.
-    # mhp 5/96: solar models in 3 runs rather than 2.
+    # Each calibration cycle takes 3 runs (kind cards) (mhp 5/96).
     n.numrun = 48
     for i in range(2, 49):
         n.xenv0a[i] = n.xenv0a[1]
@@ -39,7 +39,7 @@ def setcal(facage, lsol):
         n.rsclzm2[i] = n.rsclzm2[1]
         for j in range(1, 5):
             r.rescal[j, i] = r.rescal[j, 1]
-    # MHP 06/13: run 2 hardwired to 1e8 yr, run 3 to CALSOLAGE.
+    # Run 2 is hard-wired to 1e8 yr, run 3 to CALSOLAGE (MHP 06/13).
     # Question (see the page): the hard-wired 1e8 yr.
     n.endage[2] = 1.0e8 * facage
     n.setdt[2] = n.setdt[2] * facage

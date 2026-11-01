@@ -28,7 +28,7 @@ def wczimp(hd, hjm, hr, hs, hs2, istart, iend, eta2, hi, omega, qiw, r0,
     cln = constants_mod.cln
     walpcz = n.walpcz
 
-    # JVS 2026/02/13: GT reverted to GE.
+    # GE, not GT: WALPCZ = 0 is solid-body rotation (JVS 2026/02/13).
     # Question (see the page): IMPJMOD = 2 and 3 are reached only when
     # WALPCZ < 0, since this test comes first.
     if walpcz >= 0.0 or n.lsolid or n.impjmod == 1 or iend < m:

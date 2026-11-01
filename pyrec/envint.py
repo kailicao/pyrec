@@ -33,7 +33,7 @@ from pyrec.qenv import qenv
 from pyrec.surfp import surfp
 from pyrec.taucal import taucal
 
-MAXSTP = 2000             # "DBG changed MAXSTEP from 200 to 2000"
+MAXSTP = 2000             # the maximum number of integration steps (DBG)
 TINY = 1.0e-30
 JSON = dimensions_mod.json
 
@@ -42,7 +42,7 @@ XYZ = np.full(23, 99.99)
 
 # Locals kept between calls (SAVE) whose old values can be read: the
 # pulsation variables (question 5), the step counts, last mass difference
-# and errors printed at the end (see update-findings.md), and ENVG, which
+# and errors printed at the end, and ENVG, which
 # is never set (question 2).
 taup = 0.0
 op = 0.0
@@ -130,7 +130,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
     # QENV is called through BSSTEP with a fixed argument list, so CMIXL
     # reaches it through qenvmix_mod.
     qenvmix_mod.cmixlq = cmixl
-    # DBG pulse: turn on the derivative calculator.
+    # Pulsation output: turn on the derivative calculator (DBG).
     if lpulpt and lprt:
         pulse1_mod.lpumod = True
         lderiv = True
@@ -140,7 +140,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
         lderiv = False
         latmo = True
     locond = False
-    # JVS 10/07/13: always calculate derivatives.
+    # Derivatives are always calculated (the profiles need them) (JVS 10/07/13).
     lderiv = True
 
     if lprt and nml.lstatm:
@@ -223,7 +223,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                              f"{fxion[3]:6.3f}{ksaha:7d}{katm:7d}"
                              f"{gam1:12.8f}{qdp:12.8f}{qdt:12.8f}"
                              f"{beta:12.8f}{qcpp:12.5E}{cv:12.5E}")  # 20
-            # DBG pulse: the initial point for pulsation.
+            # Pulsation output: the initial point (DBG).
             if lpulpt and lprt:
                 q.qqed = 0.0
                 qesum = 0.0
@@ -240,7 +240,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                                                  + c.cdelrl)) * ftl / fpl
                 del_ = delr if delr - dela <= 1.0e-6 else dela
                 if nml.ipver == 1:
-                    # MHP 10/02 typo: QED should have been QQED.
+                    # QQED, not QED, the atmosphere's energy generation (MHP 10/02).
                     _pulse_lines(io.iopatm,
                                  [deltr, q.qfs, b, tl, dl, pl, qesum, o, qdp,
                                   q.qqed, q.qqet, qod, qot, del_, dela, qcp,
@@ -305,7 +305,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                              f"{apr.afxion[3]:6.3f}{ksaha:7d}{katm:7d}"
                              f"{gam1:12.8f}{q.qqdp:12.8f}{q.qqdt:12.8f}"
                              f"{beta:12.8f}{q.qqcp:12.5E}{cv:12.5E}")  # 20
-                # JvS: save the structure in atmstruct_mod.
+                # Save the structure in atmstruct_mod, for the stitched output
+                # (JvS).
                 atm.atmop[nstep] = apr.ap
                 atm.atmot[nstep] = apr.at
                 atm.atmod[nstep] = apr.ad
@@ -321,8 +322,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                 nok = nok + 1
             else:
                 nbad = nbad + 1
-            # DBG pulse: atmosphere values for pulsation (JVS 02/11: also
-            # for LCLCD).
+            # Pulsation output: atmosphere values (also for the acoustic depth,
+            # LCLCD, JVS 02/11) (DBG).
             # Question (see the page): taup, op, dp are set only with
             # pulsation output; otherwise they are left from an earlier call.
             if (lpulpt and lprt) or acd.lclcd or nml.lstch:
@@ -356,7 +357,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                                       taun, q.qo, q.qqdp, q.qqed, q.qqet,
                                       q.qqod, q.qqot, del_, q.qdela, q.qqcp,
                                       q.qrmu, q.qqdt, pelpf], 5)
-                # JvS: save in atmstruct_mod.
+                # Save in atmstruct_mod, for the stitched output (JvS).
                 # Question (see the page): stored on other switches than
                 # atmop, atmot, ...
                 atm.atmor[nstep] = deltr
@@ -384,8 +385,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             io.write(io.ishort, msg)
             raise SystemExit(msg)
 
-    # label 200 (tables come here directly). G Somers 3/17: if only the
-    # photospheric pressure is wanted, stop here.
+    # label 200 (tables come here directly). If only the photospheric pressure
+    # is wanted, stop here (G Somers 3/17).
     ovrtrn_mod.pphot = apr.ap
     if not nml.lcalcenv:
         return rl, istore, katm, kenv, ksaha           # go to 555
@@ -395,7 +396,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
     if lprt and nml.lstenv:
         if not nml.lstch:
             io.write(io.istor, "\n******** ENVELOPE BEGIN ********")  # 61
-    # DBG pulse: end-of-data marker for the atmosphere file.
+    # Pulsation output: end-of-data marker for the atmosphere file (DBG).
     if lpulpt and lprt:
         if nml.ipver == 1:
             _pulse_lines(io.iopatm, list(XYZ[1:20]), 0)
@@ -442,7 +443,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
         rl, kenv, ksaha = qenv(x0, y, dydx, b, fpl, ftl, gl, latmo,
                                lderiv, locond, lprt, rl, teffl, x, z, kenv,
                                ksaha)
-        # DBG pulse: the first point of the envelope.
+        # Pulsation output: the first point of the envelope (DBG).
         pal = pualpha_mod
         if lpulpt and lprt:
             _envelope_pulse_point(rl, b, pal)
@@ -463,11 +464,11 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             eg = math.exp(c.cln * sgl)
             if not nml.lstch:
                 io.write(io.istor, _fmt260(eg, de))
-        # Store the starting values (07/02: one stored envelope point).
+        # Store the starting values (one stored envelope point) (07/02).
         lsurcz = False
         tauczenv = 0.0
         _store_envelope_point(1, x, z, b)
-        # JVS 10/10
+        # Gradients kept for the convection zone's edge (unused here) (JVS 10/10).
         chdelj = epr.edel[2]                       # set, never used
         chdeld = q.qdela                           # set, never used
         if env.lcenv[1]:
@@ -563,7 +564,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             io.write(io.ishort, msg)
             raise SystemExit(msg)
 
-    # label 300 (07/02): reverse the envelope profile, centre outward.
+    # label 300: reverse the envelope profile, centre outward (07/02).
     if comp.senv < -1.0e-12:
         n = env.numenv
         for i in range(1, n + 1):
@@ -586,14 +587,14 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                     env.edels[k, i2], env.edels[k, i1]
                 env.efxions[k, i1], env.efxions[k, i2] = \
                     env.efxions[k, i2], env.efxions[k, i1]
-    # DBG pulse: end-of-data marker for the envelope file.
+    # Pulsation output: end-of-data marker for the envelope file (DBG).
     if lpulpt and lprt:
         if nml.ipver == 1:
             _pulse_lines(io.iopenv, list(XYZ[1:20]), 0)
         elif nml.ipver in (2, 3):
             _pulse_lines(io.iopenv, list(XYZ[1:23]), 6)
 
-    # Possible bug (update-findings.md): when the envelope is skipped,
+    # Possible bug (see the page): when the envelope is skipped,
     # nok, nbad, sdif and y are from the atmosphere or an earlier call.
     io.write(io.ishort,
              f" ENVELOPE INTEGRATION COMPLETE NUMBER OF STEPS ACCEPTED"
@@ -602,8 +603,9 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
              f"     MAX RELATIVE ERRORS:M {errsum[1]:14.5E}  T "
              f"{errsum[2]:14.5E}  R {errsum[3]:14.5E}")   # format 215
 
-    # JVS 08/13: if the convection zone's base lies in the envelope, find
-    # it, and the overturn time (G Somers 3/17: not with LNEWTCZ).
+    # If the convection zone's base lies in the envelope, find it, and the
+    # overturn time (not with LNEWTCZ, which computes it elsewhere) (JVS 08/13)
+    # (G Somers 3/17).
     if nml.lnewtcz:
         return rl, istore, katm, kenv, ksaha           # go to 555
     jenv = 0
@@ -653,7 +655,7 @@ def _store_envelope_point(n, x, z, b):
         env.edels[k, n] = e.edel[k]
     env.evels[n] = e.evel
     env.ebetas[n] = e.ebeta
-    # JVS 08/25: always save these.
+    # Always save these, for the profile output (JVS 08/25).
     chrh = 1.0 / q.qqdp
     cht = -chrh * q.qqdt
     cv = q.qqcp - math.exp(constants_mod.cln * (e.ep - e.ed - e.et)) \

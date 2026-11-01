@@ -9,7 +9,7 @@ from pyrec.putmodel2 import putmodel2
 _saved = {'atm': None}
 
 _ATM_LABELS = {0: 'EDD ', 1: 'KS  ', 2: 'HRA ', 3: 'KUR ', 4: 'ALL ',
-               5: 'K/C '}  # 5: JNT 06/14
+               5: 'K/C '}  # 5: Kurucz/Castelli (JNT 06/14)
 
 
 def wrtlst(iwrite, hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps,
@@ -54,7 +54,7 @@ def wrtlst(iwrite, hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps,
             if n.ldh:
                 eos = 'OP6+DH'
 
-    # Low-temperature opacity flag ALOK (no options left since 09c3b9b).
+    # Low-temperature opacity flag ALOK (no options left).
     alok = 'NONE'
     # High-temperature opacity flag HIK.
     hik = 'NONE'

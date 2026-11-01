@@ -118,7 +118,8 @@ def microdiff_cod(npt, espec, er, eden, etem, ehqpr, edelr,
         thdiff(NSPEC, atomwt, zspec, xfrac, tcl, tap, tat, tac)
         hru_i = er[i]
         htu_i = t * con_temp
-        # JvS 01/26: the FGRY and FGRZ factors.
+        # The FGRY and FGRZ factors scale the settling of helium and metals
+        # (JvS 01/26).
         # Question (see the page): FGRZ also scales the light elements (j = 3).
         fac = hru_i**2 * htu_i**2.5 / ln_lambda
         if j == 1:

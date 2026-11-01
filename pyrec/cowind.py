@@ -28,8 +28,8 @@ def cowind(bl, dt, hicz, it, omegas, smass, teffl, wold, wind1, wind2):
     c = constants_mod
     n = nmlpar_mod
     taucz = ovrtrn_mod.taucz
-    # MHP 3/09: WMAX > 1 is read as WMAX(sun)*TAUCZ(sun), and the
-    # saturation threshold is WMAX/TAUCZ(star).
+    # WMAX > 1 is read as WMAX(sun)*TAUCZ(sun), and the saturation threshold is
+    # WMAX/TAUCZ(star) (MHP 3/09).
     # Question (see the page): the test WMAX > 1 works as a switch.
     if n.wmax > 1.0:
         if taucz > 1.0:

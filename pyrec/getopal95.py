@@ -228,8 +228,7 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
                 im.bd[j, i] = b[i]
                 im.bdd[j, i] = c[i]
 
-    # 2D, 3D or 4D? The 4D path is forced for acoustic-depth output
-    # ("JVS 04/11").
+    # 2D, 3D or 4D? The 4D path is forced for acoustic-depth output (JVS 04/11).
     if not (acdpth_mod.ladon and acdpth_mod.lacout):
         ztab = llot95_mod.ztab
         if abs(z - ztab) / max(ztab, 1.0e-6) <= 1.0e-4:
@@ -244,7 +243,7 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
 
     # label 153: 4D in Z, X, T, rho. Nearest tables in Z.
     if z > zzg[im.jz + 2]:
-        for i in range(im.jz + 3, NUMZ):            # "mhp 7/12 corrected typo"
+        for i in range(im.jz + 3, NUMZ):  # up to NUMZ, a typo fixed (mhp 7/12)
             if z < zzg[i]:
                 im.jz = i - 2
                 break                                   # label 110
@@ -257,7 +256,7 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
                 break                                   # label 120
         else:
             im.jz = 1
-    im.jz = min(im.jz, NUMZ - 3)                    # "mhp 7/12 added failsafe"
+    im.jz = min(im.jz, NUMZ - 3)  # failsafe: four Z points (mhp 7/12)
     for i in range(1, 5):
         a[i] = zzg[im.jz + i - 1]
     intrp2(a, b, z)

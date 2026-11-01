@@ -1,4 +1,4 @@
-"""Python version of engeb.f (YREC 09c3b9b): nuclear energy generation at
+"""Python version of engeb.f (YREC a8a5950): nuclear energy generation at
 one point, its derivatives, the reaction rates, the solar neutrino fluxes
 and the neutrino losses."""
 
@@ -64,7 +64,7 @@ C21 = 5.240358e-8
 
 # ---- SAVE: locals kept between calls ----
 # Below TCUT(1) the routine jumps to label 200, and these keep the previous
-# call's values there (see the page, question 6).
+# call's values there (see the page, question 5).
 xfrac = np.zeros(NELEM + 1)
 rate = np.zeros(NRXNS + 1)
 dratro = np.zeros(NRXNS + 1)
@@ -100,7 +100,7 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
     PET, the per-reaction rates HR1-HR13, the solar neutrino fluxes and
     the neutrino losses.
 
-    Translates: engeb.f#ENGEB (09c3b9b)
+    Translates: engeb.f#ENGEB (a8a5950)
 
     Arguments: dl, tl (log rho, log T); the mass fractions x, y, xhe3,
     xc12, xc13, xn14, xo16, xo18, xh2; iu, the point's index; hr1-hr13,
@@ -175,7 +175,7 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
         t9m12 = 1.0 / math.sqrt(t9)
         t9m32 = t9m1 * t9m12
 
-        # Deuterium burning (MHP 5/02), as in DEUTRATE.
+        # Deuterium burning, as in DEUTRATE (MHP 5/02).
         if xh2 <= 1.0e-11:
             rdeut = 0.0
             qrtdeut = 0.0
@@ -183,16 +183,15 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
             qdeut = 5.494
             zz = -3.72 * t9m13
             tfacdeut = 1.0 + 0.112 * t9p13 + 3.38 * t9p23 + 2.65 * t9
-            # Question (see the page): T9**(+2/3); the derivative below is
-            # that of the T9**(-2/3) form.
-            rdeut = (rho * 2.240e3 * t9p23 * math.exp(zz) * tfacdeut
-                     * 6.023e23 / ANUC[3])
+            # CAVOG/ANUC(3): Avogadro's number over the deuteron's mass in amu.
+            rdeut = (rho * 2.240e3 * t9m23 * math.exp(zz) * tfacdeut
+                     * c.cavog / ANUC[3])
             tfacdeut2 = 0.112 * t9p13 + 6.76 * t9p23 + 7.95 * t9
             qrtdeut = c.cc13 * ((tfacdeut2 / tfacdeut) - 2.0 - zz)
             # Cap in the surface convection zone by the overturn time.
             # Question (see the page): IU is never set by main.f's call.
             if iu >= deuter_mod.jcz and ovrtrn_mod.taucz > 1.0:
-                rdeutmax = 6.023e23 / ANUC[3] / ovrtrn_mod.taucz
+                rdeutmax = c.cavog / ANUC[3] / ovrtrn_mod.taucz
                 rdeut2 = rdeut * x
                 if rdeut2 > rdeutmax:
                     if x > 1.0e-6:
@@ -269,12 +268,15 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                     dratt[i] = 0.0
                 else:
                     dratro[i] = 1.0 + dscr[i]
-                    # Question (see the page): no QS0E, QQS0EE factors here.
+                    # The bracket's derivative carries the same QS0E, QQS0EE
+                    # factors as R1.
                     dratt[i] = (dsct[i] - (Q6[i] * t9m13
                                            + (2.0 * t9m23 + Q1[i] * t9m13
-                                              - Q3[i] * t9p13
-                                              - 2.0 * Q4[i] * t9p23
-                                              - 3.0 * Q5[i] * t9) / r1) / 3.0
+                                              - cr.qs0ee[i] * Q3[i] * t9p13
+                                              - cr.qqs0ee[i]
+                                              * (2.0 * Q4[i] * t9p23
+                                                 + 3.0 * Q5[i] * t9)) / r1)
+                                / 3.0
                                 + 2.0 * (Q8[i] * t9)**2)
 
             # Be7: electron capture against proton capture.
@@ -507,7 +509,7 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
     t = 10.0**tl
     d = 10.0**dl
     if nml.lnulos1:
-        # Itoh et al. 1996 (Grant Newsham 9/06).
+        # Itoh et al. 1996, through NEUTRINO (Grant Newsham 9/06).
         snu, dsnudt, dsnudd = neutrino(t, d, x, y, zc, zo, 0.0, 0.0, 0.0)
         enu = -snu
         # Question (see the page): relative derivatives added to absolute.

@@ -99,7 +99,7 @@ def ll95tbl(fliv95):
                 # Question (see the page): hard-coded table shape.
                 for i in range(1, 58):
                     _read_row(f, n, i, NUMD)              # format 30
-                # MHP 12/97: now treat the corner without data.
+                # The corner of the table without data (MHP 12/97).
                 _read_row(f, n, 58, NUMD - 1)             # format 31
                 a.cappa2[n, 58, 19] = 9.999
                 for i in range(59, 61):

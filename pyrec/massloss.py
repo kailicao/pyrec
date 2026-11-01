@@ -13,8 +13,8 @@ from pyrec.alsurfp import alsurfp
 from pyrec.eqstat import eqstat
 from pyrec.mdot import mdot
 
-# MHP 5/02: efficiency factor for the thermal energy content of accreted
-# matter (DATA FACC/1.0D0/).
+# Efficiency factor for the thermal energy content of accreted matter (DATA
+# FACC/1.0D0/) (MHP 5/02).
 FACC = 1.0
 
 # SAVEd locals passed to MDOT that are set only for accretion: for a loss
@@ -75,7 +75,7 @@ def massloss(bl, dage, delts, hcomp, hd, hjm, hp, hr, hs, hs1, hs2, hstot,
     else:
         ovrtrn_mod.taucz = 0.0
         deuter_mod.jcz = m
-    # MHP 8/10: the mass of the convective envelope.
+    # The mass of the convective envelope (MHP 8/10).
     sumdm = 0.0
     for j in range(jenv, m + 1):
         sumdm = sumdm + hs2[j]
@@ -152,8 +152,7 @@ def massloss(bl, dage, delts, hcomp, hd, hjm, hp, hr, hs, hs1, hs2, hstot,
             masschg2_mod.scen = 0.0
         else:
             masschg2_mod.scen = 0.0
-    # Mass loss or accretion (the call matches MDOT's 23 arguments since
-    # 09c3b9b).
+    # Mass loss or accretion (MDOT, with its 23 arguments).
     if ldomdot:
         (delts, hstot, lnew, RMU, smass, dmdt, senvold) = mdot(
             delts, hcomp, hd, hjm, hp, hr, hs, hs1, hs2, hstot, ht, jenv,

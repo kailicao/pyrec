@@ -92,7 +92,7 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
 
     if sound_mod.lsound:
         print(' wrtmod LSOUND 2: ', _l1(sound_mod.lsound))
-        # CFD 10/09: the sound-speed profile, on ISOUND (opened in PARMIN).
+        # The sound-speed profile, on ISOUND (opened in PARMIN) (CFD 10/09).
         # Question (see the page): the header is written at every call.
         io.write(io.isound, " Shell#     R/Rsun       M/Msun       Cs"
                             "               Rho")  # FORMAT 9124
@@ -177,7 +177,7 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
             debhu_mod.zdh[2] = hcomp[7, m] + hcomp[8, m]
             debhu_mod.zdh[3] = hcomp[9, m] + hcomp[10, m] + hcomp[11, m]
         idum = 0
-        # G. Somers 10/14: for a spotted star, the ambient temperature.
+        # For a spotted star, the ambient temperature (G. Somers 10/14).
         if jenv == m and n.spotf != 0.0 and n.spotx != 1.0:
             ateffl = teffl - 0.25 * math.log10(
                 n.spotf * n.spotx**4.0 + 1.0 - n.spotf)
@@ -243,7 +243,7 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
                     hcomp[3, i]]
             io.write(io.iopmod, _records(vals, (5, 5, 5, 5), 23, 16))
         elif n.ipver == 3:
-            # DBG 7/95: with the mixing-length variables.
+            # With the mixing-length variables (DBG 7/95).
             vals = [hr[i], fs, hl[i], ht[i], hd[i], v.valfmlt[i],
                     hp[i], s.sesum[i], s.so[i], p.pqdp[i], p.pqed[i],
                     v.vphmlt[i],

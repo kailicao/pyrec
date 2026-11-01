@@ -1,14 +1,18 @@
-"""Python version of constants_mod.f (YREC 09c3b9b): the physical and
+"""Python version of constants_mod.f (YREC a8a5950): the physical and
 mathematical constants, formerly COMMON/CONST/, /CONST1/, /CONST2/,
 /CONST3/ and C_2 of /CWIND/.
 
-Translates: constants_mod.f#CONSTANTS_MOD (09c3b9b)
+Translates: constants_mod.f#CONSTANTS_MOD (a8a5950)
 
 Module-level names, as in the Fortran module, in lower case (all REAL*8).
 Routines that USE CONSTANTS_MOD import this module and write
-``constants_mod.<name>``. Apart from clsun and crsun, the values are set at
+``constants_mod.<name>``. Apart from cavog, clsun and crsun, the values are set at
 run time by setups (and cln, cc13, cc23, c_2 by parmin).
 """
+
+# Avogadro's number as the reciprocal of the atomic mass unit in g (the
+# scale of ENGEB's nuclear masses ANUC); a PARAMETER in the Fortran.
+cavog = 1.0 / 1.6605402e-24
 
 clsun = 3.8515e33       # solar luminosity (initializer; PHYSICS namelist)
 clsunl = 0.0            # log10(clsun) (setups)

@@ -69,7 +69,7 @@ def microdiff_etm(dt, er, edelx, edelz, edelli, ibegin, iend, npt, hcomp,
             if er[j] >= hru[i]:
                 k0 = max(j - 2, 1)
                 k0 = min(k0, npt - 3)
-                # JVS fix for NPT = 3?
+                # Handles the case NPT = 3 (JVS).
                 # Question (see the page): k0 = -1 for npt = 2 is not caught.
                 if k0 == 0:
                     k0 = 1

@@ -1,4 +1,4 @@
-"""Python version of remap.f (YREC 09c3b9b): translates the newer,
+"""Python version of remap.f (YREC a8a5950): translates the newer,
 "more intuitively named" namelist parameters into the arrays the rest of
 the code uses."""
 
@@ -20,9 +20,16 @@ S0_1_BE7P_REF = 0.0243
 S0_HEP_REF = 8.0e-20
 S0_1_15_C12ALP_REF = 6.75e4
 S0_1_15_O16_REF = 6.4e1
-# DATA: Adelberger et al. 1998 (Solar Fusion I) values; the others are
-# commented out in the Fortran (KC 2025-05-31).
+# DATA: Adelberger et al. 1998 (Solar Fusion I) values (keV b), each the
+# normalization of its own reaction's derivative factors below; the others
+# are commented out in the Fortran (KC 2025-05-31).
 S0_1_1_A98 = 4.00e-22
+S0_3_3_A98 = 5.4e3
+S0_3_4_A98 = 5.3e-1
+S0_1_12_A98 = 1.34
+S0_1_13_A98 = 7.6
+S0_1_14_A98 = 3.5
+S0_1_16_A98 = 9.4
 S0_1_BE7P_A98 = 0.019
 # First derivatives (b).
 QS0E_1_1_A98 = 4.48e-24
@@ -53,7 +60,7 @@ def remap():
     cross sections; with LNEWVARS, copy the new tolerance names into
     HPTTOL, ATIME, LPTIME, DTWIND and DTDIF.
 
-    Translates: remap.f#REMAP (09c3b9b)
+    Translates: remap.f#REMAP (a8a5950)
 
     No arguments; nothing is returned. Reads nmlbypass_mod, sets
     cross_mod and nmlpar_mod.
@@ -86,28 +93,27 @@ def remap():
         cr.fc12 = nb.s0_1_15_c12alp / S0_1_15_C12ALP_REF
         cr.fo16 = nb.s0_1_15_o16 / S0_1_15_O16_REF
         # First-derivative factors (multiply Q2 and Q3 in ENGEB and RATES).
-        # Question (see the page): 2-7 divide by S0_1_1_A98, not their own.
         cr.qs0e[1] = _ratio(nb.s0_1_1, nb.s0p_1_1, QS0E_1_1_A98, S0_1_1_A98)
-        cr.qs0e[2] = _ratio(nb.s0_3_3, nb.s0p_3_3, QS0E_3_3_A98, S0_1_1_A98)
-        cr.qs0e[3] = _ratio(nb.s0_3_4, nb.s0p_3_4, QS0E_3_4_A98, S0_1_1_A98)
+        cr.qs0e[2] = _ratio(nb.s0_3_3, nb.s0p_3_3, QS0E_3_3_A98, S0_3_3_A98)
+        cr.qs0e[3] = _ratio(nb.s0_3_4, nb.s0p_3_4, QS0E_3_4_A98, S0_3_4_A98)
         cr.qs0e[4] = _ratio(nb.s0_1_12, nb.s0p_1_12, QS0E_1_12_A98,
-                            S0_1_1_A98)
+                            S0_1_12_A98)
         cr.qs0e[5] = _ratio(nb.s0_1_13, nb.s0p_1_13, QS0E_1_13_A98,
-                            S0_1_1_A98)
+                            S0_1_13_A98)
         cr.qs0e[6] = _ratio(nb.s0_1_14, nb.s0p_1_14, QS0E_1_14_A98,
-                            S0_1_1_A98)
+                            S0_1_14_A98)
         cr.qs0e[7] = _ratio(nb.s0_1_16, nb.s0p_1_16, QS0E_1_16_A98,
-                            S0_1_1_A98)
+                            S0_1_16_A98)
         cr.qs0e[8] = _ratio(nb.s0_1_be7p, nb.s0p_1_be7p, QS0E_1_BE7P_A98,
                             S0_1_BE7P_A98)
         # Second-derivative factors (multiply Q4 and Q5); 1-3 and 6 were
-        # zeroed out in the 2003 version.
+        # zeroed out.
         cr.qqs0ee[4] = _ratio(nb.s0_1_12, nb.s0pp_1_12, QQS0EE_1_12_A98,
-                              S0_1_1_A98)
+                              S0_1_12_A98)
         cr.qqs0ee[5] = _ratio(nb.s0_1_13, nb.s0pp_1_13, QQS0EE_1_13_A98,
-                              S0_1_1_A98)
+                              S0_1_13_A98)
         cr.qqs0ee[7] = _ratio(nb.s0_1_16, nb.s0pp_1_16, QQS0EE_1_16_A98,
-                              S0_1_1_A98)
+                              S0_1_16_A98)
         cr.qqs0ee[8] = _ratio(nb.s0_1_be7p, nb.s0pp_1_be7p,
                               QQS0EE_1_BE7P_A98, S0_1_BE7P_A98)
 

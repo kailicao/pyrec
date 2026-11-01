@@ -82,8 +82,8 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                 to_100 = False
         else:
             # label 70: find the base of the uppermost convection zone.
-            # JvS 02/2026: LCZ(J+1) traps the case where the last points are
-            # already radiative.
+            # LCZ(J+1) traps the case where the last points are already
+            # radiative (JvS 02/2026).
             j = 0  # the Fortran's J after the loop runs out
             for jj in range(m - 1, 0, -1):  # loop 80
                 if lcz[jj + 1] and not lcz[jj]:
@@ -97,7 +97,7 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
             jmax = j + 1
             ijmax = jmax - imax
             # Skip convective shells just above the convective core.
-            # (KC 2025-05-30: the check on imax and jcore.)
+            # The check on imax and jcore (KC 2025-05-30).
             # Question (see the page): for a fully convective star with a
             # stitched envelope, this restarts the search for ever.
             if imax > 0 and jcore > 0:
@@ -147,9 +147,9 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                     cvel = svel[imax]
                     psca = psca2
                     ovrtrn_mod.taucz = psca / cvel
-                    # Possible bug (update-findings, batch 12): since the
-                    # ENDIF was moved (KC 2025-05-31) this branch falls
-                    # through to label 110, which overwrites taucz.
+                    # Possible bug (see the page): with the ENDIF where it now
+                    # is, this branch falls through to label 110, which
+                    # overwrites taucz (the ENDIF moved, KC 2025-05-31).
                     to_110 = True
                 else:
                     to_110 = True

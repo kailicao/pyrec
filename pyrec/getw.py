@@ -38,8 +38,8 @@ from pyrec.wczimp import wczimp
 JSON = dimensions_mod.json
 
 # GETW has SAVE: its local arrays are module-level. HCOMPS (the composition
-# at the start of the step, filled by MIDMOD and read by SECULR) was the
-# COMMON block /OLDAB/ until rp_1; GETW now owns it.
+# at the start of the step, filled by MIDMOD and read by SECULR) is owned
+# by GETW.
 hcomps = np.zeros((16, JSON + 1))
 lcz = np.zeros(JSON + 1, dtype=bool)
 hjmsav = np.zeros(JSON + 1)
@@ -211,7 +211,7 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
                 sumdt = delts
             else:
                 sumdt = sumdt + dt
-            # Time change of theta (MHP 06/02).
+            # Time change of theta, for the d theta/dt term of the circulation (MHP 06/02).
             if lfirstit:
                 o2.thp[1] = o2.tho[1]
                 o2.wmst[1] = oldrot_mod.wold[1]

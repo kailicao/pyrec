@@ -72,7 +72,7 @@ def microdiff_mte(nlight, cslight, hcomp, hqpr, hru, hs1, ibegin,
     npt = int(drtot / drmin)
     if math.fmod(drtot, drmin) != 0.0:
         npt = npt + 1
-    # JvS: trap for models with NPT = 1.
+    # Trap for models with NPT = 1 (the grid needs two points) (JvS).
     if npt == 1:
         npt = npt + 1
     # Ensure that the number of points does not exceed JSON.

@@ -12,8 +12,8 @@ from pyrec import nmlpar_mod
 from pyrec import scrtch_mod
 from pyrec.thdiff import thdiff
 
-# MHP 8/94: atomic weights and charges of H, He, Fe and electrons (DATA),
-# for the full Thoul et al. coefficients.
+# Atomic weights and charges of H, He, Fe and electrons (DATA), for the full
+# Thoul et al. coefficients (MHP 8/94).
 NSPEC = 4
 ATOMWT = np.array([0.0, 1.008, 4.004, 55.86, 5.486e-4])
 ZSPEC = np.array([0.0, 1.0, 2.0, 26.0, -1.0])
@@ -69,7 +69,7 @@ def setup_grsett(dt, hqpr, hr, hd, hs1, ht, lc, m, stot, cod1, cod2,
         ibegin = i - 1
     else:
         ibegin = 1
-    # MHP 6/90: hydrogen-exhausted core.
+    # Hydrogen-exhausted core (MHP 6/90).
     for i in range(ibegin, m + 1):
         if hcomp[1, i] > n.xmin:
             break                                       # go to 25
@@ -117,7 +117,7 @@ def setup_grsett(dt, hqpr, hr, hd, hs1, ht, lc, m, stot, cod1, cod2,
     dt = dt / cf.con_time
     stot = stot * cf.con_mass
 
-    # Diffusion coefficients (BC 5/90), for every shell.
+    # Diffusion coefficients, for every shell (BC 5/90).
     for i in range(1, m + 1):                           # loop 60
         x = hcomp[1, i]
         if n.ilambda == 2:
@@ -173,7 +173,7 @@ def setup_grsett(dt, hqpr, hr, hd, hs1, ht, lc, m, stot, cod1, cod2,
             qapx = -2.42 + 1.688 * x
             qatx = sdel[2, i] * (-2.69 + 1.61 * x)
             qacx = -1.42 + 1.294 * x
-            # FD 10/09: mimic mixing to reduce settling.
+            # Mimic mixing, to reduce settling (FD 10/09).
             # Question (see the page): the derivatives lack CSTMIXING.
             cod1[i] = n.cstmixing * fac * hqpr[i] * x * (ap + at)
             cod2[i] = n.cstmixing * fac * ac

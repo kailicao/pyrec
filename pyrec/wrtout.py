@@ -375,7 +375,7 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                                  hstot, bl, m, lc, ce.czsurf_r, cmixl)
             ovrtrn_mod.taucz0 = ovrtrn_mod.taucz
             ovrtrn_mod.pphot0 = ovrtrn_mod.pphot
-            # FORMAT 1499 (MCR 12/25: E17.8E3 for three-digit exponents).
+            # FORMAT 1499 (E17.8E3, for three-digit exponents) (MCR 12/25).
             w(itrack, _model_block(model, m, dage, bl, rl, gl, teffl, corem,
                                    ce.czsurf_m, 17, 8, 3)
                       + _es([ce.czsurf_r, czsurf_t, czsurf_d, czsurf_p,
@@ -459,7 +459,7 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
         wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl,
                fp, ft, hs, dage, cmixl, xmsol)
 
-    # Acoustic depths (JVS), and a second track line.
+    # Acoustic depths, and a second track line (JVS).
     if ac.lacout:
         if jenv > 1 and ac.ladon:
             # Question (see the page): CZsurf_RL may be from an earlier model.

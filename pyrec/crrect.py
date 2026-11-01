@@ -107,7 +107,7 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
          lflp) = surfbc(trit, tril, cfenv, ps, ts, rs, ftri, istore, estore,
                         lnew, lreset, ksaha, kenv, katm, hstot, bl,
                         teffl, x, z, fpl, ftl, lflp, plim, lc, m, cmixl)
-    # 7/91: reset the composition to the start of the step, then MIX.
+    # Reset the composition to the start of the step, then MIX (7/91).
     if itlvl > 2 and delts > 0.0:
         nspec = 11
         if nml.lexcom:

@@ -45,8 +45,8 @@ def surfbc(trit, tril, cfenv, ps, ts, rs, ftri, istore, estore, lnew,
     nml = nmlpar_mod
     ltri = [None, False, False, False]
 
-    # MHP 9/01: above the atmosphere table's range, switch to the gray
-    # atmosphere and start a new triangle.
+    # Above the atmosphere table's range, switch to the gray atmosphere and
+    # start a new triangle (MHP 9/01).
     # Question (see the page): the limit 3.95 is hard-coded; KTTAU = 5 has
     # no switch.
     if nml.kttau == 3:
@@ -57,7 +57,7 @@ def surfbc(trit, tril, cfenv, ps, ts, rs, ftri, istore, estore, lnew,
             print()
             nml.kttau = 0
             lnew = True
-            nml.lttau = True  # MHP 06/13: remember that the flag is switched
+            nml.lttau = True  # remember that the flag is switched (MHP 06/13)
     if nml.kttau == 4:
         if teffl >= alatm05_mod.al_tefflmax:
             print()
@@ -136,11 +136,11 @@ def surfbc(trit, tril, cfenv, ps, ts, rs, ftri, istore, estore, lnew,
             rl = 0.5 * (tril[i] + c.clsunl - 4.0 * teffl - c.c4pil - c.csigl)
             gl = c.cgl + comp_mod.stotal - rl - rl
             numenv = numenv + 1
-            lpenv = False  # G Somers 11/14: now part of LSTENV
+            lpenv = False  # part of LSTENV (G Somers 11/14)
             ixx = i
             lsbc0 = True
             lpulpt = False  # no pulsation output
-            # G Somers 10/14: for spotted stars, the ambient temperature.
+            # For spotted stars, the ambient temperature (G Somers 10/14).
             if lc[m] and nml.spotf != 0.0 and nml.spotx != 1.0:
                 ateffl = teffl - 0.25 * math.log10(
                     nml.spotf * nml.spotx**4.0 + 1.0 - nml.spotf)

@@ -50,7 +50,7 @@ def microdiff_setup(dt, hqpr, hr, hd, hs1, ht, lc, m, stot, hcomp, hru,
         ibegin = i - 1
     else:
         ibegin = 1
-    # MHP 6/90: check for a hydrogen-exhausted core.
+    # Check for a hydrogen-exhausted core (MHP 6/90).
     for i in range(ibegin, m + 1):        # loop 23
         if hcomp[1, i] > nmlpar_mod.xmin:
             break                         # GOTO 25

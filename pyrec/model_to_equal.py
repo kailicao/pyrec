@@ -71,7 +71,7 @@ def model_to_equal(cod1, cod2, hcomp, hru, hs1, ibegin, iend, m, qcod1x,
     npt = int(drtot / drmin)
     if math.fmod(drtot, drmin) != 0.0:
         npt = npt + 1
-    # JvS: trap for models with NPT = 1.
+    # Trap for models with NPT = 1 (the grid needs two points) (JvS).
     if npt == 1:
         npt = npt + 1
     npt = min(npt, JSON)

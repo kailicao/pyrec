@@ -1,4 +1,4 @@
-"""Python version of main.f (YREC 09c3b9b): YREC's main program, which reads
+"""Python version of main.f (YREC a8a5950): YREC's main program, which reads
 the run's settings, sets up the tables, and evolves the starting model of
 each kind card model by model."""
 
@@ -62,7 +62,7 @@ def main():
     burning, rezoning, four levels of CRRECT, rotation, light elements,
     time step, output), with the solar and stellar calibrations around it.
 
-    Translates: main.f#(file level) (09c3b9b)
+    Translates: main.f#(file level) (a8a5950)
 
     No arguments; it ends with STOP (SystemExit).
     """
@@ -215,7 +215,7 @@ def main():
                 print(msg)
                 io.write(io.ishort, msg)
 
-        # MHP 2/04: the neutrino table, switched off.
+        # The neutrino table, switched off (MHP 2/04).
         # Question (see the page): remove the block, or repair it?
         lnutab = False
         if lnutab:
@@ -292,7 +292,7 @@ def main():
 
         # Mass in solar units, kept for the output (formerly COMMON/PULSE/).
         xmsol = smass
-        # MHP 08/02: store the starting convection-zone properties.
+        # Store the starting convection-zone properties (MHP 08/02).
         deuter_mod.jcz = jenv
         ovrtrn_mod.taucz = 0.0
         # Headers of the output files.
@@ -340,8 +340,8 @@ def main():
             # Pulsation output on the last model of the run.
             if modeln == nml.nmodls[nk] and nk == nml.numrun:
                 nml.lpulse = lsavpu
-            # JVS 02/11: pulsation output at chosen ages (AGEOUT), for the
-            # steps before and after each.
+            # Pulsation output at chosen ages (AGEOUT), for the steps before
+            # and after each (JVS 02/11).
             a = acdpth_mod
             if a.lacout:
                 a.ladon = True
@@ -367,7 +367,7 @@ def main():
                         a.lclcd = True
                         a.ljlast = True
                         a.ljwrt = True
-            # MHP 10/24: at the final age, pulsation output and sound speed.
+            # At the final age, pulsation output and sound speed (MHP 10/24).
             if (rl_.lendag[nk] and nml.endage[nk] > 0.0
                     and abs(nml.endage[nk] - dage * 1.0e9 - ddage) <= 1.0):
                 nml.lpulse = lsavpu
@@ -399,10 +399,12 @@ def main():
                         raise SystemExit
                 lpunch = True
                 # Age the model, unless the kind card only relaxes a
-                # rescaled model (pre-main-sequence models still age).
+                # rescaled model (pre-main-sequence models, log Tc < 6.6,
+                # still age as a failsafe, unless L_ZERODT_PREMS is set).
                 if rl_.iresca[nk] != 2 and model >= 0:
                     lage = True
-                elif model >= 0 and ht[1] < 6.6:
+                elif (not nml.l_zerodt_prems and model >= 0
+                      and ht[1] < 6.6):
                     lage = True
                 else:
                     lage = False
@@ -546,8 +548,9 @@ def main():
                             for j in range(1, 16):
                                 old.hcompp[j, i] = hcompp0[j, i]
                     # Level 4: repeats the iteration between mixing and
-                    # structure (7/91: not for models where semiconvection
-                    # matters; for high-precision work such as solar models).
+                    # structure (not for models where semiconvection matters,
+                    # where it oscillates; for high-precision work such as
+                    # solar models) (7/91).
                     niter = nml.niter4
                     lsbc = False
                     itlvl = 4
@@ -559,11 +562,11 @@ def main():
                         large = True
                         goto15 = True
                         break
-                    # Converged: fully mix the convection zones (G. Somers
-                    # 6/14, LIMIX so that the correct gradients are used).
+                    # Converged: fully mix the convection zones (LIMIX, so that
+                    # the correct gradients are used) (G. Somers 6/14).
                     limix = True
                     mixcz(hcomp, hs2, lc, m)
-                    # MHP 9/94: the total age.
+                    # The total age, for disk locking (MHP 9/94).
                     disk_mod.sage = dage
                     if nml.lrot:
                         if itrot > 1:
@@ -607,7 +610,7 @@ def main():
                         liov_mod.pscal1 = 0.0
                     lirate88(hcomp, hd, ht, m, 2)
                     liburn(delts, hcomp, hr, hs1, hs2, ht, jenv1, jenv0, m)
-            # MHP 07/02: restore the earlier fitting point after accretion.
+            # Restore the earlier fitting point after accretion (MHP 07/02).
             if lnewfit:
                 senvold, sjtot, skerot, m, lnew = getnewenv(
                     senvold, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot, ht,
@@ -642,7 +645,7 @@ def main():
                 jcore, jenv, tlumx, trit, tril, ps, ts, rs, cfenv, ftri,
                 hstot, omega, lpunch, fp, ft, eta2, r0, hjm, hi, sjtot,
                 skerot, hs2, cmixl, xmsol, compmix)
-            # MHP 10/24: stop conditions.
+            # Stop conditions (MHP 10/24).
             if (rl_.lendag[nk] and nml.endage[nk] > 0.0
                     and (nml.endage[nk] - dage * 1.0e9) <= 1.0):
                 break                                     # go to 110
@@ -690,13 +693,13 @@ def main():
                      teffl, bl, hstot, dage, ddage, omega, hs1, eta2, r0, fp,
                      ft, hjm, hi, cmixl, xmsol, compmix)
             lpunch = False
-        # MHP 1/93, 5/96: the solar calibration, in three kind cards.
+        # The solar calibration, in three kind cards (MHP 1/93, 5/96).
         if nml.lcals:
-            acdpth_mod.ladon = False   # JVS: calcad off, for speed
+            acdpth_mod.ladon = False   # calcad off, for speed (JVS)
             if nk % 3 == 0:
                 rll = (0.5 * (bl + c.clsunl - c.c4pil - c.csigl
                               - 4.0 * teffl) - c.crsunl)
-                # MHP 06/13: the solar Z/X as an observable.
+                # The solar Z/X as an observable (MHP 06/13).
                 solzx = hcomp[3, m] / hcomp[1, m]
                 dldx, drdx, dlda, drda, lsol = chkcal(
                     bl, rll, nk, solzx, dldx, drdx, dlda, drda, lsol)
@@ -706,7 +709,7 @@ def main():
                     break                                 # go to 250
                 else:
                     iconv = iconv + 1
-                    # MHP 6/97 "stop after 10 attempts": now 15.
+                    # Stop after 15 attempts (the Fortran comment still says 10) (MHP 6/97).
                     if iconv >= 15:
                         break                             # go to 250
                     if nml.lpulse:

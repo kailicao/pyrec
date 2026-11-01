@@ -63,7 +63,7 @@ def tpgrad(tl, t, pl, p, d, rl, sl, b, o, qdt, qdp, qot, qod, qcp, dele,
             qacp = qap
             qacr = 0.0
         return dele, delr, qact, qacp, qacr, vel, lconv
-    # G Somers 9/14: spots reduce the radiative flux in convective regions.
+    # Spots reduce the radiative flux in convective regions (G Somers 9/14).
     # Question (see the page): delr itself, its derivatives and the
     # radiative/convective test are left uncorrected.
     if nml.spotf != 0.00:

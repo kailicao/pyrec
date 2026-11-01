@@ -111,7 +111,7 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
         md.qdtm[j] = op.qdto[j] + fx * (tp.sqdt[j] - op.qdto[j])
         md.om[j] = op.oo[j] + fx * (sc.so[j] - op.oo[j])
         md.amum[j] = md.amum[j] + fac2 * (tp.hamu[j] - op.amuo[j])
-        # MHP 6/00: the total energy generation.
+        # The total energy generation: nuclear plus the gravitational terms (MHP 6/00).
         temp = sc.sesum[j] + sc.seg[6, j] + sc.seg[7, j]
         md.epsm[j] = op.epso[j] + fx * (temp - op.epso[j])
     # Shells that change state over the step are convective if
@@ -138,14 +138,13 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
     # Convective overshoot applied to normal convection zones.
     nrzone, nzone = ovrot(hcomp, hdm, hpm, hrm, hs, htm, lcm, m, lczm,
                           mrzone, mxzone, nrzone, nzone)
-    # Reburn the original mixture for the short step, at the current T
-    # (MHP 6/00).
+    # Reburn the original mixture for the short step, at the current T (MHP 6/00).
     rotmix(dt, hcomp, hs2, htm, m, mrzone, mxzone, nrzone, nzone,
            hstot, hdm, hs, hrm, hpm, lczm, hs1)
     for i in range(1, m + 1):
         for j in range(1, iend + 1):
             hcomps[j, i] = hcomp[j, i]
-    # MHP 05/02: deuterium burning.
+    # Deuterium burning (MHP 05/02).
     if om_.hcompp[12, m] > 1.0e-14:
         dr = deuter_mod
         if lfirstit:
@@ -211,8 +210,8 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
     else:
         imax = m
         lczsur = False
-    # (The MHP 3/09 local convective overturn time is commented out.)
-    # JNT 09/25: IMPJMOD = 1 is the same as LSOLID.
+    # A local convective overturn time is not computed here (MHP 3/09).
+    # IMPJMOD = 1 is the same as LSOLID (JNT 09/25).
     if not nml.lsolid and nml.impjmod != 1:
         # First guess: thin spherical shells, I/M = 2/3 r**2, Omega = J/I.
         for i in range(1, m + 1):
@@ -243,8 +242,8 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
 
 
 def _receding_cz(m, fx, hjm, hr, hs2, lcm):
-    # MHP 06/02: correct the specific angular momentum of shells that left a
-    # convection zone during the step. Never run (LNEWCZ is reset first);
+    # Correct the specific angular momentum of shells that left a convection
+    # zone during the step (MHP 06/02). Never run (LNEWCZ is reset first);
     # translated as written, its apparent bugs included (question 1 of the
     # page). Returns FX, which the Fortran overwrites.
     c = constants_mod

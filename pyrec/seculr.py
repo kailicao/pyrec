@@ -265,7 +265,7 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
                 break  # to label 90
 
             # Skip the angular momentum evolution for solid-body models
-            # (MHP 3/09; IMPJMOD = 1 as LSOLID).
+            # (IMPJMOD = 1 as LSOLID) (MHP 3/09).
             if not nml.lsolid and nml.impjmod != 1:
                 # Surface convection zone in the region: wind terms.
                 if lczsur and s.iend == imax:

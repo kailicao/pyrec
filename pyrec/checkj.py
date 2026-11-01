@@ -192,7 +192,7 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
                 line += f" {delji[j]:11.3E}{imaxi[j]:4d}"
             print(line)
         # The detailed output to IMODPT is switched off (IF(.TRUE.)GOTO
-        # 240, G. Somers 11/14); kept here as in the Fortran.
+        # 240); kept here as in the Fortran (G. Somers 11/14).
         # Question (see the page): can it be removed?
         if False:
             idm = _detailed_print(hjm, hjmsav, hv, imin, imax, m, omega,

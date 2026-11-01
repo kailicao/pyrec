@@ -60,7 +60,7 @@ def qenv(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
     # would divide.
     dydx[3] = -math.exp(c.cln * (pl + rl - c.cgl - sl - dl)) * fpl
     kenv = kenv + 1
-    # 07/02: always store the basic structure variables.
+    # Always store the basic structure variables (07/02).
     e = envprt_mod
     e.ep = pl
     e.et = tl
@@ -68,12 +68,12 @@ def qenv(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
     e.er = rl
     e.ed = dl
     e.evel = vel
-    # JVS 08/13: always store the gradients (for tracking the CZ).
+    # Always store the gradients (for tracking the convection zone) (JVS 08/13).
     e.edel[1] = delr
     e.edel[2] = dela
     e.edel[3] = dele
     e.ebeta = beta
-    # JVS 08/25: also always save these, for the profile.
+    # Also always save these, for the profile (JVS 08/25).
     e.efxion[1] = fxion[1]
     e.efxion[2] = fxion[2]
     e.efxion[3] = fxion[3]

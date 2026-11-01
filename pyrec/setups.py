@@ -89,7 +89,7 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
     c.cdelrl = -c.c4pi3l - c.csigl - math.log10(16.0)
     c.cmixl2 = c.cc13
     c.cmixl3 = 16.0 * math.sqrt(2.0) * c.csig
-    # DBG: the Debye-Hueckel constant CDH.
+    # The Debye-Hueckel constant CDH (DBG).
     hmass = 1.0 / 6.0222137e23
     elec = 4.802e-10
     debhu_mod.cdh = (-math.sqrt(c.cpi / (cboltz * hmass * hmass * hmass))
@@ -122,7 +122,7 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
             ccr_mod.dtable[1:6, i, j] = _fields(line[10:], [12] * 5)
     k1 = 1
     for i in range(1, 42):
-        # MHP 10/02: "should be INT(DVAL, etc.)".
+        # The table's density grid must increase ("should be INT(DVAL, etc.)") (MHP 10/02).
         if ccr_mod.dval[i + 1] <= ccr_mod.dval[i]:
             print(' ' + '>' * 39 + '<' * 40)      # format 1000, to ISHORT
             print(' ERROR IN SUBROUTINE SETUPS')
@@ -151,11 +151,11 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
             for j in range(1, NT + 1):
                 a.atmpl[j, 1:NG + 1] = _read_e16(f, NG, [4, 4, 3])  # 203
         _set_imin(a.atmpl, NT, NG, fac_mod.imin, fac_mod.iminmax, NG)
-        # MHP 6/97: Allard model atmospheres, below 10,000 K.
+        # Allard model atmospheres, below 10,000 K (MHP 6/97).
         if kttau == 4:
             alfilein(fallard)
     elif kttau == 5:
-        # JNT 6/14: Kurucz/Castelli atmospheres.
+        # Kurucz/Castelli atmospheres (JNT 6/14).
         a = atmos2c_mod
         with open(fatm) as f:
             atmos2_mod.atmz = _fields(f.readline(), [11, 16])[1]  # 200
@@ -169,11 +169,11 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
         # Question (see the page): an empty row sets IMIN2 to NG, not NGC.
         _set_imin(a.atmplc, NTC, NGC, fac_mod.imin2, fac_mod.iminmax2, NG)
 
-    # OPAL 2006 EOS table (read here since 09c3b9b).
+    # OPAL 2006 EOS table.
     if nmlpar_mod.lopale06:
         seteos06()
 
-    # MHP 5/97: SCV equation-of-state tables.
+    # SCV equation-of-state tables (MHP 5/97).
     if nmlpar_mod.lscv:
         s = scveos_mod
         with open(fscvh) as fh, open(fscvhe) as fhe, open(fscvz) as fz:
