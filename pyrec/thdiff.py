@@ -1,4 +1,4 @@
-"""Python version of thdiff.f (YREC 09c3b9b): Burgers' equations for the
+"""Python version of thdiff.f (YREC 7be4133): Burgers' equations for the
 diffusion of the species in a fully ionised plasma (Thoul et al. 1994)."""
 
 import math
@@ -12,20 +12,24 @@ MMAX = 20
 NMAX = 42
 
 
-def thdiff(m, a, z, x, cl, ap, at, ax):
+def thdiff(m: int, a: np.ndarray, z: np.ndarray, x: np.ndarray, cl: np.ndarray, ap: np.ndarray, at: np.ndarray,
+           ax: np.ndarray) -> None:
     """Solve Burgers' equations (Thoul, Bahcall & Loeb 1994) for the
     coefficients of the pressure, temperature and concentration gradients
     in each species' diffusion velocity.
 
-    Translates: thdiff.f#THDIFF (09c3b9b)
+    Translates: thdiff.f#THDIFF (7be4133)
 
     Arguments: m, the number of species (1 hydrogen, 2 helium, 3..m-1 heavy
     elements, m the electrons); a, z, x, their atomic masses, charges and
     mass fractions (index 0 unused); cl[s, t], the Coulomb logarithms; ap,
     at and ax[s, t], set in place. x[m] is overwritten with the electrons'
     mass fraction. None is returned.
+
     """
-    # Question (see the page): no check that m <= MMAX.
+
+    # Work arrays (Fortran lines 48–56).
+    # Suspected bug (see the page): no check that m <= MMAX.
     indx = np.zeros(NMAX + 1, dtype=int)
     c = np.zeros(MMAX + 1)
     xx = np.zeros((MMAX + 1, MMAX + 1))
@@ -38,9 +42,10 @@ def thdiff(m, a, z, x, cl, ap, at, ax):
     delta = np.zeros((NMAX + 1, NMAX + 1))
     ga = np.zeros(NMAX + 1)
 
+    # Initialize parameters; concentrations, normalised to the electrons
+    # (Fortran lines 69–95).
     ko = 2.0
     n = 2 * m + 2
-    # Concentrations, normalised to the electrons.
     for i in range(1, m + 1):
         c[i] = 0.0
     cc = 0.0
@@ -54,9 +59,12 @@ def thdiff(m, a, z, x, cl, ap, at, ax):
     for i in range(1, m + 1):
         cc = cc + c[i]
         ac = ac + a[i] * c[i]
-    # Question (see the page): the caller's x[m] is overwritten.
+
+    # The electrons' mass fraction, written into the caller's x[m] (Fortran
+    # lines 97–99).
     x[m] = a[m] / ac
-    # Mass ratios and collision coefficients.
+
+    # Mass ratios and collision coefficients (Fortran lines 101–116).
     for i in range(1, m + 1):
         for j in range(1, m + 1):
             xx[i, j] = a[j] / (a[i] + a[j])
@@ -65,8 +73,9 @@ def thdiff(m, a, z, x, cl, ap, at, ax):
             k[i, j] = (1.0 * cl[i, j]
                        * math.sqrt(a[i] * a[j] / (a[i] + a[j])) * c[i] * c[j]
                        * z[i]**2 * z[j]**2)
+
     # Right-hand sides: alpha (pressure), nu (temperature), gamma
-    # (concentrations).
+    # (concentrations) (Fortran lines 118–164).
     for i in range(1, m + 1):
         alpha[i] = c[i] / cc
         nu[i] = 0.0
@@ -95,7 +104,8 @@ def thdiff(m, a, z, x, cl, ap, at, ax):
     nu[n] = 0.0
     for j in range(1, n + 1):
         gamma[n, j] = 0.0
-    # The matrix delta.
+
+    # The matrix delta (Fortran lines 166–246).
     for i in range(1, n + 1):
         for j in range(1, n + 1):
             delta[i, j] = 0.0
@@ -144,7 +154,9 @@ def thdiff(m, a, z, x, cl, ap, at, ax):
         delta[n, j] = c[j] * a[j]
     for j in range(m + 1, n + 1):
         delta[n, j] = 0.0
-    # Factorise once, solve for each right-hand side.
+
+    # Factorise once, solve for each right-hand side (Fortran lines
+    # 251–276).
     d = 0.0
     d = ludcmp(delta, n, NMAX, indx, d)
     lubksb(delta, n, NMAX, indx, alpha)
@@ -155,12 +167,16 @@ def thdiff(m, a, z, x, cl, ap, at, ax):
         lubksb(delta, n, NMAX, indx, ga)
         for i in range(1, n + 1):
             gamma[i, j] = ga[i]
+
+    # The normalisation (Fortran lines 278–286).
     # Question (see the page): the factor ko*ac*cc against the comment's p/K0.
     for i in range(1, m + 1):
         alpha[i] = alpha[i] * ko * ac * cc
         nu[i] = nu[i] * ko * ac * cc
         for j in range(1, m + 1):
             gamma[i, j] = gamma[i, j] * ko * ac * cc
+
+    # The results (Fortran lines 288–294).
     for i in range(1, m + 1):
         ap[i] = alpha[i]
         at[i] = nu[i]

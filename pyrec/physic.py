@@ -1,4 +1,4 @@
-"""Python version of physic.f (YREC development, 09c3b9b): the auxiliary
+"""Python version of physic.f (YREC development, 7be4133): the auxiliary
 physics at every shell, and the shear-stability limit on dOmega/dln r."""
 
 import math
@@ -24,20 +24,22 @@ from pyrec.viscos import viscos
 atomwt = np.array([0.0, 1.007825, 4.002603, 12.0, 3.01603])
 
 # PHYSIC has SAVE: its locals are kept between calls. KSAHA, which EQSTAT
-# updates, is never initialized here (Question, see the page).
+# updates, is never initialized or read here (unused?, see the page).
 ksaha = 0
 fxion = np.zeros(4)
 hf = np.zeros(5)
 hold = np.zeros(5)
 
 
-def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
+def physic(fp: np.ndarray, ft: np.ndarray, hcomp: np.ndarray, hd: np.ndarray, hg: np.ndarray, hl: np.ndarray,
+           hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, ht: np.ndarray, lc: np.ndarray, m: int, teffl: float,
+           cmixl: float) -> None:
     """Recompute, at every shell, the equation of state, opacity,
     temperature gradients and convective velocity, and the mean molecular
     weight; then the thermal diffusivity and viscosity (VISCOS), and the
     largest dOmega/dln r stable against the shear instability.
 
-    Translates: physic.f#PHYSIC (09c3b9b)
+    Translates: physic.f#PHYSIC (7be4133)
 
     Arguments: fp, ft, the rotational distortion factors; the model hcomp
     [species, shell], hd, hg, hl, hp, hr, hs, ht (arrays, index 0 unused);
@@ -47,15 +49,18 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
     Returns nothing; sets lc and, in the modules, SDEL, SO, SVEL
     (scrtch_mod), CP, HAMU, SQDT (temp_mod; THDIF and VISC through VISCOS),
     QWRMAX (dwmax_mod) and IOVIM (dpmix_mod).
+
     """
+
     global ksaha
     c = constants_mod
     sdel = scrtch_mod.sdel
+
     # Actual and adiabatic temperature gradients, opacity and mean
-    # molecular weight for all shells (the Fortran comment says "radiative
-    # shells": Question, see the page).
+    # molecular weight for all shells (Fortran lines 81–97; the Fortran
+    # comment says "radiative shells": Question, see the page).
     lderiv = False
-    locond = False  # Question (see the page): unused.
+    locond = False  # noqa: F841  (unused in the Fortran too)
     latmo = False
     for im in range(1, m + 1):
         sl = hs[im]
@@ -68,8 +73,9 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
         dl = hd[im]
         fpl = fp[im]
         ftl = ft[im]
+
         # The Debye-Hueckel correction, if chosen; the MHD equation of state is
-        # removed (9/22/26 MHP via Claude).
+        # removed (9/22/26 MHP via Claude) (Fortran lines 98–107).
         if nmlpar_mod.ldh:
             debhu_mod.xxdh = hcomp[1, im]
             debhu_mod.yydh = hcomp[2, im] + hcomp[4, im]
@@ -77,6 +83,9 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
             debhu_mod.zdh[1] = hcomp[5, im] + hcomp[6, im]
             debhu_mod.zdh[2] = hcomp[7, im] + hcomp[8, im]
             debhu_mod.zdh[3] = hcomp[9, im] + hcomp[10, im] + hcomp[11, im]
+
+        # The equation of state, the opacity and the gradients (Fortran
+        # lines 108–119).
         (t, p, dl, d, beta, betai, beta14, rmu, amu, emu, eta, qdt, qdp,
          qcp, dela, qdtt, qdtp, qat, qap, qcpt, qcpp, ksaha) = eqstat(
             tl, 0.0, pl, 0.0, dl, 0.0, x, z, 0.0, 0.0, 0.0, fxion, 0.0, 0.0,
@@ -88,13 +97,14 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
             tl, t, pl, p, d, rl, sl, b, o, qdt, qdp, qot, qod, qcp, 0.0,
             0.0, dela, qdtt, qdtp, qat, qap, 0.0, 0.0, 0.0, qcpt, qcpp,
             0.0, lderiv, False, fpl, ftl, teffl, cmixl)
-        # Question (see the page): the caller's LC is overwritten.
         lc[im] = lconv
         sdel[1, im] = delr
         sdel[2, im] = dele
         sdel[3, im] = dela
+
         # Mean molecular weight of a fully ionized gas. AMUENV is 1/(mean
-        # molecular weight per ion) of the surface mixture.
+        # molecular weight per ion) of the surface mixture (Fortran lines
+        # 120–132).
         dfx1 = hcomp[1, im] - comp_mod.xenv
         dfx2 = hcomp[2, im] - comp2_mod.yenv
         dfx3 = hcomp[3, im] - comp_mod.zenv
@@ -107,22 +117,30 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
                 + 0.5 * hcomp[3, im])
         emu2 = 1.0 / temp
         temp_mod.hamu[im] = amu2 * emu2 / (amu2 + emu2)
+
+        # The opacity, c_P, dlnrho/dlnT and the convective velocity, stored
+        # (Fortran lines 133–142); SVEL is always kept (JVS 10/13).
         scrtch_mod.so[im] = o
         temp_mod.cp[im] = qcp
         temp_mod.sqdt[im] = qdt
-        # SVEL (the convective velocity) is always kept (JVS 10/13).
         scrtch_mod.svel[im] = vel
     # label 30
-    # Thermometric diffusivity and kinematic viscosity.
+
+    # Thermometric diffusivity and kinematic viscosity (Fortran lines
+    # 144–146).
     viscos(hcomp, hd, ht, m)
+
     # The largest stable dOmega/dln r at each interface (Endal & Sofia
-    # 1978), from quantities interpolated to the midpoint in HS.
+    # 1978), from quantities interpolated to the midpoint in HS (Fortran
+    # lines 147–188).
     qwrmax = dwmax_mod.qwrmax
     for im in range(2, m + 1):
         # Skip convective regions.
         if lc[im] and lc[im - 1]:
             qwrmax[im] = 0.0
             continue  # label 100
+
+        # The four points for the interpolation (Fortran lines 158–170).
         if im <= 2:
             k = 1
         elif im == m:
@@ -131,6 +149,9 @@ def physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl):
             k = im - 2
         for i in range(1, 5):
             hold[i] = hs[i + k - 1]
+
+        # Interpolated to the interface, and the limit (Fortran lines
+        # 171–187).
         hsmid = 0.5 * (hs[im] + hs[im - 1])
         intrp2(hold, hf, hsmid)
         pmid = (hp[k] * hf[1] + hp[k + 1] * hf[2] + hp[k + 2] * hf[3]

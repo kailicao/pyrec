@@ -1,4 +1,4 @@
-"""Python version of parmin.f (YREC development, a8a5950): a run's
+"""Python version of parmin.f (YREC development, 7be4133): a run's
 parameters, its input and output files, and its run cards."""
 
 import math
@@ -15,8 +15,6 @@ from pyrec import comp_mod
 from pyrec import constants_mod
 from pyrec import intpar_mod
 from pyrec import iounits_mod
-from pyrec import label_mod      # USEd by the Fortran; no name read here
-from pyrec import newopac_mod    # USEd by the Fortran; no name read here
 from pyrec import nmlbypass_mod
 from pyrec import nmlpar_mod
 from pyrec import runloop_mod
@@ -26,7 +24,7 @@ _this = sys.modules[__name__]
 
 # PARMIN's own locals with DATA defaults, kept between calls (SAVE). Arrays
 # have index 0 unused, as everywhere in pyrec. Character values are kept
-# without Fortran's trailing blanks.
+# without Fortran's trailing blanks (Fortran lines 481–625).
 kindrn = np.ones(51, dtype=int)            # DATA KINDRN/50*1/
 rsclm = np.zeros(51)
 rsclx = np.zeros(51)
@@ -60,7 +58,7 @@ fcalcad = ''        # FCLCD
 yrec1 = yrec2 = ''
 cmd = ''
 sum_frac = 0.0
-last_slash_idx = 0  # Question (see the page): unset when FTRACK has no '/'
+last_slash_idx = 0  # Suspected bug (see the page): unset without a '/'
 mrk = 0
 ncmxck = 0
 lcmxbad = False
@@ -68,7 +66,7 @@ lcmxbad = False
 # The three namelists, member by member in the Fortran's order, each with
 # where the variable lives: 'nml' NMLPAR_MOD, 'byp' NMLBYPASS_MOD, 'con'
 # CONSTANTS_MOD, 'ipar' INTPAR_MOD, 'loc' a local of PARMIN (this file),
-# 'arg' one of PARMIN's arguments.
+# 'arg' one of PARMIN's arguments (Fortran lines 335–460).
 _CONTROL = (
     ('nml', 'cmixla'), ('nml', 'calsolage'), ('nml', 'calsolzx'),
     ('loc', 'descrip'), ('nml', 'endage'), ('arg', 'fpurez'),
@@ -222,6 +220,7 @@ _KTTAU_TEXT = {
 
 def _l(flag):
     """A logical in an L format: T or F."""
+
     return 'T' if flag else 'F'
 
 
@@ -232,6 +231,7 @@ def _owners(args):
 
 def _value(token, like):
     """Convert one namelist value to the type of the variable it sets."""
+
     if isinstance(like, (bool, np.bool_)):
         t = token.upper().lstrip('.')
         return t.startswith('T')
@@ -248,6 +248,7 @@ def _value(token, like):
 def _fortran_order(shape, start):
     """The indices of an array (index 0 unused) from `start` on, in
     Fortran's order: the first index varies fastest."""
+
     idx = list(start)
     while True:
         yield tuple(idx)
@@ -265,6 +266,7 @@ def _read_namelist(path, group, members, owners):
     uses (name = values, name(i) = values, repeat counts r*v, quoted
     strings, logicals, D exponents, '!' comments). Each value is stored
     where its variable lives."""
+
     table = {name: (owners[where], name) for where, name in members}
     with open(path) as f:
         # Drop '!' comments, outside quoted strings.
@@ -321,6 +323,7 @@ def _format_value(v):
 def _write_namelist(unit, group, members, owners):
     """WRITE(UNIT, NML=group): every member with its value (the layout
     approximates the compiler's)."""
+
     lines = [f"&{group}"]
     for where, name in members:
         v = getattr(owners[where], name)
@@ -338,32 +341,37 @@ def _write_namelist(unit, group, members, owners):
 
 def _both(text):
     """WRITE(*, fmt) and WRITE(ISHORT, fmt) of the same record."""
+
     print(text)
     iounits_mod.write(iounits_mod.ishort, text)
 
 
 def _screen_and_short(text):
     """WRITE(IOWR, fmt) and WRITE(ISHORT, fmt) of the same record."""
+
     iounits_mod.write(iounits_mod.iowr, text)
     iounits_mod.write(iounits_mod.ishort, text)
 
 
-def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
-           fpurez, fscvh, fscvhe, fscvz, yrecver, githash):
+def parmin(falex06: str, fallard: str, fatm: str, ffermi: str, fliv95: str, fpatm: str, fpenv: str, fpmod: str,
+           fpurez: str, fscvh: str, fscvhe: str, fscvz: str, yrecver: str,
+           githash: str) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str]:
     """Read the run's parameters from the CONTROL and PHYSICS namelists into
     the modules, set the unit numbers, expand the file names' placeholders,
     open the output files and some tables, derive settings (wind law,
     mixtures, settling switches), write the settings to the .short file,
     and interpret the run cards.
 
-    Translates: parmin.f#PARMIN (a8a5950)
+    Translates: parmin.f#PARMIN (7be4133)
 
     Arguments: the 12 table file names (set from the CONTROL namelist; any
     value), and yrecver, githash, the code's version and git hash.
 
     Returns (falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     fpurez, fscvh, fscvhe, fscvz): the file names as read and expanded.
+
     """
+
     global anewcp, atmp, sum_frac, last_slash_idx, mrk, ncmxck, lcmxbad
     global yrec1, yrec2, cmd, fcalcad
     me = _this
@@ -377,7 +385,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                            fscvh=fscvh, fscvhe=fscvhe, fscvz=fscvz)
     owners = _owners(args)
 
-    # All logical unit numbers.
+    # All logical unit numbers (Fortran lines 654–738).
     io.iowr = 6          # output: status file (the screen)
     io.ilast = 11        # output: last model
     io.ifirst = 12       # input: first model
@@ -404,20 +412,24 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     io.iscvhe = 73
     io.iscvz = 74
     io.icondopacp = 75   # input: Potekhin conductive opacities
-    # Default [Fe/H] and alpha for the new Allard atmospheres.
+    # Default [Fe/H] and alpha for the new Allard atmospheres (Fortran lines
+    # 733–735).
     nml.alatm_feh = 0.0
     nml.alatm_alpha = 0.0
     nml.laltptau100 = False
     io.ialex06 = 90      # input: Alexander 2006 opacities
 
+
+    # The version line (Fortran lines 740–756).
     print(' ')
     print(f" Yale Rotating Evolution Code - YREC, v{yrecver.rstrip()} "
           f"({githash.rstrip()})")
     # VERFMT, the version line (format built at run time, 315).
     verline = f"# YREC v{yrecver.rstrip()} ({githash.rstrip()})"
 
-    # The namelist files from the command line, or the defaults (JVS 02/11).
-    # Question (see the page): GETARG is a compiler extension.
+
+    # The namelist files from the command line, or the defaults (JVS 02/11)
+    # (Fortran lines 758–771).
     yrec1 = sys.argv[1] if len(sys.argv) > 1 else ''
     if yrec1[:2].strip() == '':
         yrec1 = 'yrec8.nml1'
@@ -430,13 +442,19 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     # OPEN, READ(NML=...) and CLOSE of ISTAND and IRUN.
     _read_namelist(yrec1, 'CONTROL', _CONTROL, owners)
     _read_namelist(yrec2, 'PHYSICS', _PHYSICS, owners)
-    # Map the newer inputs onto the vectors the code uses (MHP 8/14).
+
+    # Map the newer inputs onto the vectors the code uses (MHP 8/14)
+    # (Fortran lines 772–775).
+    # Question (see the page): the old entries that REMAP overwrites.
     remap()
-    # Remember the original atmosphere choice (SURFBC may switch it) (MHP 06/13).
+
+    # Remember the original atmosphere choice (SURFBC may switch it) (MHP
+    # 06/13) (Fortran lines 776–779).
     nml.kttau0 = nml.kttau
     nml.lttau = False
 
-    # Expand a leading placeholder in every file name.
+    # Expand a leading placeholder in every file name (Fortran lines
+    # 788–813).
     for where, name in (('arg', 'falex06'), ('arg', 'fallard'),
                         ('arg', 'fatm'), ('loc', 'fcondopacp'),
                         ('arg', 'ffermi'), ('loc', 'ffirst'),
@@ -451,18 +469,21 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         owner = owners[where]
         setattr(owner, name, expand_value(getattr(owner, name)))
 
-    # Create the output folder, FTRACK up to its last '/'.
+    # Create the output folder, FTRACK up to its last '/' (Fortran lines
+    # 814–828).
     for i in range(len(me.ftrack.rstrip()), 0, -1):
         if me.ftrack[i - 1] == '/':
             last_slash_idx = i
             break
-    # label 1250. Question (see the page): no '/' leaves LAST_SLASH_IDX unset.
+    # label 1250. Suspected bug (see the page): no '/' leaves
+    # LAST_SLASH_IDX unset.
     cmd = 'mkdir -p "' + me.ftrack[:last_slash_idx] + '"'
     print(f" OUTPUT placed in :  {me.ftrack[:last_slash_idx]}")
     print(' ')
     os.system(cmd)
 
-    # The acoustic-depth output, named after the .short file (JVS 02/11).
+    # The acoustic-depth output, named after the .short file (JVS 02/11)
+    # (Fortran lines 830–850).
     if acdpth_mod.lacout:
         io.iclcd = 91
         mrk = me.fshort.find('short') + 1      # INDEX: 0 if absent
@@ -477,7 +498,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                  'radius (CZ), 1/cs (CZ)       delad,gamma1,P, T, X')
 
     # Li/Be cross sections given by the user, as factors on the defaults (Li6
-    # 5.5 MeV b; Li7 52 keV b; Be9 1.1, 15000, 15000 keV b) (G Somers 6/14).
+    # 5.5 MeV b; Li7 52 keV b; Be9 1.1, 15000, 15000 keV b) (G Somers 6/14)
+    # (Fortran lines 855–876).
     if byp.lxli6:
         nml.sli6 = byp.xsli6 / 5.5e3
     if byp.lxli7:
@@ -488,11 +510,13 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         nml.sbe92 = byp.xsbe92 / 1.5e4
     if byp.lxbe93:
         nml.sbe93 = byp.xsbe93 / 1.5e4
-    # The OPAL 2006 EOS table.
+
+    # The OPAL 2006 EOS table (Fortran lines 877–882).
     if nml.lopale06:
         io.open(io.iopale, me.fopale06, status='OLD')
 
-    # The stored models, with their header if LSTORE.
+    # The stored models, with their header if LSTORE (Fortran lines
+    # 888–899).
     io.open(io.istor, me.fstor, status='UNKNOWN')
     io.rewind(io.istor)
     if nml.lstore:
@@ -503,6 +527,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
             io.write(io.istor, verline)
             io.write(io.istor, _STORE_KEY)       # format 1012
 
+
+    # The .short file and the other files (Fortran lines 924–977).
     io.open(io.ishort, me.fshort, status='UNKNOWN')
     io.rewind(io.ishort)
     # The sound-speed profile, opened always (LSOUND is known only later).
@@ -528,7 +554,9 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     if nml.lcondopacp:
         io.open(io.icondopacp, me.fcondopacp, status='OLD')
 
-    # Semiconvection with any overshoot stops the run.
+    # Semiconvection with any overshoot stops the run (Fortran lines
+    # 978–989).
+    # Question (see the page): why may the two not be combined?
     if nml.lsemic:
         if nml.lovstc or nml.lovste or nml.lovstm:
             io.write(io.ishort,
@@ -537,7 +565,21 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                      f"{_l(nml.lsemic)} OVERSHOOT - CORE,ENVELOPE,"
                      f"INTERMEDIATE- {_l(nml.lovste)} {_l(nml.lovstc)} "
                      f"{_l(nml.lovstm)}\nRUN STOPPED")          # format 2
-            raise SystemExit
+            raise SystemExit(3)
+    # LDIFAD with rotation stops the run: the advection-diffusion transport
+    # (DADCOEFT) reads coefficients that no routine sets (Fortran lines
+    # 990–1007).
+    if nml.lrot and nml.ldifad:
+        text = (" ERROR IN SUBROUTINE PARMIN\n LDIFAD (ADVECTION-DIFFUSION "
+                "TRANSPORT OF ANGULAR MOMENTUM) IS NOT IMPLEMENTED:\n "
+                "DADCOEFT READS COEFFICIENTS THAT NO ROUTINE SETS.  SET "
+                "LDIFAD = .FALSE. FOR ROTATING RUNS.\nRUN STOPPED")  # format 3
+        io.write(io.ishort, text)
+        print(text)
+        raise SystemExit(1)
+
+    # The line of tolerances and rotation settings (Fortran lines
+    # 1008–1016).
     io.write(io.ishort,
              " PT TOL" + ''.join(f"{nml.hpttol[i]:6.3f}" for i in range(1, 13))
              + f"\n O.S.ENV{nml.alphae:6.3f} O.S.CORE{nml.alphac:6.3f}"
@@ -546,6 +588,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
              f"{nml.fc:5.2f} COUPLING{byp.fo:6.3f} F MU{nml.fmu:5.2f}"
              f" RCRIT{nml.rcrit:9.1f}")                        # format 1
 
+    # Rotation and the wind law (Fortran lines 1017–1117).
     if nml.lrot:
         nml.lnew0 = True
         if nml.walpcz < -2.0:
@@ -559,6 +602,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
             # The old wind law:
             # JDOT = FK*2.036D33*1.452D9**ALFA*(MDOT/1.0D-14)**(1-2ALFA/3)
             #        *OMEGA**(1+4ALFA/3)*(R/RSUN)**(2-ALFA)*(M/MSUN)**-ALFA/3
+            # Question (see the page): the units of OMEGA and JDOT.
             c.cc13 = 1.0 / 3.0
             c.cc23 = 2.0 / 3.0
             nml.constfactor = me.fk * 2.036e33 * 1.452e9**me.alfa
@@ -586,7 +630,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                 nml.lbscale = True
             nml.exw = (1.0 + byp.pmma - 2.0 * byp.pmma * byp.pmmm
                        + 4.0 * byp.pmmm * byp.pmmb)
-            # The tau_cz term is applied in MWIND/MCOWIND, not here (G Somers 8/17).
+            # The tau_cz term is applied in MWIND/MCOWIND, not here (G Somers
+            # 8/17).
             nml.extau = 0.0
             # EXR with the typo removed (JvS 09/25). Question (see the page):
             # the Fortran comment's derivation gives another exponent.
@@ -602,9 +647,12 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
             if me.wmax_sun < 1.0e3:
                 nml.wmax = me.wmax_sun * nml.pmmsolw
     # Wind law end.
+
+    # Fortran line 1119.
     c.cln = math.log(10.0)
 
-    # A single species to rescale in the starting model.
+    # A single species to rescale in the starting model (Fortran lines
+    # 1120–1138).
     if nml.lnewcp:
         nml.lrel = True
         if atmp.rstrip() == 'ABS':
@@ -622,7 +670,10 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         # label 30
 
     # The CNO mixture (ISETMIX) and the isotope ratios and light-element
-    # abundances (ISETISO) of the starting model (MHP 10/24).
+    # abundances (ISETISO) of the starting model (MHP 10/24) (Fortran lines
+    # 1139–1191).
+    # Suspected bug (see the page): ISETMIX = 2 and ISETISO = 2, the
+    # documentation's custom mixtures, do nothing.
     nml.lmixture = False
     nml.lisotope = False
     to_606 = True        # False where the Fortran jumps to label 602
@@ -661,7 +712,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         _both(f"CNO MIXTURE {me.amix:8} C {nml.frac_c:12.4E} N "
               f"{nml.frac_n:12.4E} O {nml.frac_o:12.4E} APPLIED TO "
               "STARTING MODEL.")                                 # 604
-    # label 602: the isotope ratios.
+
+    # label 602: the isotope ratios (Fortran lines 1192–1237).
     to_605 = True        # False where the Fortran jumps to label 603
     if byp.isetiso == 1:
         if me.aiso.rstrip() == 'CUS':
@@ -694,8 +746,9 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
               f"{nml.xh2_ini:12.4E} HE3 {nml.xhe3_ini:12.4E} LI6 "
               f"{nml.xli6_ini:12.4E} LI7 {nml.xli7_ini:12.4E} BE9 "
               f"{nml.xbe9_ini:12.4E} APPLIED TO STARTING MODEL.")  # 605
+
     # label 603: the settling switches. Z diffusion needs Y diffusion and
-    # Thoul's coefficients (DBG 12/95).
+    # Thoul's coefficients (DBG 12/95) (Fortran lines 1238–1252).
     if nml.ldifz:
         nml.ldify = True
         nml.lthoul = True
@@ -708,7 +761,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         nml.lthoulfit = False
         nml.ilambda = 4
 
-    # The run's parameters: the namelists as read, and the derived values.
+    # The run's parameters: the namelists as read, and the derived values
+    # (Fortran lines 1254–1273).
     if nml.npoint <= 0:
         nml.npoint = 9999
     if byp.npenv <= 0:
@@ -721,8 +775,9 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     _write_namelist(io.ishort, 'CONTROL', _CONTROL, owners)
     _write_namelist(io.ishort, 'DERIVED', _DERIVED, owners)
 
-    # Every mixing length the run uses must be positive (10/15/26). Under solar
-    # calibration only CMIXLA(1) comes from the namelist.
+    # Every mixing length the run uses must be positive (10/15/26). Under
+    # solar calibration only CMIXLA(1) comes from the namelist (Fortran lines
+    # 1274–1321).
     if nml.lcals:
         ncmxck = 1
     else:
@@ -745,8 +800,20 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                     "CARDS\nRUN STOPPED")                        # 8803
         io.write(io.ishort, text)
         print(text)
-        raise SystemExit
+        raise SystemExit(3)
 
+    # A non-positive envelope triangle size stops the run (Fortran lines
+    # 1322–1333).
+    if nml.tridt <= 0.0 or nml.tridl <= 0.0:
+        text = (f" ERROR IN SUBROUTINE PARMIN\nENVELOPE TRIANGLE SIZE TRIDT"
+                f"{nml.tridt:11.3E} TRIDL{nml.tridl:11.3E} MUST BE POSITIVE"
+                "\nRUN STOPPED")                                  # 8804
+        io.write(io.ishort, text)
+        print(text)
+        raise SystemExit(3)
+
+    # The atmosphere, the pulsation output and the pure C and N tables
+    # (Fortran lines 1334–1362).
     if nml.kttau in _KTTAU_TEXT:
         io.write(io.ishort, _KTTAU_TEXT[nml.kttau])
     if nml.lpulse:
@@ -754,7 +821,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
     if nml.lpurez:
         io.write(io.ishort, '  USING PURE C AND N OPACITY TABLES')
 
-    # The run's description (formats 310, 314, 320).
+    # The run's description (formats 310, 314, 320) (Fortran lines
+    # 1364–1383).
     rule = '#' + '=' * 100
     description = (f"# DESCRIPTION OF RUN:{descrip[1]:<80.80}\n#"
                    + ' ' * 9 + '  ' + ' ' * 8
@@ -769,7 +837,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         io.write(io.itrack, description)
     io.write(io.ishort, " USING OSCILATORY SPLINE INTERPOLATION IN HPOINT")
 
-    # Interpret the run from the sequence of "kind" cards.
+    # Interpret the run from the sequence of "kind" cards (Fortran lines
+    # 1385–1488).
     io.write(io.ishort, "\n" + ' ' * 35 + "RUN CARDS\n")
     nml.lfirst[1] = True
     rl = runloop_mod
@@ -777,7 +846,8 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
         rl.iresca[nkind] = kindrn[nkind]
         if kindrn[nkind] == 1:
             # Evolve card: stop at an age, or at a central D, X or Y (MHP
-            # 10/24).
+            # 10/24). Only here are LENDAG and LSETDT set (see main.f's
+            # page, bug 1).
             if (nml.endage[nkind] > 0.0 or nml.end_dcen[nkind] > 0.0
                     or nml.end_xcen[nkind] > 0.0
                     or nml.end_ycen[nkind] > 0.0):
@@ -828,12 +898,13 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
                 _screen_and_short(f"\n RUN #{nkind:3d}   RESCALE & EVOLVE "
                                   'THE INPUT MODEL: "FIRST MODEL".')  # 550
             else:
-                # Question (see the page): format 451, its own 551 is
+                # Suspected bug (see the page): format 451, its own 551 is
                 # commented out.
                 _screen_and_short(f"\n RUN #{nkind:3d}   RESCALE THE "
                                   "PREVIOUS RUN'S LAST MODEL.")
             _screen_and_short(_relax_text(nml.nmodls[nkind], nkind))
-        # Question (see the page): runs for every card, evolve cards too.
+        # Suspected bug (see the page): runs for every card, evolve cards
+        # too.
         if rl.rescal[3, nkind] >= 0.0:
             comp_mod.zenv = rl.rescal[3, nkind]
     # label 1000
@@ -844,6 +915,7 @@ def parmin(falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod,
 
 def _relax_text(nmodls, nkind):
     """Format 452: the rescaling of a rescale card."""
+
     r = runloop_mod.rescal
     return (f" RELAX RESCALED MODEL{nmodls:3d} TIMES. RESCALE THE FOLLOWING"
             f"(0=USE CURRENT VALUE):\n MASS {r[1, nkind]:9.6f}   X"
@@ -857,17 +929,22 @@ _PHOLDERS = ('{YREC_INPUT}', '{YREC_START}', '{YREC_OUTPUT}')
 _DEFAULTS = ('../../input', '../../startmodels', 'output')
 
 
-def expand_value(nml_var):
+def expand_value(nml_var: str) -> str:
     """Replace a placeholder at the start of a file name, {YREC_INPUT},
     {YREC_START} or {YREC_OUTPUT}, by the environment variable of that
     name, or by its default if it is not set.
 
-    Translates: parmin.f#EXPAND_VALUE (a8a5950)
+    Translates: parmin.f#EXPAND_VALUE (7be4133)
 
     Arguments: nml_var, the file name.
 
     Returns nml_var, expanded.
+
     """
+
+    # Fortran lines 1512–1540.
+    # Suspected bug (see the page): in the Fortran's default branch the
+    # tail of TEMP after the name is left undefined; here it is empty.
     for i in range(len(_PHOLDERS)):
         pholder = _PHOLDERS[i]
         ph_len = len(pholder)

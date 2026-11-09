@@ -1,0 +1,8 @@
+# Lint settings only (ruff). The translation keeps YREC's names (E741: l, I, O) and KC's one-line statements
+# (E701, E702); lines may run to 120 characters, as Fortran's lines run to 132.
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E701", "E702", "E741"]

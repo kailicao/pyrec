@@ -1,4 +1,4 @@
-"""Python version of chkscal.f (YREC 09c3b9b): calibrating a star's track
+"""Python version of chkscal.f (YREC 7be4133): calibrating a star's track
 to a target radius and luminosity."""
 
 import math
@@ -18,13 +18,14 @@ ager = 0.0
 blrp = 0.0
 
 
-def chkscal(bl, teffl, dage, nk, alri, lstar, lpassr):
+def chkscal(bl: float, teffl: float, dage: float, nk: int, alri: float, lstar: bool,
+            lpassr: bool) -> tuple[float, bool, bool]:
     """Calibrate X (thus Y) so that a track passes through a target
     (R*, L*): detect the crossing of R*, interpolate L and the age there,
     and set X for the next run by a secant step, or set the final run's
     stopping age.
 
-    Translates: chkscal.f#CHKSCAL (09c3b9b)
+    Translates: chkscal.f#CHKSCAL (7be4133)
 
     Arguments: bl, log L/L_sun; teffl, log Teff; dage, the age (Gyr); nk,
     the kind card; alri, the previous model's R/R_sun (despite the comments,
@@ -33,16 +34,19 @@ def chkscal(bl, teffl, dage, nk, alri, lstar, lpassr):
     Returns (alri, lstar, lpassr). The new X goes to runloop_mod.rescal and
     nmlpar_mod.xenv0a; the stopping age to runloop_mod.lendag and
     nmlpar_mod.endage.
+
     """
+
     global bli, agei, blr, ager, blrp
     c = constants_mod
     nml = nmlpar_mod
     rescal = runloop_mod.rescal
     itrack = iounits_mod.itrack
 
-    # Has the star passed R*? If not, store L and age and return.
-    # Question (see the page): linear or log radius; and the previous
-    # model across runs.
+    # Has the star passed R*? If not, store L and age and return (Fortran lines 94–111).
+    # Question (see the page): linear or log radius.
+    # Suspected bug (see the page): alri starts at 0 and is not reset at a
+    # crossing, so a track that starts above R* crosses at once.
     lpassr = False
     teff = 10.0**teffl
     alr = math.sqrt((10.0**bl) * c.clsun / (c.c4pi * c.csig)) / (
@@ -60,12 +64,13 @@ def chkscal(bl, teffl, dage, nk, alri, lstar, lpassr):
             alri = alr
             return alri, lstar, lpassr
 
+    # Passed (Fortran lines 112–118).
     # Question (see the page): the first crossing only.
     print("  Just passed R*")
     iounits_mod.write(itrack, " #Just passed R*")
     lpassr = True
 
-    # Interpolate L and the age at R*, linearly in R.
+    # Interpolate L and the age at R*, linearly in R (Fortran lines 120–127).
     dldr = (bl - bli) / (alr - alri)
     blr = bl + dldr * (nml.sr - alr)
     dadr = (dage - agei) / (alr - alri)
@@ -73,7 +78,8 @@ def chkscal(bl, teffl, dage, nk, alri, lstar, lpassr):
     print(f"  X, LogL/Lsun at R* = {rescal[2, nk - 1]} {blr}")
     iounits_mod.write(itrack, f" #X, LogL/Lsun at R* = {rescal[2, nk - 1]}"
                               f" {blr}")
-    # Question (see the page): two tolerances.
+
+    # Found: one more run (Fortran lines 128–146).
     if abs(10.0**blr - nml.xls) <= nml.xlstol:
         # Found: one more run, with the same X, stopping at that age.
         lstar = True
@@ -88,8 +94,9 @@ def chkscal(bl, teffl, dage, nk, alri, lstar, lpassr):
         iounits_mod.write(itrack, " #Have hit R* & L*, prepare final run "
                                   f"to age: {ager}")
         return alri, lstar, lpassr
+
+    # First time through: save L at R*, lower X by 0.01 (Fortran lines 148–160).
     if nk == 2:
-        # First time through: save L at R*, lower X by 0.01.
         blrp = blr
         xp = rescal[2, nk - 1]
         x = xp - 0.01
@@ -99,7 +106,8 @@ def chkscal(bl, teffl, dage, nk, alri, lstar, lpassr):
         print(f"  NK=2, Y=Y+0.01, Setup next run, X= {x}")
         iounits_mod.write(itrack, f" #NK=2, Y=Y+0.01, Setup next run, X= {x}")
         return alri, lstar, lpassr
-    # NK = 4, 6, 8, ...: a secant step in X against log L.
+
+    # NK = 4, 6, 8, ...: a secant step in X against log L (Fortran lines 161–176).
     x = rescal[2, nk - 1]
     xp = rescal[2, nk - 3]
     dxdl = (x - xp) / (blr - blrp)

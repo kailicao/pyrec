@@ -1,6 +1,7 @@
-"""Python version of aeos06_mod.f (YREC 09c3b9b): the OPAL 2006 equation-of-state tables and grids, formerly COMMON/AEOS06/.
+"""Python version of aeos06_mod.f (YREC 7be4133): the OPAL 2006
+equation-of-state tables and grids, formerly COMMON/AEOS06/.
 
-Translates: aeos06_mod.f#AEOS06_MOD (09c3b9b)
+Translates: aeos06_mod.f#AEOS06_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE AEOS06_MOD import this module and write ``aeos06_mod.<name>``.
@@ -8,12 +9,13 @@ USE AEOS06_MOD import this module and write ``aeos06_mod.<name>``.
 
 import numpy as np
 
-# Table dimensions (PRIVATE in the Fortran).
+# Table dimensions (PRIVATE in the Fortran) (Fortran lines 32–35).
 _MX = 5
 _MV = 10
 _NR = 169
 _NT = 197
 
+# Fortran lines 37–47.
 xz = np.zeros((_MX + 1, _MV + 1, _NT + 1, _NR + 1))   # the tables (readcoeos06)
 t6list = np.zeros((_NR + 1, _NT + 1))
 rho = np.zeros(_NR + 1)            # density grid (readcoeos06)
@@ -26,6 +28,7 @@ dfsr = np.zeros(_NR + 1)
 midx = 0                           # formerly M (readcoeos06)
 mf = 0                             # the X index (esac06)
 # The X values of the tables, index 0 unused (DATA, from esac06; the
-# Fortran's single-precision literals, as stored in REAL*8).
+# Fortran's single-precision literals, as stored in REAL*8) (Fortran lines
+# 48–50).
 xa = np.array([0.0, 0.0, np.float32(0.2), np.float32(0.4),
                np.float32(0.6), np.float32(0.8)], dtype=float)

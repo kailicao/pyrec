@@ -1,4 +1,4 @@
-"""Python version of radsub06.f (YREC 09c3b9b): radiation added to the
+"""Python version of radsub06.f (YREC 7be4133): radiation added to the
 OPAL 2006 gas equation of state."""
 
 from pyrec import eos06misc_mod
@@ -9,22 +9,26 @@ SIGMACC = 1.8914785e-3
 APROP = 83.14510
 
 
-def radsub06(irad, t6, density, moles, tmass):
+def radsub06(irad: int, t6: float, density: float, moles: float, tmass: float) -> None:
     """Rewrite EOS(IRI(1..7)) in EOS06MISC_MOD with radiation added (when
     irad != 0): pressure, energy, entropy, dE/drho, c_V, chi_rho, chi_T,
     and add the radiation's differences to Gamma_1 and Gamma_2/(Gamma_2-1).
     With irad = 0 only the gas values are rewritten (c_V times Nk/M).
 
-    Translates: radsub06.f#RADSUB06 (09c3b9b)
+    Translates: radsub06.f#RADSUB06 (7be4133)
 
     Arguments: irad; t6, T in 10^6 K; density (g/cc); moles; tmass.
     Returns nothing.
+
     """
+
+    # Constants (Fortran lines 56–58).
     eos = eos06misc_mod.eos
     iri = eos06misc_mod.iri
     rat = SIGMACC
     molenak = moles * APROP     # Mb-cc/unit T6
 
+    # The equation of state without radiation (Fortran lines 60–72).
     pt = eos[iri[1]]
     et = eos[iri[2]]
     st = eos[iri[3]]
@@ -36,6 +40,8 @@ def radsub06(irad, t6, density, moles, tmass):
     gam1t_norad = chir + chitt * gam3pt_norad
     gam2pt_norad = gam1t_norad / gam3pt_norad
 
+    # With radiation; esac06 calls this routine only with irad = 1
+    # (Fortran lines 74–103).
     if irad != 0:
         pr = 4.0 / 3.0 * rat * t6**4    # Mb
         er = 3.0 * pr / density         # Mb-cc/gm
@@ -50,10 +56,12 @@ def radsub06(irad, t6, density, moles, tmass):
         gam3pt = pt * chitt / (cvtt * density * t6)
         gam1t = chir + chitt * gam3pt   # eq 16.16 Landau & Lifshitz
         gam2pt = gam1t / gam3pt
-
+        # Add the differences with and without radiation.
         eos[iri[8]] = eos[iri[8]] + gam1t - gam1t_norad
         eos[iri[9]] = eos[iri[9]] + gam2pt - gam2pt_norad
-        # Question (see the page): Gamma_3 (IRI(10)) is not corrected.
+        # Gamma_3 (IRI(10)) is not corrected: it is never computed.
+
+    # Store (Fortran lines 109–115).
     eos[iri[1]] = pt
     eos[iri[2]] = et
     eos[iri[3]] = st

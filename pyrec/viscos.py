@@ -1,4 +1,4 @@
-"""Python version of viscos.f (YREC 09c3b9b): the kinematic viscosity and
+"""Python version of viscos.f (YREC 7be4133): the kinematic viscosity and
 radiative thermal diffusivity of every shell."""
 
 import math
@@ -12,7 +12,7 @@ from pyrec import temp_mod
 # DATA: the atomic mass unit (g), and the mass and charge of HCOMP's first
 # 11 species (index 0 unused; species 3, the total Z, has charge 0).
 # Question (see the page): written here, not taken from the constants;
-# some masses differ from standard values.
+# some masses differ from standard values (Fortran lines 37–42).
 AMU = 1.6605655e-24
 WEIGHT = np.array([0.0, 1.007825, 4.0026, 1.0, 3.01603, 12.0,
                    13.00335, 14.00307, 15.0011, 15.99491, 16.99491,
@@ -26,26 +26,32 @@ viscy = np.zeros(12)
 compn = np.zeros(12)
 
 
-def viscos(hcomp, hd, ht, m):
+def viscos(hcomp: np.ndarray, hd: np.ndarray, ht: np.ndarray, m: int) -> None:
     """For every shell, the kinematic viscosity (radiative, Ledoux 1958,
     plus molecular, Spitzer 1962) into temp_mod.visc, and the radiative
     thermal diffusivity into temp_mod.thdif; the Endal & Sofia values are
     computed for comparison and discarded.
 
-    Translates: viscos.f#VISCOS (09c3b9b)
+    Translates: viscos.f#VISCOS (7be4133)
 
     Arguments: hcomp[species, shell], log rho hd and log T ht (index 0
     unused); m, the number of shells. Reads the opacity scrtch_mod.so and
     temp_mod.cp (from physic). None is returned.
+
     """
+
     cln = constants_mod.cln
     so = scrtch_mod.so
     visc = temp_mod.visc
     thdif = temp_mod.thdif
     cp = temp_mod.cp
+
     # Question (see the page): the comment says convective zones are
     # skipped, but every shell is computed.
     for im in range(1, m + 1):              # loop 100
+
+        # Number densities, the mean charge per ion, T, rho and ELECN
+        # (Fortran lines 47–61).
         o = so[im]
         zf = 0.0
         comsum = 0.0
@@ -58,10 +64,16 @@ def viscos(hcomp, hd, ht, m):
         t = math.exp(cln * ht[im])
         t2 = t**2
         rho = math.exp(cln * hd[im])
-        # Question (see the page): mean charge per ion, not per unit mass.
+        # Suspected bug (see the page): the mean charge per ion, not the
+        # electron density the comment names.
         elecn = zf * rho / AMU
+
+        # Radiative viscosity, Ledoux and Endal & Sofia (Fortran lines
+        # 62–67).
         viscr = 6.7282653e-26 * t2 * t2 / (o * rho**2)
         viscr2 = 3.36e-25 * t2 * t2 / (hcomp[1, im] + 1.0) / rho**2
+
+        # Molecular viscosity, Spitzer (Fortran lines 68–92).
         factor = min(1.0, 4.2e5 / t)
         lambd1 = 9.424536845 + 0.5 * math.log(t2 * t * factor / (elecn * zf**2))
         c = 3.125e-15 * math.sqrt(t) * t2
@@ -84,7 +96,9 @@ def viscos(hcomp, hd, ht, m):
                 vismol = vismol + viscx[i]
         vismol = vismol / rho
         visc[im] = viscr + vismol
-        # Endal & Sofia, for comparison only (question: never used).
+
+        # Endal & Sofia, for comparison only; unused? (Fortran lines
+        # 93–103).
         vismo2 = 0.0
         con = 2.21e-15 * math.sqrt(t) * t2
         for i in range(1, 12):              # loop 40
@@ -95,6 +109,8 @@ def viscos(hcomp, hd, ht, m):
             if viscy[i] > 0.0:
                 vismo2 = vismo2 + viscy[i]
         vismo2 = vismo2 / rho / comsum
-        visc2 = viscr2 + vismo2             # noqa: F841 (unused, as in Fortran)
+        visc2 = viscr2 + vismo2  # noqa: F841  (unused in the Fortran too)
+
+        # Radiative thermal diffusivity (Fortran lines 104–107).
         thdif[im] = (1.6e1 * constants_mod.cc13 * 5.669e-5 * t * t2
                      / (o * rho**2 * cp[im]))

@@ -1,12 +1,14 @@
-"""Python version of lax_wendrof2.f (YREC development, 09c3b9b)."""
+"""Python version of lax_wendrof2.f (YREC development, 7be4133)."""
 
 from pyrec import constants_mod
+import numpy as np
 from pyrec import dimensions_mod  # noqa: F401  (JSON, the declared size)
 from pyrec import gravez_mod
 from pyrec import nmlpar_mod
 
 
-def lax_wendrof2(dt, ecod1_h, em_h, ex, npt, stot, ldoli):
+def lax_wendrof2(dt: float, ecod1_h: np.ndarray, em_h: np.ndarray, ex: np.ndarray, npt: int, stot: float,
+                 ldoli: bool) -> None:
     """Second (full) step of the Lax-Wendroff scheme for settling.
 
     Adds to X at the grid points the change over a full time step, from
@@ -15,7 +17,7 @@ def lax_wendrof2(dt, ecod1_h, em_h, ex, npt, stot, ldoli):
     ``gravez_mod.ecod1z_h``) when metal diffusion is on and ``ldoli`` is
     false. Follows LAX_WENDROF1.
 
-    Translates: lax_wendrof2.f#LAX_WENDROF2 (09c3b9b)
+    Translates: lax_wendrof2.f#LAX_WENDROF2 (7be4133)
 
     Parameters
     ----------
@@ -36,24 +38,30 @@ def lax_wendrof2(dt, ecod1_h, em_h, ex, npt, stot, ldoli):
 
     Updates ``gravez_mod.ez[1..npt]`` with metal diffusion. Nothing is
     returned.
+
     """
+
     ecod1z_h = gravez_mod.ecod1z_h
     ez = gravez_mod.ez
     dt2 = dt * constants_mod.c4pi
-    # Central boundary condition.
+
+    # Central boundary condition (Fortran lines 41–45).
     emass = em_h[1]
     dex = dt2 * ecod1_h[1] / emass
     ex[1] = ex[1] + dex
-    # General case (loop 10).
+
+    # General case (loop 10) (Fortran lines 48–52).
     for i in range(2, npt):
         emass = em_h[i] - em_h[i - 1]
         dex = dt2 * (ecod1_h[i] - ecod1_h[i - 1]) / emass
         ex[i] = ex[i] + dex
-    # Surface boundary condition.
+
+    # Surface boundary condition (Fortran lines 54–56).
     emass = stot - em_h[npt - 1]
     dex = -dt2 * ecod1_h[npt - 1] / emass
     ex[npt] = ex[npt] + dex
-    # Metal diffusion (MHP 3/94).
+
+    # Metal diffusion (MHP 3/94) (Fortran lines 58–72).
     if nmlpar_mod.ldifz and not ldoli:
         emass = em_h[1]
         dez = dt2 * ecod1z_h[1] / emass

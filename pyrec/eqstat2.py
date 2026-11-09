@@ -1,4 +1,4 @@
-"""Python version of eqstat2.f (YREC development, 09c3b9b): the core of
+"""Python version of eqstat2.f (YREC development, 7be4133): the core of
 the equation of state, choosing and blending Saha, SCV, the relativistic
 gas and OPAL 2006 by regime."""
 
@@ -16,7 +16,7 @@ from pyrec.eqsaha import eqsaha
 from pyrec.eqscve import eqscve
 from pyrec.oeqos06 import oeqos06
 
-# DATA, kept between calls (SAVE).
+# DATA, kept between calls (SAVE; Fortran lines 76–81).
 NZP1 = 12
 ATOMWT = np.array([0.0, 0.9921, 0.24975, 0.08322, 0.4995])
 SCALET = 0.500
@@ -31,15 +31,20 @@ qdtt0 = qdtp0 = qcpt0 = qcpp0 = qat0 = qap0 = 0.0
 qdt2 = qcp2 = dela2 = 0.0
 
 
-def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
-            amu, emu, eta, qdt, qdp, qcp, dela, qdtt, qdtp, qat, qap, qcpt,
-            qcpp, lderiv, latmo, ksaha):
+def eqstat2(tl: float, t: float, pl: float, p: float, dl: float, d: float, x: float, z: float, beta: float,
+            betai: float, beta14: float, fxion: np.ndarray, rmu: float, amu: float, emu: float, eta: float, qdt: float,
+            qdp: float, qcp: float, dela: float, qdtt: float, qdtp: float, qat: float, qap: float, qcpt: float,
+            qcpp: float, lderiv: bool, latmo: bool,
+            ksaha: int) -> tuple[float, float, float, float, float, float,
+                                 float, float, float, float, float, float,
+                                 float, float, float, float, float, float,
+                                 float, float, float, int]:
     """Choose and blend the equations of state by regime: composition,
     radiation, Saha (or SCV) below TSCUT, the relativistic gas above it
     with a smooth-step blend between, and OPAL 2006 on top where its
     table covers the point.
 
-    Translates: eqstat2.f#EQSTAT2 (09c3b9b)
+    Translates: eqstat2.f#EQSTAT2 (7be4133)
 
     Arguments: tl, pl (log T, log P), x, z, lderiv (also the second
     derivatives), latmo (passed to eqsaha), ksaha (eqsaha's iteration
@@ -49,7 +54,9 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
 
     Returns (t, p, dl, d, beta, betai, beta14, rmu, amu, emu, eta, qdt,
     qdp, qcp, dela, qdtt, qdtp, qat, qap, qcpt, qcpp, ksaha).
+
     """
+
     global qdtt0, qdtp0, qcpt0, qcpp0, qat0, qap0, qdt2, qcp2, dela2
     c = constants_mod
     nml = nmlpar_mod
@@ -60,11 +67,12 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
                 qdp, qcp, dela, qdtt, qdtp, qat, qap, qcpt, qcpp, ksaha)
 
     # lsaha: solve Saha (else fully ionized); lonlys: Saha alone, no
-    # relativistic gas.
+    # relativistic gas (Fortran lines 87–88).
     lsaha = tl < nml.tscut
     lonlys = tl <= (nml.tscut - SCALET)
 
-    # Composition: AMU (ions per unit mass) and the number fractions FX.
+    # Composition: AMU (ions per unit mass) and the number fractions FX
+    # (Fortran lines 91–152).
     z0 = z
     if nml.ldifz:
         # Metal diffusion: all metals scale together by Z/ZENV.
@@ -111,7 +119,7 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
                 fx[7] = fx[7] + dfx1 * amui
                 fx[12] = fx[12] + dfx4 * amui
 
-    # Radiation pressure.
+    # Radiation pressure (Fortran lines 154–166).
     t = math.exp(c.cln * tl)
     p = math.exp(c.cln * pl)
     beta14 = c.ca3 * (t**2)**2 / p
@@ -122,13 +130,11 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
                           f" EQSTAT2: BETA is negative: TL,PL,BETA,1-BETA "
                           f"{tl} {pl} {beta} {1.0 - beta}")
     betai = 1.0 / beta
-    # Question (see the page): beta14 is 4(1-beta)/beta here, 1-beta
-    # after OPAL.
     beta14 = 4.0 * betai * min(1.0, beta14)
     eta = 0.0
 
     if not lsaha:
-        # Fully ionized gas.
+        # Fully ionized gas (Fortran lines 167–178).
         emu = x * ATOMWT[1] + (1.0 - x) * ATOMWT[4]
         rmu = c.cgas * (amu + emu)
         fxion[1] = 1.0
@@ -139,7 +145,10 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
                         qcp, dela, qdtt, qdtp, qat, qap, qcpt, qcpp)
     else:
         if nml.lscv:
-            # SCV replaces Saha, except for the second derivatives.
+            # SCV replaces Saha, except for the second derivatives
+            # (Fortran lines 181–187).
+            # Question (see the page): rmu, emu and the second derivatives
+            # stay from eqsaha.
             (dl, d, rmu, emu, qdt, qdp, qcp, dela, qdtt, qdtp, qat, qap,
              qcpt, qcpp, ksaha) = eqsaha(
                 fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
@@ -149,8 +158,10 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
             dl, d, qdt, qdp, qcp, dela, lcalc = eqscve(
                 tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela,
                 lcalc)
-            # Question (see the page): this block never runs, and would
-            # use qdt2, qcp2, dela2, dl1, d1 unset.
+
+            # Suspected bug (see the page): this block never runs, and
+            # would use qdt2, qcp2, dela2, dl1, d1 unset (Fortran lines
+            # 189–241).
             lscvd = False
             if lscvd and lcalc:
                 # Unset in the Fortran (uninitialized locals).
@@ -195,13 +206,15 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
                 qcpp = qcpp1
                 qcpt = qcpt1
         else:
-            # Saha alone (Prather's EOS).
+            # Saha alone (Prather's EOS; Fortran lines 242–247).
             (dl, d, rmu, emu, qdt, qdp, qcp, dela, qdtt, qdtp, qat, qap,
              qcpt, qcpp, ksaha) = eqsaha(
                 fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
                 amu, emu, lderiv, latmo, qdt, qdp, qcp, dela, qdtt, qdtp,
                 qat, qap, qcpt, qcpp, ksaha)
-        # Store the Saha values for the blend with the relativistic gas.
+
+        # Store the Saha values for the blend with the relativistic gas
+        # (Fortran lines 249–261).
         dl0 = dl
         qdt0 = qdt
         qdp0 = qdp
@@ -214,8 +227,10 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
             qcpp0 = qcpp
             qat0 = qat
             qap0 = qap
+
         if not lonlys:
-            # Transition band: the fully ionized gas too, then blend.
+            # Transition band: the fully ionized gas too (Fortran lines
+            # 262–271).
             emu = x * ATOMWT[1] + (1.0 - x) * ATOMWT[4]
             rmu = c.cgas * (amu + emu)
             fxion[1] = 1.0
@@ -225,7 +240,11 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
              qcpp) = eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt,
                             qdp, qcp, dela, qdtt, qdtp, qat, qap, qcpt,
                             qcpp)
-            # Smooth step W(w) = w^3 (6w^2 - 15w + 10).
+
+            # Blend with the smooth step W(w) = w^3 (6w^2 - 15w + 10)
+            # (Fortran lines 273–304).
+            # No term from dW/dlog T (WT1), a known gap (KNOWN_ISSUES.md,
+            # section 40).
             wts = SCALES * (nml.tscut - tl)
             wts2 = wts * wts
             wt0 = wts2 * wts * (6.0 * wts2 - 15.0 * wts + 10.0)
@@ -234,7 +253,8 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
             qdp0 = qdp0 - qdp
             qcp0 = qcp0 - qcp
             dela0 = dela0 - dela
-            # Question (see the page): no differences for qdtt0, qdtp0.
+            # No differences for qdtt0, qdtp0, a known gap (KNOWN_ISSUES.md,
+            # section 40).
             qcpt0 = qcpt0 - qcpt
             qcpp0 = qcpp0 - qcpp
             qat0 = qat0 - qat
@@ -259,7 +279,8 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
                 qap = qap + wt0 * qap0
     # label 200
 
-    # OPAL 2006, replacing or blended with the Yale/SCV result.
+    # OPAL 2006, replacing or blended with the Yale/SCV result (Fortran
+    # lines 311–358).
     # Question (see the page): the rough ranges are hard-coded.
     if nml.lopale06 and t >= 1.870e3 and t <= 200e6 and dl <= 7.0:
         # oeqos06's alternate return (*998) is its last returned value,
@@ -301,6 +322,7 @@ def eqstat2(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
             qdp = qdp + fac * (qdpo - qdp)
             qcp = qcp + fac * (qcpo - qcp)
             dela = dela + fac * (delao - dela)
-    # label 998: Z = Z0 (question 6: nothing here changes z).
+    # label 998: Z = Z0, though nothing here changes z (unused?; Fortran
+    # lines 361–363).
     z = z0
     return _out()

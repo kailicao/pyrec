@@ -1,8 +1,8 @@
-"""Python version of eos06misc_mod.f (YREC 09c3b9b): results and workspace
+"""Python version of eos06misc_mod.f (YREC 7be4133): results and workspace
 of the OPAL 2006 EOS interpolation, formerly COMMON/EEOS06/, /AAEOS06/,
 /BBEOS06/ and /BEOS06/.
 
-Translates: eos06misc_mod.f#EOS06MISC_MOD (09c3b9b)
+Translates: eos06misc_mod.f#EOS06MISC_MOD (7be4133)
 
 Routines that USE EOS06MISC_MOD import this module and write
 ``eos06misc_mod.<name>``. Arrays have index 0 unused.
@@ -10,17 +10,18 @@ Routines that USE EOS06MISC_MOD import this module and write
 
 import numpy as np
 
-# Table dimensions (PRIVATE in the Fortran).
+# Table dimensions (PRIVATE in the Fortran) (Fortran lines 34–37).
 _MX = 5
 _MV = 10
 _NR = 169
 _NT = 197
 
+# Fortran lines 39–58.
 esact = 0.0                         # one quantity at (T6, rho) (t6rinteos06)
-eos = np.zeros(_MV + 1)             # the ten interpolated quantities (esac06)
+eos = np.zeros(_MV + 1)             # the interpolated quantities (esac06); nine are computed
 q = np.zeros(5)                     # quadratics in T (t6rinteos06)
 h = np.zeros(5)                     # quadratics in rho (t6rinteos06)
-xxh = 0.0                           # set and read nowhere
+xxh = 0.0                           # set and read nowhere (unused in the Fortran too)
 l1 = 0                              # density indices around the point (esac06)
 l2 = 0
 l3 = 0
@@ -35,7 +36,8 @@ zz = np.zeros(_MX + 1)              # Z of each table (readcoeos06)
 iri = np.zeros(11, dtype=int)       # inverse of index (seteos06)
 index = np.arange(11)               # storage order of the quantities, 1..10
 # Number of temperatures for each density, and of densities for each
-# temperature (initializers, expanded from the DATA repeat counts).
+# temperature (initializers, expanded from the DATA repeat counts)
+# (Fortran lines 60–70).
 nta = np.array([0, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197,
      197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197,
      197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197, 197,

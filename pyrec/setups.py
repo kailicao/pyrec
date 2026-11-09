@@ -1,4 +1,4 @@
-"""Python version of setups.f (YREC 09c3b9b): the one-time setup of a run's
+"""Python version of setups.f (YREC 7be4133): the one-time setup of a run's
 constants and tables."""
 
 import math
@@ -11,7 +11,7 @@ from pyrec import comp_mod
 from pyrec import constants_mod
 from pyrec import debhu_mod
 from pyrec import fac_mod
-from pyrec import iounits_mod  # unit numbers; Python opens files by name
+from pyrec import iounits_mod  # ISHORT; Python opens the tables by name
 from pyrec import nmlpar_mod
 from pyrec import scveos_mod
 from pyrec.alfilein import alfilein
@@ -27,6 +27,7 @@ NTS = 63             # temperatures of the SCV tables
 def _fields(line, widths):
     """Split a fixed-format record into floats (a blank field reads as 0,
     as in Fortran)."""
+
     out, pos = [], 0
     for w in widths:
         text = line[pos:pos + w].strip()
@@ -38,26 +39,29 @@ def _fields(line, widths):
 def _read_e16(f, n, rows):
     """Read n values in E16.8 fields, as many per record as `rows` says
     (formats 201, 202, 203, 206, 208)."""
+
     values = []
     for count in rows:
         values += _fields(f.readline(), [16] * count)
     return values[:n]
 
 
-def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
-           fscvz):
+def setups(falex06: str, fallard: str, fatm: str, ffermi: str, fliv95: str, fpurez: str, fscvh: str, fscvhe: str,
+           fscvz: str) -> None:
     """Set the physical constants, then read every table the run needs:
     opacities (through setupopac), the Fermi-Dirac tables, the
     model-atmosphere pressure tables, the OPAL 2006 EOS tables and the SCV
     EOS tables. All results go into modules; nothing is returned.
 
-    Translates: setups.f#SETUPS (09c3b9b)
+    Translates: setups.f#SETUPS (7be4133)
 
     Arguments: the file names of the tables (strings).
+
     """
+
     c = constants_mod
 
-    # Setup constants (cgs).
+    # Setup constants (cgs) (Fortran lines 131–177).
     c.clndp = math.log(10.0)
     c.cln = c.clndp
     c.clni = 1.0 / c.cln
@@ -89,24 +93,26 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
     c.cdelrl = -c.c4pi3l - c.csigl - math.log10(16.0)
     c.cmixl2 = c.cc13
     c.cmixl3 = 16.0 * math.sqrt(2.0) * c.csig
-    # The Debye-Hueckel constant CDH (DBG).
+
+    # The Debye-Hueckel constant CDH (DBG) (Fortran lines 178–183).
     hmass = 1.0 / 6.0222137e23
     elec = 4.802e-10
     debhu_mod.cdh = (-math.sqrt(c.cpi / (cboltz * hmass * hmass * hmass))
                      * elec * elec * elec / 3.0)
+
     # Charges of C, N, O, Ne, Na, Mg, Al, Si, P, S, Cl, Ar, Ca, Ti, Cr, Mn,
-    # Fe, Ni.
+    # Fe, Ni (Fortran lines 184–202).
     for k, z in enumerate([6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18,
                            20, 22, 24, 25, 26, 28], start=1):
         debhu_mod.dhnue[k] = float(z)
 
-    # Temperature at tau = 2/3 of the HRA.
+    # Temperature at tau = 2/3 of the HRA (Fortran lines 203–206).
     atmos_mod.hras = hra(c.cc23)
 
-    # Opacity tables.
+    # Opacity tables (Fortran lines 207–211).
     setupopac(comp_mod.xenv, falex06, fliv95, fpurez)
 
-    # F-tables for the degenerate equation of state.
+    # F-tables for the degenerate equation of state (Fortran lines 214–224).
     with open(ffermi) as f:
         for arr in (ccr_mod.dval, ccr_mod.etat8):
             vals = []
@@ -120,15 +126,19 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
             # used as subscripts at once.
             i, j = int(line[0:5]), int(line[5:10])
             ccr_mod.dtable[1:6, i, j] = _fields(line[10:], [12] * 5)
+
+    # The index IDEN of the density bins; the table's density grid must
+    # increase (Fortran lines 225–246).
     k1 = 1
     for i in range(1, 42):
-        # The table's density grid must increase ("should be INT(DVAL, etc.)") (MHP 10/02).
+        # Question (see the page): "should be INT(DVAL, etc.)" (MHP 10/02).
         if ccr_mod.dval[i + 1] <= ccr_mod.dval[i]:
-            print(' ' + '>' * 39 + '<' * 40)      # format 1000, to ISHORT
-            print(' ERROR IN SUBROUTINE SETUPS')
-            print(f' GLITCH IN FERMI TABLE ELEMENT{i:4d}')
-            print(' RUN STOPPED')
-            raise SystemExit
+            iounits_mod.write(iounits_mod.ishort,          # format 1000
+                              ' ' + '>' * 39 + '<' * 40
+                              + '\n ERROR IN SUBROUTINE SETUPS'
+                              + f'\n GLITCH IN FERMI TABLE ELEMENT{i:4d}'
+                              + '\n RUN STOPPED')
+            raise SystemExit(3)
         k = int((ccr_mod.dval[i + 1] - ccr_mod.dval[i]) * 20.0 + 0.10)
         k2 = k1 + k - 1
         if i == 41:
@@ -137,7 +147,8 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
             ccr_mod.iden[j] = i
         k1 = k2 + 1
 
-    # Pressure tables for the surface boundary condition.
+    # Pressure tables for the surface boundary condition (Fortran lines
+    # 248–307).
     kttau = nmlpar_mod.kttau
     if kttau == 3 or kttau == 4:
         a = atmos2_mod
@@ -155,7 +166,7 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
         if kttau == 4:
             alfilein(fallard)
     elif kttau == 5:
-        # Kurucz/Castelli atmospheres (JNT 6/14).
+        # Kurucz/Castelli atmospheres (JNT 6/14) (Fortran lines 309–357).
         a = atmos2c_mod
         with open(fatm) as f:
             atmos2_mod.atmz = _fields(f.readline(), [11, 16])[1]  # 200
@@ -166,14 +177,15 @@ def setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
             f.readline()
             for j in range(1, NTC + 1):
                 a.atmplc[j, 1:NGC + 1] = _read_e16(f, NGC, [4, 4, 3])
-        # Question (see the page): an empty row sets IMIN2 to NG, not NGC.
+        # Suspected bug (see the page): an empty row sets IMIN2 to NG, not
+        # NGC.
         _set_imin(a.atmplc, NTC, NGC, fac_mod.imin2, fac_mod.iminmax2, NG)
 
-    # OPAL 2006 EOS table.
+    # OPAL 2006 EOS table (Fortran lines 360–367).
     if nmlpar_mod.lopale06:
         seteos06()
 
-    # SCV equation-of-state tables (MHP 5/97).
+    # SCV equation-of-state tables (MHP 5/97) (Fortran lines 368–393).
     if nmlpar_mod.lscv:
         s = scveos_mod
         with open(fscvh) as fh, open(fscvhe) as fhe, open(fscvz) as fz:
@@ -197,7 +209,9 @@ def _set_imin(atmpl, nt, ng, imin, iminmax, ng_empty):
     """G Somers 5/15: for each temperature j, the range of gravities with a
     valid pressure: iminmax[j], the highest, and imin[j], the lowest of the
     contiguous valid run below it (or ng_empty if there is none). Written
-    out twice in the Fortran, for each grid."""
+    out twice in the Fortran, for each grid (Fortran lines 270–299 and
+    327–356)."""
+
     for j in range(1, nt + 1):
         lcatch = False
         for k in range(ng, 0, -1):

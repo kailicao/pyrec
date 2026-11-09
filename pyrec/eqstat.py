@@ -1,26 +1,29 @@
-"""Python version of eqstat.f (YREC 09c3b9b): the front end to the
+"""Python version of eqstat.f (YREC 7be4133): the front end to the
 equation of state, with numerical second derivatives."""
 
 import math
+import numpy as np
 
 from pyrec import constants_mod
 from pyrec import nmlpar_mod
 from pyrec.eqstat2 import eqstat2
 
 # SAVE: the counters of the derivative calls. ksahax is never set from
-# ksaha, because of the misspelled kssahax (see the page's question 1).
+# ksaha, because of the misspelled kssahax (see the page's suspected bug).
 ksahax = 0
 kssahax = 0
 
 
-def eqstat(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
-           amu, emu, eta, qdt, qdp, qcp, dela, qdtt, qdtp, qat, qap, qcpt,
-           qcpp, lderiv, latmo, ksaha):
+def eqstat(tl: float, t: float, pl: float, p: float, dl: float, d: float, x: float, z: float, beta: float, betai: float,
+           beta14: float, fxion: np.ndarray, rmu: float, amu: float, emu: float, eta: float, qdt: float, qdp: float,
+           qcp: float, dela: float, qdtt: float, qdtp: float, qat: float, qap: float, qcpt: float, qcpp: float,
+           lderiv: bool, latmo: bool, ksaha: int) -> tuple[float, float, float, float, float, float, float, float,
+           float, float, float, float, float, float, float, float, float, float, float, float, float, int]:
     """Call EQSTAT2, the equation of state, at the point; with lderiv and
     nmlpar_mod.lnumderiv, first compute the second derivatives by central
     differences from four calls at log T +- 3e-4 and log P +- 1.5e-3.
 
-    Translates: eqstat.f#EQSTAT (09c3b9b)
+    Translates: eqstat.f#EQSTAT (7be4133)
 
     Arguments: tl, pl (log T, log P), x, z, lderiv (second derivatives
     wanted), latmo (atmosphere), ksaha (EQSAHA's iteration counter,
@@ -31,18 +34,23 @@ def eqstat(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
     qdp, qcp, dela, qdtt, qdtp, qat, qap, qcpt, qcpp, ksaha). The Fortran
     also assigns TL and PL, but only back to their own values, so they are
     not returned. Without lderiv, qdtt ... qcpp come back as passed in.
+
     """
+
     global ksahax, kssahax
     cln = constants_mod.cln
 
+    # Keep the point's TL and PL (Fortran lines 82–85).
     plo = pl
     tlo = tl
     latmox = latmo
-    # Question (see the page): the misspelled kssahax leaves ksahax unset.
+    # Suspected bug (see the page): the misspelled kssahax leaves ksahax
+    # unset.
     kssahax = ksaha
 
     if lderiv and nmlpar_mod.lnumderiv:
-        # Central differences, error of order h**2.
+        # Central differences, error of order h**2: the steps (Fortran
+        # lines 87–106).
         dpl = 0.150      # the approximate table intervals
         dtl = 0.030
         dpl = dpl * 0.01  # empirically, scaling the intervals down by 100
@@ -53,7 +61,7 @@ def eqstat(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
         dl1 = dl  # start the table lookups from the called values
         d1 = d
 
-        # Derivatives with respect to T.
+        # Derivatives with respect to T (Fortran lines 108–125).
         ttl = tl + dtl
         t = 10.0 ** ttl
         lderiv2 = False
@@ -77,7 +85,7 @@ def eqstat(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
         tl = tlo
         t = 10.0 ** tlo  # restore the original T
 
-        # Derivatives with respect to P.
+        # Derivatives with respect to P (Fortran lines 127–143).
         ppl = pl + dpl
         p = 10.0 ** ppl
         lderiv2 = False
@@ -100,6 +108,7 @@ def eqstat(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
         qcpp1 = (math.log10(qcp1) - math.log10(qcp2)) / dpl2
         qap1 = (math.log10(dela1) - math.log10(dela2)) / dpl2
 
+        # Fortran lines 145–150.
         qdtt = qdtt1
         qdtp = qdtp1
         qat = qat1
@@ -107,9 +116,11 @@ def eqstat(tl, t, pl, p, dl, d, x, z, beta, betai, beta14, fxion, rmu,
         qcpp = qcpp1
         qcpt = qcpt1
 
-    tl = tlo  # restore the original TL and PL
+    # Restore the original TL and PL (Fortran lines 153–154).
+    tl = tlo
     pl = plo
 
+    # The call at the point (Fortran lines 156–172).
     if lderiv and not nmlpar_mod.lnumderiv:
         # Derivatives wanted, none numerical: EQSTAT2's analytic ones.
         lderiv2 = True

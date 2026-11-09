@@ -1,13 +1,15 @@
-"""Python version of meval.f (YREC development, 09c3b9b)."""
+"""Python version of meval.f (YREC development, 7be4133)."""
 
 from pyrec import dimensions_mod  # noqa: F401  (JSON, the declared size)
+import numpy as np
 from pyrec.cases import cases
 from pyrec.choose import choose
 from pyrec.search import search
 from pyrec.spline import spline
 
 
-def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
+def meval(xval: np.ndarray, yval: np.ndarray, xtab: np.ndarray, ytab: np.ndarray, mtab: np.ndarray, num: int, nume: int,
+          eps: float, err: int) -> int:
     """Evaluate McAllister and Roulier's shape-preserving quadratic spline.
 
     Walks through the evaluation points ``xval`` and the data intervals
@@ -16,7 +18,7 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
     once and SPLINE evaluates it; points beyond the ends are extrapolated
     with the end intervals' splines. Called only by OSPLIN.
 
-    Translates: meval.f#MEVAL (09c3b9b)
+    Translates: meval.f#MEVAL (7be4133)
 
     Parameters
     ----------
@@ -39,39 +41,48 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
     err : int
         0 normal; 1 extrapolation occurred; 2 ``xval`` not sorted (then
         nothing is computed).
+
     """
+
     # SAVE in the Fortran: every local is set before it is read within a
     # call, so all are kept local here. The spline's parameters start at
     # zero; CASES returns those a case does not set as passed in, and
     # SPLINE reads only those the case set.
     e1 = e2 = v1 = v2 = w1 = w2 = z1 = z2 = y1 = y2 = 0.0
+
+    # Fortran lines 88–90.
     start = 1
     end = nume
     err = 0
+
+    # Determine if xval is nondecreasing (loop 10, Fortran lines 91–99).
     if nume != 1:
-        # Determine if xval is nondecreasing (loop 10).
         for i in range(1, nume):
             if xval[i + 1] < xval[i]:
-                # Question (see the page): OSPLIN does not check err, and
-                # yval is left as it was.
+                # Suspected bug (see OSPLIN's page): OSPLIN does not check
+                # err, and yval is left as it was.
                 err = 2
                 return err  # label 230
 
     # Question (see the page): the Fortran's comment here says points
     # beyond the data get the end values; the code extrapolates instead.
-    # Points below the first data abscissa (label 20, loop 30).
+    # Points below the first data abscissa (label 20, loop 30, Fortran
+    # lines 107–110).
     for i in range(1, nume + 1):
         if xval[i] >= xtab[1]:
             break
         start = i + 1
-    # Points above the last data abscissa (label 40, loop 50).
+
+    # Points above the last data abscissa (label 40, loop 50, Fortran
+    # lines 113–121).
     for i in range(1, nume + 1):
         ind = nume + 1 - i
         if xval[ind] <= xtab[num]:
             break
         end = ind - 1
 
-    # Extrapolate below the first data point (label 60).
+    # Extrapolate below the first data point (label 60, Fortran lines
+    # 126–138).
     if start != 1:
         err = 1
         ncase = choose(xtab[1], ytab[1], mtab[1], mtab[2], xtab[2],
@@ -85,16 +96,18 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
         if nume == 1:
             return err
 
-    # label 80
+    # Label 80 (Fortran lines 143–146).
     goto_200 = (nume == 1) and (end != nume)
     if not goto_200:
-        # The interval of the first in-range point. Possible bug (see
+        # The interval of the first in-range point. Suspected bug (see
         # the page): if every point lies below xtab[1], start is
         # nume + 1 and the Fortran reads XVAL(NUME+1) here.
         lcn, fnd = search(xtab, num, xval[start], 0, 0)
         lcn1 = lcn + 1
+
+        # Points equal to a data point take its value (label 90, Fortran
+        # lines 152–178).
         if fnd != 0:
-            # Points equal to a data point take its value (label 90).
             while True:
                 yval[start] = ytab[lcn]
                 start1 = start
@@ -118,8 +131,9 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
                 lcn = lcn1  # label 120
                 lcn1 = lcn1 + 1
 
-        # The points within range of the data (label 130). With
-        # extrapolation below, the parameters of interval 1 are known.
+        # The points within range of the data (label 130, Fortran lines
+        # 185–190). With extrapolation below, the parameters of interval 1
+        # are known.
         if not (lcn == 1 and err == 1):
             ncase = choose(xtab[lcn], ytab[lcn], mtab[lcn], mtab[lcn1],
                            xtab[lcn1], ytab[lcn1], eps, 0)
@@ -127,7 +141,9 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
                 xtab[lcn], ytab[lcn], mtab[lcn], mtab[lcn1],
                 xtab[lcn1], ytab[lcn1],
                 e1, e2, v1, v2, w1, w2, z1, z2, y1, y2, ncase)
-        for i in range(start, end + 1):  # label 140, loop 190
+
+        # Label 140, loop 190 (Fortran lines 192–237).
+        for i in range(start, end + 1):
             if xval[i] < xtab[lcn1]:
                 # label 150: the parameters of this interval are known.
                 yval[i] = spline(xval[i], z1, z2, xtab[lcn], ytab[lcn],
@@ -157,13 +173,16 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
                         yval[i] = ytab[lcn1]  # label 160
                         break
 
-        # The points beyond the last data point.
+        # The points beyond the last data point (Fortran lines 242–243).
+        # Suspected bug (see the page): with every point above xtab[num],
+        # end is 0 and the Fortran reads XVAL(0).
         if end == nume:
             return err
         goto_200 = not (lcn1 == num and xval[end] != xtab[num])
 
+    # Label 200: extrapolation above the last data point (Fortran lines
+    # 249–255).
     if goto_200:
-        # label 200: extrapolation above the last data point.
         err = 1
         num1 = max(num - 1, 1)
         ncase = choose(xtab[num1], ytab[num1], mtab[num1], mtab[num],
@@ -172,7 +191,8 @@ def meval(xval, yval, xtab, ytab, mtab, num, nume, eps, err):
             xtab[num1], ytab[num1], mtab[num1], mtab[num], xtab[num],
             ytab[num], e1, e2, v1, v2, w1, w2, z1, z2, y1, y2,
             ncase)
-    # label 210
+
+    # Label 210 (Fortran lines 256–261).
     end1 = end + 1
     num1 = max(num - 1, 1)
     for i in range(end1, nume + 1):  # loop 220

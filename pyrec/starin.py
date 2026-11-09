@@ -1,4 +1,4 @@
-"""Python version of starin.f (YREC a8a5950): the starting model of a run,
+"""Python version of starin.f (YREC 7be4133): the starting model of a run,
 read from file or kept, and prepared for evolution."""
 
 import math
@@ -71,11 +71,15 @@ def _e(x, w, d):
     return f"{s + f'E{e:+03d}':>{w}}"
 
 
-def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
-           hd, hi, hjm, hkerot, hl, hp, hr, hs, hs1, hs2, hstot, ht, ikut,
-           istore, jenv, large, lc, lnew, m, model, nk, omega, ps, qdp, qdt,
-           qiw, r0, rs, sjtot, skerot, smass, teffl, tlumx, tril, trit, ts,
-           vel, hg, v, cmixl, compmix):
+def starin(bl: float, cfenv: np.ndarray, dage: float, ddage: float, delts: float, deltsh: float, eta2: np.ndarray,
+           fp: np.ndarray, ft: np.ndarray, ftri: float, hcomp: np.ndarray, hd: np.ndarray, hi: np.ndarray,
+           hjm: np.ndarray, hkerot: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray,
+           hs1: np.ndarray, hs2: np.ndarray, hstot: float, ht: np.ndarray, ikut: int, istore: int, jenv: int,
+           large: bool, lc: np.ndarray, lnew: bool, m: int, model: int, nk: int, omega: np.ndarray, ps: np.ndarray,
+           qiw: np.ndarray, r0: np.ndarray, rs: np.ndarray, sjtot: float, skerot: float, smass: float, teffl: float,
+           tlumx: np.ndarray, tril: np.ndarray, trit: np.ndarray, ts: np.ndarray, vel: float, hg: np.ndarray,
+           v: np.ndarray, cmixl: float, compmix: str) -> tuple[float, float, float, float, float, float, float, int,
+           int, bool, int, int, float, float, float, float, float, str]:
     """Provide the starting model of run nk: read it from the unit IFIRST
     (YREC7 or MODEL2 format) or keep the one in memory, then prepare it:
     change the mixture of a homogeneous model, extend the core inward,
@@ -83,7 +87,7 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
     the rotation quantities, the surface composition, and the first
     physics, convection zones and overturn time.
 
-    Translates: starin.f#STARIN (a8a5950)
+    Translates: starin.f#STARIN (7be4133)
 
     Arguments: the model (hs, hr, hl, hp, ht, hd, hcomp[species, shell],
     lc, omega, m points, index 0 unused) and its rotation arrays (eta2, fp,
@@ -92,41 +96,43 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
     model, tlumx, the run number nk, jenv (read only, for the spots), large
     (the previous model failed: stop), the totals sjtot, skerot, v (the
     surface mixture's relative mass fractions), cmixl (the run's mixing
-    length) and compmix (set by the readers). delts, deltsh, ikut, lnew,
-    qdp, qdt and vel are output only. Arrays are changed in place.
+    length) and compmix (set by the readers). delts, deltsh, ikut, lnew
+    and vel are output only. Arrays are changed in place.
 
     Returns (bl, dage, ddage, delts, deltsh, ftri, hstot, ikut, istore,
-    lnew, m, model, qdp, qdt, sjtot, skerot, smass, teffl, vel, compmix).
+    lnew, m, model, sjtot, skerot, smass, teffl, vel, compmix).
+
     """
+
     c = constants_mod
     nml = nmlpar_mod
     es = envstruct_mod
     ishort = iounits_mod.ishort
 
+    # A failed previous model stops the run (Fortran lines 227–236).
     if large:
         iounits_mod.write(ishort, " " + ">" * 39 + "<" * 40 + "\n"
                           "STARIN:        ***** RUN STOPPED *****")
         iounits_mod.write(ishort,
                           "STARIN: ***** MODEL FAILED TO CONVERGE *****")
-        raise SystemExit()
+        raise SystemExit(1)
 
+    # Fortran lines 241–248.
     ikut = 0
     iread = iounits_mod.ifirst
     vel = 0.0
     qdt = -1.0
     qdp = 1.0
 
-    if not nml.lfirst[nk]:
-        # Keep the model in memory (rescaled if asked).
-        if runloop_mod.iresca[nk] != 1:
-            hstot, smass = rscale(hl, hcomp, hs, hstot, m, nk, smass, lc)
-    else:
+    # Without LFIRST, the model in memory is kept (GOTO 3000), and rescaled
+    # below (Fortran lines 250–263).
+    if nml.lfirst[nk]:
         # Read the starting model; its first four characters give the
-        # format.
+        # format (Fortran lines 266–308).
         iounits_mod.rewind(iread)
         atemp = iounits_mod.read(iread)[:4]  # format 10, A4
-        # The readers' returns (not yet translated) are taken as every
-        # scalar argument except the units, in argument order.
+        # The readers return every scalar argument except the units, in
+        # argument order.
         if atemp == "NMOD":
             iounits_mod.write(ishort, "STARIN:  Input model has YREC7 format")
             (bl, cmixl0, dage, ddage, ftri, hstot, jcore0, jenv0, lexcom0,
@@ -153,23 +159,25 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
         else:
             iounits_mod.write(ishort, "STARIN: ***** RUN TERMINATED, "
                               "INVALID INPUT MODEL FILE.  *****")
-            raise SystemExit()
+            raise SystemExit(3)
 
-        # The step in seconds (ddage in years).
+        # The step in seconds (ddage in years) (Fortran lines 310–314).
         delts = c.csecyr * ddage
         deltsh = abs(delts)
         comp_mod.stotal = hstot
 
         # An evolved model: warn if its mixing length or composition switch
-        # differs from the run's (the run is no longer stopped).
+        # differs from the run's (the run is no longer stopped) (Fortran
+        # lines 316–337).
         # Question (see the page): should a mismatch still stop the run?
         if model > 0:
             lmixl = True
             if cmixl0 > 0.0:
                 lmixl = abs(cmixl - cmixl0) < 2.0e-3
             if not lmixl or lexcom0 != nml.lexcom:
-                # Question (see the page): LEXCP0 is never set; the model's
-                # value is LEXCOM0. False stands for the undefined value.
+                # Suspected bug (see the page): LEXCP0 is never set; the
+                # model's value is LEXCOM0. False stands for the undefined
+                # value.
                 lexcp0 = False
                 text = (" ERROR IN SUBROUTINE STARIN\n USER PARAMETERS"
                         " OF WRONG TYPE FOR INITIAL MODEL\n MIXING LENGTH -"
@@ -180,6 +188,8 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
                 iounits_mod.write(ishort, text)
                 iounits_mod.write(iounits_mod.iowr, text)
 
+        # A new envelope, the surface X and Z, and rotation (Fortran lines
+        # 339–380).
         istore = 0
         ftri = 1.0
         lnew = True  # the envelope is always recomputed
@@ -196,7 +206,8 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
                 ft[i] = 1.0
         iounits_mod.rewind(iread)
 
-        # Change the mixture, only of a homogeneous model (MHP 10/24).
+        # Change the mixture, only of a homogeneous model (MHP 10/24)
+        # (Fortran lines 383–461).
         testmix = np.zeros(16)
         homogeneous = True
         if nml.lmixture or nml.lisotope:
@@ -246,7 +257,9 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
             if nml.lisotope:
                 # Impose 12C/13C and 16O/18O at fixed sums, and the light
                 # elements' initial values.
-                # Question (see the page): R14_15, R16_17 are not applied.
+                # R14_15, R16_17 are not applied (unused?).
+                # Suspected bug (see the page): the defaults of R16_18 and
+                # R16_17 look swapped.
                 sum_c = hcomp[5, 1] + hcomp[6, 1]
                 sum_o = hcomp[9, 1] + hcomp[11, 1]
                 for j in range(1, m + 1):
@@ -271,22 +284,23 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
         # label 602
 
     # label 3000
-    # Extend the model inward by MCORE points (MHP 9/98, 9/14).
+    # Extend the model inward by MCORE points (MHP 9/98, 9/14) (Fortran
+    # lines 462–565).
     if nml.lcore and nml.lfirst[nk]:
         nml.mcore = int(math.log10(nml.fcore) / nml.hpttol[2]) + 1
         nml.fcore = float(nml.mcore) * nml.hpttol[2]  # now a log offset
         mn = m + nml.mcore
         if mn > JSON:
-            # Question (see the page): no stop; the arrays overflow below.
             iounits_mod.write(ishort, "STARIN: Unable to extend core inward "
                               "- JSON too small")
             iounits_mod.write(ishort, f"STARIN: Required size ={mn:8d}"
                               f", JSON = {JSON:8d}")
             iounits_mod.write(ishort, "STARIN:  ***** RUN TERMINATED *****")
+            raise SystemExit(3)
         ds = nml.hpttol[2]
         mcore = nml.mcore
         # Shift the old points outward.
-        # Question (see the page): hd is not shifted.
+        # Suspected bug (see the page): hd is not shifted.
         for i in range(m, 0, -1):
             hs[i + mcore] = hs[i]
             hr[i + mcore] = hr[i]
@@ -299,7 +313,7 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
             omega[i + mcore] = omega[i]
         mp1 = mcore + 1
         rhoc = hd[1]
-        # Question (see the page): with mcore = 1 this is 0/0.
+        # Suspected bug (see the page): with mcore = 1 this is 0/0.
         dele = (ht[2] - ht[1]) / (hp[2] - hp[1])
         hlc = hl[1]
         facd = hp[mp1] - hd[mp1] - ht[mp1]
@@ -323,17 +337,18 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
             hd[i] = hp[i] - ht[i] - facd
         m = mn
 
+    # Rescale (Fortran lines 567–569).
     if runloop_mod.iresca[nk] != 1:
         hstot, smass = rscale(hl, hcomp, hs, hstot, m, nk, smass, lc)
 
-    # Move the envelope's fitting point to SENV0.
+    # Move the envelope's fitting point to SENV0 (Fortran lines 571–864).
     if cenv_mod.lsenv0:
         # (In one branch EQSTAT and TPGRAD set STARIN's qdt, qdp and vel.)
         m, lnew, qdt, qdp, vel = _new_fitting_point(
             hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl, teffl,
             hstot, jenv, lnew, qdt, qdp, vel, cmixl)
 
-    # Shell masses.
+    # Shell masses (Fortran lines 866–876).
     ds3 = math.exp(c.cln * hs[1])
     ds2 = -ds3
     for i in range(2, m + 1):  # loop 120
@@ -345,7 +360,8 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
     hs1[m] = ds3
     hs2[m] = math.exp(c.cln * hstot) - 0.5 * (ds2 + ds3)
 
-    # Rotation: distortion, moments of inertia, J and kinetic energy.
+    # Rotation: distortion, moments of inertia, J and kinetic energy
+    # (Fortran lines 878–902).
     if nml.lrot:
         fpft(hd, hr, hs, m, omega, eta2, fp, ft, hg, r0)
         momi(eta2, hr, hs, hs2, 1, m, omega, r0, hi, qiw)
@@ -364,7 +380,8 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
         sjtot = sumj
         skerot = sumke
 
-    # The surface composition, for the first run only.
+    # The surface composition, for the first run only (Fortran lines
+    # 904–943).
     # Question (see the page): skipped for later runs.
     if nk <= 1:
         if not newopac_mod.llaol:
@@ -384,37 +401,46 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
         for i in range(1, 13):  # loop 610
             v[i] = fv * v[i] / ATOMWT[i]
             vsum = vsum + v[i]
-        # Question (see the page): the comment calls this the mean atomic
-        # weight of the surface Z.
+        # The inverse mean atomic weight per ion (the Fortran's comment
+        # says the mean atomic weight of the surface Z).
         comp_mod.amuenv = vsum
         fv = 1.0 / comp_mod.amuenv
         for i in range(1, 13):  # loop 620
             comp_mod.fxenv[i] = v[i] * fv
-    # label 630
+
+    # label 630: the surface opacities and the SCV EOS (Fortran lines
+    # 944–951).
     surfopac(comp_mod.xenv)
     if nml.lscv:
         setscv()
 
-    # Save the old model.
+    # Save the old model (Fortran lines 953–974).
     om = oldmod_mod
     for i in range(1, m + 1):  # loop 710
         om.hpo[i] = hp[i]
         om.hto[i] = ht[i]
         om.hro[i] = hr[i]
         om.hlo[i] = hl[i]
-        # Question (see the page): these two are loop-invariant.
+        # Loop-invariant, as in the Fortran.
         om.tefflo = teffl
-        om.mo = m
+        om.hlsuro = hl[m]
     if nml.lrot:
         for i in range(1, m + 1):  # loop 720
             oldrot_mod.wold[i] = omega[i]
 
-    # The first physics, convection zones and overturn time.
+    # The first physics and convection zones (Fortran lines 976–1033).
     physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl)
     nrzone, nzone = ovrot(hcomp, hd, hp, hr, hs, ht, lc, m, lcz, mrzone,
                           mxzone, 0, 0)
-    # Possible bug (see the page): the module array ENVR is
-    # passed as GETTAU's scalar RBCZ, so ENVR(1) receives the base's radius.
+
+    # Keep the starting model's rotation convective flags for CRRECT's
+    # GETROT (Fortran lines 1034–1039).
+    for i in range(1, m + 1):
+        om.lczo[i] = lcz[i]
+
+    # The overturn time and photospheric pressure (Fortran lines 1040–1046).
+    # The module array ENVR is passed as GETTAU's scalar RBCZ, so ENVR(1)
+    # receives the base's radius (KNOWN_ISSUES.md lists it).
     es.envr[1] = gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl, hstot,
                         bl, m, lc, es.envr[1], cmixl)
     ovrtrn_mod.taucz0 = ovrtrn_mod.taucz
@@ -422,7 +448,7 @@ def starin(bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri, hcomp,
     ovrtrn_mod.fracstep = 0.5
 
     return (bl, dage, ddage, delts, deltsh, ftri, hstot, ikut, istore, lnew,
-            m, model, qdp, qdt, sjtot, skerot, smass, teffl, vel, compmix)
+            m, model, sjtot, skerot, smass, teffl, vel, compmix)
 
 
 def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
@@ -431,22 +457,28 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
     fitting point to SENV0, deeper (drop shells, interpolate the new last
     one) or shallower (integrate an envelope and take its points down to
     the new fitting mass as interior shells). Returns (m, lnew, qdt, qdp,
-    vel): STARIN's arguments, which the physics of one branch sets."""
+    vel): STARIN's arguments, which the physics of one branch sets
+    (Fortran lines 586–864)."""
+
     c = constants_mod
     nml = nmlpar_mod
     ce = cenv_mod
     es = envstruct_mod
     ishort = iounits_mod.ishort
 
+    # The sign and the minimum of SENV0 (Fortran lines 587–591).
+    # Question (see the page): the smallest envelope.
     if ce.senv0 > 0.0:
         ce.senv0 = -ce.senv0
     if ce.senv0 > -1.0e-12:
         ce.senv0 = -1.0e-12
     comp_mod.senv = hs[m] - hstot
     senv1 = comp_mod.senv
+
     # Leave the fitting point alone when the request matches the current
     # one to within roundoff (SENV is a difference of two log masses near
-    # 33): 100 ulps of HSTOT, Fortran's EPSILON for REAL*8.
+    # 33): 100 ulps of HSTOT, Fortran's EPSILON for REAL*8 (Fortran lines
+    # 594–607).
     senvtol = 1.0e2 * np.finfo(np.float64).eps * abs(hstot)
     if abs(comp_mod.senv - ce.senv0) <= senvtol:
         return m, lnew, qdt, qdp, vel  # GOTO 599
@@ -455,7 +487,8 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
         jend = 15
 
     if ce.senv0 < comp_mod.senv:
-        # A deeper fitting point: drop the shells beyond it.
+        # A deeper fitting point: drop the shells beyond it (Fortran lines
+        # 608–685).
         hsend = hstot + ce.senv0
         i = 0
         for ii in range(m - 1, 0, -1):  # loop 575
@@ -468,7 +501,8 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
                               f" ENVELOPE MASS{ce.senv0:22.13E} TOO LARGE\n"
                               f"     ENVELOPE MASS NOT CHANGED")  # format 576
             return m, lnew, qdt, qdp, vel  # GOTO 599
-        # label 580
+
+        # label 580: the new last shell.
         m = i + 1
         comp_mod.senv = ce.senv0
         fs = (hsend - hs[i]) / (hs[i + 1] - hs[i])
@@ -522,7 +556,8 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
             lc[m] = lconv
     else:
         # A shallower fitting point: integrate an envelope from the surface
-        # at fixed steps HPTTOL(8), and take its points down to SENV0.
+        # at fixed steps HPTTOL(8), and take its points down to SENV0
+        # (Fortran lines 686–736).
         mm = m
         emax0 = nml.envmax
         emin0 = nml.envmin
@@ -567,8 +602,9 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
         comp_mod.senv = ce.senv0
         if m + es.numenv >= JSON:
             raise SystemExit(9999)
+
         # Shift the envelope to match the last interior point, dropping its
-        # first point.
+        # first point (Fortran lines 737–756).
         dp = hp[m] - es.envp[1]
         dd = hd[m] - es.envd[1]
         dt = ht[m] - es.envt[1]
@@ -581,7 +617,11 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
             es.envt[j] = es.envt[j + 1] + dt
             es.envx[j] = es.envx[j + 1]
             es.envz[j] = es.envz[j + 1]
+            es.lcenv[j] = es.lcenv[j + 1]
         es.numenv = es.numenv - 1
+
+        # The envelope's points down to the fitting mass become shells
+        # (Fortran lines 757–830).
         senv = comp_mod.senv
         stotal = comp_mod.stotal
         reached = False
@@ -614,7 +654,7 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
                     hr[j] = hr[m] + fx * (es.envr[jm] - hr[m])
                     hs[j] = x1
                     ht[j] = ht[m] + fx * (es.envt[jm] - ht[m])
-                    # Question (see the page): the sign is reversed here.
+                    # Suspected bug (see the page): the sign is reversed here.
                     hcomp[1, j] = hcomp[1, m] + fx * (hcomp[1, m]
                                                       - es.envx[jm])
                     hcomp[3, j] = hcomp[3, m] + fx * (hcomp[3, m]
@@ -654,7 +694,9 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
                 break  # GOTO 587
         if not reached:
             m = m + es.numenv
-        # label 587: the new shells rotate at the old surface rate.
+
+        # label 587: the new shells rotate at the old surface rate (Fortran
+        # lines 831–843).
         if nml.lrot:
             for j in range(mm + 1, m + 1):
                 omega[j] = omega[mm]
@@ -666,6 +708,8 @@ def _new_fitting_point(hcomp, hd, hjm, hl, hp, hr, hs, ht, lc, omega, m, bl,
                 f"{q:16.8E}" for q in (hd[j], hl[j], hp[j], hr[j],
                                        hs[j] - stotal, ht[j]))
                 + f" {'T' if lc[j] else 'F'}")
+
+    # Fortran lines 859–863.
     lnew = True
     iounits_mod.write(ishort,
                       f"     ***** NEW ENVELOPE MASS CALCULATED *****\n"

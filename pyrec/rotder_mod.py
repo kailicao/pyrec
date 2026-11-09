@@ -1,6 +1,7 @@
-"""Python version of rotder_mod.f (YREC 09c3b9b): derivatives at each shell for the rotational mixing, formerly COMMON/ROTDER/.
+"""Python version of rotder_mod.f (YREC 7be4133): derivatives at each shell
+for the rotational mixing, formerly COMMON/ROTDER/.
 
-Translates: rotder_mod.f#ROTDER_MOD (09c3b9b)
+Translates: rotder_mod.f#ROTDER_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE ROTDER_MOD import this module and write ``rotder_mod.<name>``.
@@ -13,6 +14,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–30.
 sqot = np.zeros(_JSON + 1)      # dln kappa / dln T, index 0 unused
 sqet = np.zeros(_JSON + 1)      # dln epsilon / dln T
 fracnuc = np.zeros(_JSON + 1)   # nuclear share of the energy generation

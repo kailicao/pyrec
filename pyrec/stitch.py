@@ -1,4 +1,4 @@
-"""Python version of stitch.f (YREC 09c3b9b): one model's interior,
+"""Python version of stitch.f (YREC 7be4133): one model's interior,
 envelope and atmosphere written to the .store file (JvS 08/25 format)."""
 
 import math
@@ -20,18 +20,20 @@ from pyrec.envint import envint
 
 JSON = dimensions_mod.json
 
-# Locals kept between calls (SAVE). b is set only in the envelope branch but
-# written by the atmosphere's lines, so an atmosphere without an envelope
-# writes the value of an earlier call.
+# Locals kept between calls (SAVE) (Fortran line 87). b is set only in the
+# envelope branch but written by the atmosphere's lines, so an atmosphere
+# without an envelope writes the value of an earlier call. Suspected bug
+# (see the page).
 b = 0.0
-# Question (see the page): LPULPT is never set in STITCH; False stands for
-# the Fortran's undefined value.
+# Suspected bug (see the page): LPULPT is never set in STITCH; False stands
+# for the Fortran's undefined value.
 lpulpt = False
 envs1 = np.zeros(JSON + 1)
 
 
 def _e0(x, w, d):
     """Fortran's 0PEw.d: a mantissa in [0.1, 1), e.g. 0.12345678E+01."""
+
     if x == 0.0:
         return f"{'0.' + '0' * d + 'E+00':>{w}}"
     e = math.floor(math.log10(abs(x))) + 1
@@ -77,14 +79,16 @@ def _fmt64(v):
             + "".join(_e0(x, 11, 3) for x in v[7:]))
 
 
-def stitch(hcomp, hr, hp, hd, hs, ht, hl, hs1, omega, eta2, hi, r0, hjm, fp,
-           ft, teffl, hstot, bl, m, lc, model, cmixl):
+def stitch(hcomp: np.ndarray, hr: np.ndarray, hp: np.ndarray, hd: np.ndarray, hs: np.ndarray, ht: np.ndarray,
+           hl: np.ndarray, hs1: np.ndarray, omega: np.ndarray, eta2: np.ndarray, hi: np.ndarray, r0: np.ndarray,
+           hjm: np.ndarray, fp: np.ndarray, ft: np.ndarray, teffl: float, hstot: float, bl: float, m: int,
+           lc: np.ndarray, model: int, cmixl: float) -> None:
     """Write one model's full profile to the .store unit ISTOR, one line of
     61 columns per point: the interior shells, then, if asked (LSTENV,
     LSTATM), the envelope integrated again with ENVINT at fixed output
     steps, and the atmosphere.
 
-    Translates: stitch.f#STITCH (09c3b9b)
+    Translates: stitch.f#STITCH (7be4133)
 
     Arguments: the model (hcomp[species, shell], hr, hp, hd, hs, ht, hl,
     hs1, omega, lc, index 0 unused), the rotation arrays eta2, hi, r0, hjm,
@@ -92,7 +96,9 @@ def stitch(hcomp, hr, hp, hd, hs, ht, hl, hs1, omega, eta2, hi, r0, hjm, fp,
     and cmixl (the mixing length, passed to envint). Nothing is changed.
 
     Returns None.
+
     """
+
     global b
     c = constants_mod
     nml = nmlpar_mod
@@ -102,14 +108,15 @@ def stitch(hcomp, hr, hp, hd, hs, ht, hl, hs1, omega, eta2, hi, r0, hjm, fp,
     unit = iounits_mod.istor
     zeros11 = [0.0] * 11
 
+    # The interior shells (Fortran lines 108–133).
     cg = math.exp(c.cln * c.cgl)
     sg = 0.0
     for i in range(1, m + 1):
         sg = math.exp(c.cln * (c.cgl - 2.0 * hr[i])) * hs1[i]
         line = _fmt62(model, i, hs[i], hr[i], hl[i], hp[i], ht[i], hd[i],
                       omega[i], lc[i], True, False, False, hcomp[:, i])
-        # Question (see the page): beta of an interior shell is read from
-        # the envelope's EBETAS, not SBETA.
+        # Suspected bug (see the page): beta of an interior shell is read
+        # from the envelope's EBETAS, not SBETA.
         line += _fmt63([sc.so[i], sg, sc.sdel[1, i], sc.sdel[2, i],
                         sc.sdel[3, i], sc.svel[i], sound_mod.gam1[i],
                         sc.sfxion[1, i], sc.sfxion[2, i], sc.sfxion[3, i],
@@ -132,20 +139,23 @@ def stitch(hcomp, hr, hp, hd, hs, ht, hl, hs1, omega, eta2, hi, r0, hjm, fp,
 
     if nml.lstenv:
         # Only provide an envelope if asked to do so: fixed output steps
-        # ("dropping a sinkline").
-        # Question (see the page): the saved steps are never restored.
-        abeg0 = nml.atmbeg
-        amin0 = nml.atmmin
-        amax0 = nml.atmmax
-        ebeg0 = nml.envbeg
-        emin0 = nml.envmin
-        emax0 = nml.envmax
+        # ("dropping a sinkline") (Fortran lines 136–151).
+        # Suspected bug (see the page): the saved steps are never restored.
+        abeg0 = nml.atmbeg  # noqa: F841  (unused in the Fortran too)
+        amin0 = nml.atmmin  # noqa: F841  (unused in the Fortran too)
+        amax0 = nml.atmmax  # noqa: F841  (unused in the Fortran too)
+        ebeg0 = nml.envbeg  # noqa: F841  (unused in the Fortran too)
+        emin0 = nml.envmin  # noqa: F841  (unused in the Fortran too)
+        emax0 = nml.envmax  # noqa: F841  (unused in the Fortran too)
         nml.atmbeg = nml.atmstp
         nml.atmmin = nml.atmstp
         nml.atmmax = nml.atmstp
         nml.envbeg = nml.envstp
         nml.envmin = nml.envstp
         nml.envmax = nml.envstp
+
+        # The envelope's surface values, and the integration (Fortran lines
+        # 152–176).
         idum = 0
         b = math.exp(c.cln * bl)
         fpl = fp[m]
@@ -175,6 +185,8 @@ def stitch(hcomp, hr, hp, hd, hs, ht, hl, hs1, omega, eta2, hi, r0, hjm, fp,
             b, fpl, ftl, gl, hstot, ixx, lprt, lsbc0, plim, rl, ateffl, x, z,
             dum1, idum, katm, kenv, ksaha, dum2, dum3, dum4, lpulpt, cmixl)
 
+        # The envelope's masses, then one line per point (Fortran lines
+        # 178–195).
         for i in range(1, es.numenv + 1):
             envs1[i] = math.exp(c.cln * (es.envs[i] + hstot))
         for i in range(m + 1, m + es.numenv + 1):
@@ -193,11 +205,17 @@ def stitch(hcomp, hr, hp, hd, hs, ht, hl, hs1, omega, eta2, hi, r0, hjm, fp,
             iounits_mod.write(unit, line)
 
     if nml.lstatm:
-        # Question (see the page): without LSTENV, numenv, envr and b are
-        # those of an earlier integration or call; sg is the last point's.
+        # The atmosphere (Fortran lines 200–227). Question (see the page):
+        # without LSTENV, numenv and envr are those of an earlier
+        # integration. Suspected bugs (see the page): b may be from an
+        # earlier call, and sg is the last point's. The base radius is the
+        # outer shell's when no envelope point is stored (MHP 10/30/26).
+        if es.numenv > 0:
+            rbase = es.envr[es.numenv]
+        else:
+            rbase = hr[m]
         for i in range(at.numatm, 0, -1):
-            rad = math.log10(math.exp(c.cln * es.envr[es.numenv])
-                             + at.atmor[i])
+            rad = math.log10(math.exp(c.cln * rbase) + at.atmor[i])
             line = _fmt62(model, at.numatm - i + m + es.numenv, hstot, rad,
                           b, at.atmop[i], at.atmot[i], at.atmod[i], omega[m],
                           False, False, False, True, hcomp[:, m])

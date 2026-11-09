@@ -1,4 +1,4 @@
-"""Python version of wrthead.f (YREC 09c3b9b): the header lines of the
+"""Python version of wrthead.f (YREC 7be4133): the header lines of the
 output files at the start of each run."""
 
 from pyrec import iounits_mod
@@ -9,7 +9,8 @@ from pyrec import runloop_mod
 _RUN_KIND = {1: 'EVOLVE  ', 2: 'RESCALE ', 3: 'RESCALE&EVOLVE '}
 
 # FORMAT 1504 (ITRVER = 0): one line of column names, 16 records of the Fortran
-# joined into one; it does not start with '#' (G. Somers 11/14).
+# joined into one; it does not start with '#' (G. Somers 11/14) (Fortran
+# lines 131–148).
 _COLUMNS_1504 = (
     '     Step    Shls         Age_gyr       LogL_lsun       LogR_rsun           Log_g'
     '        log_Teff        Mco_core         Mco_env     Rco_env     Tco_env     Dco_env'
@@ -29,7 +30,9 @@ _COLUMNS_1504 = (
 )
 _FMT_1504 = '# \n' + _COLUMNS_1504 + '\n# '
 
-# FORMAT 1505 (ITRVER = 1 and 2). Two of its lines do not start with '#'.
+# FORMAT 1505 (ITRVER = 1 and 2). Two of its lines do not start with '#'
+# (Fortran lines 152–166). Suspected bug (see the page): the headers of
+# versions 1-3 do not name all the columns WRTOUT writes.
 _FMT_1505 = '\n'.join([
     '# Model #, shells, AGE, log(L/Lsun), log(R/Rsun), log(g),'
     ' log(Teff), Mconv. core, Mconv. env.)',
@@ -47,30 +50,34 @@ _FMT_1505 = '\n'.join([
     'base, midpoint, top',
 ])
 
-# FORMAT 1510 (ITRVER = 2): the rotation columns, without '#'.
+# FORMAT 1510 (ITRVER = 2): the rotation columns, without '#' (Fortran lines
+# 170–171).
 _FMT_1510 = ' Jtot, K.E. Rotation, OMEGAsurf, OMEGAcenter'
 
-# FORMAT 1515 (ITRVER = 3).
+# FORMAT 1515 (ITRVER = 3) (Fortran lines 174–176).
 _FMT_1515 = ('#Model #, shells, AGE, log(L/Lsun), log(R/Rsun), log(g),'
              ' log(Teff), Mconv. core, Mconv. env., % Grav Energy, X env')
 
 
-def wrthead(smass, cmixl, nk):
+def wrthead(smass: float, cmixl: float, nk: int) -> None:
     """Write the run's line on IOWR and, for a run that reads its starting
     model (LFIRST(NK)) with LTRACK on, the track file's version line and
     column header on ITRACK, in the layout chosen by ITRVER.
 
-    Translates: wrthead.f#WRTHEAD (09c3b9b)
+    Translates: wrthead.f#WRTHEAD (7be4133)
 
     Arguments: the stellar mass smass (solar masses), the mixing length
     cmixl and the run index nk. Nothing is returned.
+
     """
+
     n = nmlpar_mod
     r = runloop_mod
     xenv0 = label_mod.xenv0
     zenv0 = label_mod.zenv0
 
-    # FORMATs 47, 48, 49: the same line but for the run's kind.
+    # FORMATs 47, 48, 49: the same line but for the run's kind (Fortran lines
+    # 74–86).
     kind = r.iresca[nk]
     if kind in _RUN_KIND:
         iounits_mod.write(
@@ -81,12 +88,14 @@ def wrthead(smass, cmixl, nk):
 
     if n.ltrack and r.lfirst[nk]:
         # ITRVER identifies the version of the track file: change it when
-        # the track file changes (and WRTOUT with it).
+        # the track file changes (and WRTOUT with it) (Fortran lines 88–94).
         iounits_mod.write(
             iounits_mod.itrack,
             f"#Version={n.itrver:3d}  Mtot/Msun ={smass:16.8E}"
             f"  Initial: X ={xenv0:16.8E} Z ={zenv0:16.8E}"
             f"  Mix. length ={cmixl:16.8E}")
+
+        # The column header by version (Fortran lines 95–177).
         if n.itrver == 0:
             # Question (see the page): the comment says to uncomment a
             # block, but FORMAT 1504's second version is active; its line

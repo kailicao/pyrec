@@ -1,6 +1,7 @@
-"""Python version of taukh_mod.f (YREC 09c3b9b): factors of the circulation velocities at each interface, formerly COMMON/TAUKH/.
+"""Python version of taukh_mod.f (YREC 7be4133): factors of the circulation
+velocities at each interface, formerly COMMON/TAUKH/.
 
-Translates: taukh_mod.f#TAUKH_MOD (09c3b9b)
+Translates: taukh_mod.f#TAUKH_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE TAUKH_MOD import this module and write ``taukh_mod.<name>``.
@@ -13,6 +14,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–33.
 fact6 = np.zeros(_JSON + 1)   # Eddington-Sweet term in d(Omega^2 r^2)
 fes1 = np.zeros(_JSON + 1)    # Zahn-type terms
 fes2 = np.zeros(_JSON + 1)

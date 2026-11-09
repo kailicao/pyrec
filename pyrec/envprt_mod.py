@@ -1,7 +1,7 @@
-"""Python version of envprt_mod.f (YREC 09c3b9b): the state at the current
+"""Python version of envprt_mod.f (YREC 7be4133): the state at the current
 point of the envelope integration, formerly COMMON/ENVPRT/.
 
-Translates: envprt_mod.f#ENVPRT_MOD (09c3b9b)
+Translates: envprt_mod.f#ENVPRT_MOD (7be4133)
 
 Routines that USE ENVPRT_MOD import this module and write
 ``envprt_mod.<name>``. Set by qenv, read by envint.
@@ -9,6 +9,7 @@ Routines that USE ENVPRT_MOD import this module and write
 
 import numpy as np
 
+# Fortran lines 24–33.
 ep = 0.0                # log P
 et = 0.0                # log T
 er = 0.0                # log r

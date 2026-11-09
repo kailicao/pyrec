@@ -1,4 +1,4 @@
-"""Python version of eqscvg.f (YREC development, 09c3b9b): the SCV
+"""Python version of eqscvg.f (YREC development, 7be4133): the SCV
 equation of state for a general composition, from the pure-H, pure-He
 and metal tables."""
 
@@ -26,6 +26,7 @@ def _rows(table, col, ncol=3):
     interpolation in log Pgas (weights fp) of column col of a table, at
     the 4 temperatures of the stencil. Returns the values at rows 1-4.
     ncol=2 for a table with no column index (SMIX)."""
+
     scv = scveos_mod
     out = np.zeros(5)
     for i in range(1, 5):
@@ -42,17 +43,20 @@ def _rows(table, col, ncol=3):
 def _in_t(vals, w=None):
     """Interpolate in temperature: sum of the weights ft (or w) times the
     values at the 4 temperatures."""
+
     w = ft if w is None else w
     return w[1] * vals[1] + w[2] * vals[2] + w[3] * vals[3] + w[4] * vals[4]
 
 
-def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
+def eqscvg(tl: float, t: float, p: float, dl: float, d: float, x: float, z: float, beta: float, fxion: np.ndarray,
+           qdt: float, qdp: float, qcp: float, dela: float, lcalc: bool) -> tuple[float, float, float, float, float,
+           float, bool]:
     """The SCV equation of state for any X, Z: density by additive volumes
     of the H, He and metal tables, derivatives as volume-weighted means,
     c_P from the tabulated entropies, then radiation and the H and He
     ionization fractions (equations on the page). Called by eqscve.
 
-    Translates: eqscvg.f#EQSCVG (09c3b9b)
+    Translates: eqscvg.f#EQSCVG (7be4133)
 
     Arguments: tl, t (log T, T), p (total pressure), x, z, beta (Pgas/P);
     dl, d, qdt, qdp, qcp, dela and lcalc are only set. Array changed in
@@ -60,10 +64,13 @@ def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
 
     Returns (dl, d, qdt, qdp, qcp, dela, lcalc). Outside the table, lcalc
     is False and the others are returned as passed in.
+
     """
+
     c = constants_mod
     scv = scveos_mod
-    # The gas pressure is the tabulated quantity.
+
+    # The gas pressure is the tabulated quantity (Fortran lines 41–47).
     betm1 = 1.0 - beta
     pp = math.log10(beta * p)
     # Is the point within the table?
@@ -72,7 +79,8 @@ def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
         return dl, d, qdt, qdp, qcp, dela, lcalc
 
     # Nearest 4 points in temperature, searching from the last stencil
-    # (left by this routine or eqscve).
+    # (left by this routine or eqscve; Fortran lines 49–73).
+    # Question (see the page): no smoothing when the stencil changes.
     if tl < scv.tlogx[scv.idtscv + 1]:
         for i in range(scv.idtscv, 0, -1):
             if tl > scv.tlogx[i]:
@@ -92,7 +100,8 @@ def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     idt = scv.idtscv
 
     # Nearest 4 points in pressure, searched in the row idt (the lowest
-    # temperature of the stencil, with the smallest range in P).
+    # temperature of the stencil, with the smallest range in P; Fortran
+    # lines 75–104).
     nptsx = scv.nptsx[idt]
     jjj = min(nptsx - 3, scv.idp)
     if pp < scv.tablenv[idt, jjj + 1, 1]:
@@ -117,7 +126,7 @@ def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     idp = scv.idp
     lcalc = True
 
-    # Lagrange weights in log T and log Pgas.
+    # Lagrange weights in log T and log Pgas (Fortran lines 105–112).
     for k in range(1, 5):
         qr[k] = scv.tlogx[k + idt - 1]
     interp(qr, ft, ftd, tl)
@@ -125,33 +134,39 @@ def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
         # Question (see the page): row idt's pressures for all 4 rows.
         qr[k] = scv.tablenv[idt, idp + k - 1, 1]
     interp(qr, fp, fpd, pp)
+
+    # Radiation pressure (Fortran lines 113–116).
     y = 1.0 - x - z
-    # Radiation pressure.
     prad = betm1 * p
     pgas = beta * p
 
-    # Densities for X=1, Y=1, Z=1 (column 4; log10 in the tables).
+    # Densities for X=1, Y=1, Z=1 (column 4; log10 in the tables; Fortran
+    # lines 119–140).
     denxl = _in_t(_rows(scv.tablex, 4))
     denx = math.exp(c.cln * denxl)
     denyl = _in_t(_rows(scv.tabley, 4))
     deny = math.exp(c.cln * denyl)
     denzl = _in_t(_rows(scv.tablez, 4))
     denz = math.exp(c.cln * denzl)
-    # Density by additive volumes, and the volume weights.
+
+    # Density by additive volumes, and the volume weights (Fortran lines
+    # 142–146).
     d = 1.0 / (x / denx + y / deny + z / denz)
     dl = math.log10(d)
     ddx = x * d / denx
     ddy = y * d / deny
     ddz = z * d / denz
 
-    # d ln rho / d ln P (gas): columns 8, 8 and 13.
+    # d ln rho / d ln P (gas): columns 8, 8 and 13 (Fortran lines
+    # 151–171).
     qdpx = _in_t(_rows(scv.tablex, 8))
     qdpy = _in_t(_rows(scv.tabley, 8))
     qdpz = _in_t(_rows(scv.tablez, 13))
     qdp0 = qdpx * ddx + qdpy * ddy + qdpz * ddz
     qdp = qdp0 / beta
 
-    # d ln rho / d ln T (gas): columns 7, 7 and 10; then radiation.
+    # d ln rho / d ln T (gas): columns 7, 7 and 10; then radiation
+    # (Fortran lines 177–199).
     qdtx = _in_t(_rows(scv.tablex, 7))
     qdty = _in_t(_rows(scv.tabley, 7))
     qdtz = _in_t(_rows(scv.tablez, 10))
@@ -160,7 +175,9 @@ def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     qpt = qpt0 * beta + 4.0 * betm1
     qdt = -qpt * qdp
 
-    # Entropies (column 5, log10) and the entropy of mixing.
+    # Entropies (column 5, log10) and the entropy of mixing (Fortran lines
+    # 210–234).
+    # Question (see the page): SMIX is the envelope's.
     temp[:, 1] = _rows(scv.tablex, 5)
     temp[:, 2] = _rows(scv.tabley, 5)
     temp[:, 3] = _rows(scv.smix, None, ncol=2)
@@ -169,40 +186,49 @@ def eqscvg(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     syl = _in_t(temp[:, 2])
     sy = math.exp(c.cln * syl)
     sm = _in_t(temp[:, 3])
-    # Question (see the page): log10 of SMIX fails if it is <= 0.
+    # Suspected bug (see the page): log10 of SMIX fails if it is <= 0.
     qsmt = (ftd[1] * math.log10(temp[1, 3]) + ftd[2] * math.log10(temp[2, 3])
             + ftd[3] * math.log10(temp[3, 3])
             + ftd[4] * math.log10(temp[4, 3]))
-    s0 = x * sx + y * sy + sm                      # unused, as in the Fortran
+    s0 = x * sx + y * sy + sm  # noqa: F841  (unused in the Fortran too)
 
-    # d ln S / d ln T for X and Y (column 9), dU/dT for Z (column 7, log10).
+    # d ln S / d ln T for X and Y (column 9), dU/dT for Z (column 7,
+    # log10; Fortran lines 237–258).
     qstx = _in_t(_rows(scv.tablex, 9))
     qsty = _in_t(_rows(scv.tabley, 9))
     qutzl = _in_t(_rows(scv.tablez, 7))
     qutz = math.exp(c.cln * qutzl)
     qst0 = x * sx * qstx + y * sy * qsty + sm * qsmt
     qcp0 = qst0 + z * (qutz + pgas * qdtz ** 2 / qdpz / denz / t)
-    # dU/dT for the gas, then corrected for radiation.
+
+    # dU/dT for the gas, then corrected for radiation (Fortran lines
+    # 260–263).
     qut = qcp0 - pgas * qdt0 ** 2 / qdp0 / d / t
     ur = 3.0 * prad / d
     qut = qut + 4.0 * ur / t
-    # c_P with radiation pressure, and the adiabatic gradient.
+    # c_P with radiation pressure, and the adiabatic gradient (Fortran
+    # lines 265–267).
     qcp = qut + p * qdt ** 2 / qdp / d / t
     dela = -p * qdt / d / t / qcp
 
     # Fractions of all particles (electrons included): neutral H2 and
-    # neutral He (column 2), neutral H atoms and He+ (column 3).
+    # neutral He (column 2), neutral H atoms and He+ (column 3; Fortran
+    # lines 275–309).
     xtf_h2 = _in_t(_rows(scv.tablex, 2))
     xtf_he = _in_t(_rows(scv.tabley, 2))
     xtf_h1 = _in_t(_rows(scv.tablex, 3))
     xtf_hep = _in_t(_rows(scv.tabley, 3))
-    # The rest from conservation of particles and of charge.
+
+    # The rest from conservation of particles and of charge (Fortran lines
+    # 318–321).
     xtf_h_e = 0.5 * (1.0 - xtf_h2 - xtf_h1)
     xtf_hp = xtf_h_e
     xtf_he_e = (1.0 / 3.0) * (2.0 - 2.0 * xtf_he - xtf_hep)
     xtf_hepp = 1.0 - xtf_he - xtf_hep - xtf_he_e
-    # Fractions of H nuclei singly ionized, of He nuclei singly and doubly.
-    # Question (see the page): H2 counted once among the H nuclei.
+
+    # Fractions of H nuclei singly ionized, of He nuclei singly and doubly
+    # (Fortran lines 326–333).
+    # Suspected bug (see the page): H2 counted once among the H nuclei.
     xhp = xtf_hp / (xtf_h2 + xtf_h1 + xtf_hp)
     xhep = xtf_hep / (xtf_he + xtf_hep + xtf_hepp)
     xhepp = xtf_hepp / (xtf_he + xtf_hep + xtf_hepp)

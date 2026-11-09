@@ -1,4 +1,4 @@
-"""Python version of envint.f (YREC development, 09c3b9b): the atmosphere
+"""Python version of envint.f (YREC development, 7be4133): the atmosphere
 and envelope integrations, from the surface down to the fitting point."""
 
 import math
@@ -33,17 +33,20 @@ from pyrec.qenv import qenv
 from pyrec.surfp import surfp
 from pyrec.taucal import taucal
 
+# Fortran line 98.
 MAXSTP = 2000             # the maximum number of integration steps (DBG)
 TINY = 1.0e-30
 JSON = dimensions_mod.json
 
-# End-of-data marker for the pulsation files (DATA XYZ/22*99.99D0/).
+# End-of-data marker for the pulsation files (DATA XYZ/22*99.99D0/)
+# (Fortran line 195).
 XYZ = np.full(23, 99.99)
 
 # Locals kept between calls (SAVE) whose old values can be read: the
-# pulsation variables (question 5), the step counts, last mass difference
-# and errors printed at the end, and ENVG, which
-# is never set (question 2).
+# previous point's taup, op, dp (suspected bug 3 on the page), the step
+# counts, last mass difference and errors printed at the end (suspected
+# bug 4), and ENVG, which is never set (suspected bug 1) (Fortran line
+# 202).
 taup = 0.0
 op = 0.0
 dp = 0.0
@@ -63,6 +66,7 @@ def _pulse_lines(unit, values, per_line):
     """Write values to a pulsation file, per_line to a line (FORMATs 5001:
     5E16.9 and 6001: 5E23.16, as 5, 5, 5, 4; 6003: 6E23.16, as 6, 6, 6,
     4). Python's E format prints d.ddd where Fortran's prints 0.ddd."""
+
     width, digits = (16, 9) if per_line == 0 else (23, 16)
     per_line = per_line or 5
     lines = []
@@ -74,6 +78,7 @@ def _pulse_lines(unit, values, per_line):
 
 def _fmt260(eg, de):
     """FORMAT 260: one envelope point of the .store table."""
+
     e = envprt_mod
     q = pulse2_mod
     chrh = 1.0 / q.qqdp
@@ -88,15 +93,16 @@ def _fmt260(eg, de):
             f"{gam1:12.8f}{q.qqdp:12.8f}")
 
 
-def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
-           x, z, estore, istore, katm, kenv, ksaha, ps, rs, ts,
-           lpulpt, cmixl):
+def envint(b: float, fpl: float, ftl: float, gl: float, hstot: float, ie: int, lprt: bool, lsbc: bool, plim: float,
+           rl: float, teffl: float, x: float, z: float, estore: np.ndarray, istore: int, katm: int, kenv: int,
+           ksaha: int, ps: np.ndarray, rs: np.ndarray, ts: np.ndarray, lpulpt: bool, cmixl: float) -> tuple[float, int,
+           int, int, int]:
     """Integrate the atmosphere (gray T-tau, or read from a table) and the
     envelope (in log P) down to the fitting mass; return the fitting
     point's P, T, r, store the envelope profile in envstruct_mod, and find
     the base of the convection zone and its overturn time.
 
-    Translates: envint.f#ENVINT (09c3b9b)
+    Translates: envint.f#ENVINT (7be4133)
 
     Arguments: b (L), fpl, ftl (rotational corrections), gl (log g),
     hstot (log M), ie (the point of the envelope triangle), lprt, lsbc
@@ -110,7 +116,9 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
     Returns (rl, istore, katm, kenv, ksaha): rl as QENV last set it
     (log r at the last envelope point; as passed in if QENV was not
     called).
+
     """
+
     global taup, op, dp, nok, nbad, sdif
     c = constants_mod
     nml = nmlpar_mod
@@ -121,6 +129,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
     env = envstruct_mod
     atm = atmstruct_mod
     acd = acdpth_mod
+    # Fortran lines 175–176.
     dydx = np.zeros(4)
     yscal = np.zeros(4)
     ystart = np.zeros(4)
@@ -128,9 +137,11 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
     fxion = np.zeros(4)
 
     # QENV is called through BSSTEP with a fixed argument list, so CMIXL
-    # reaches it through qenvmix_mod.
+    # reaches it through qenvmix_mod (Fortran line 204).
     qenvmix_mod.cmixlq = cmixl
-    # Pulsation output: turn on the derivative calculator (DBG).
+
+    # Pulsation output: turn on the derivative calculator (DBG) (Fortran
+    # lines 205–218).
     if lpulpt and lprt:
         pulse1_mod.lpumod = True
         lderiv = True
@@ -143,11 +154,13 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
     # Derivatives are always calculated (the profiles need them) (JVS 10/07/13).
     lderiv = True
 
+    # Fortran lines 220–225.
     if lprt and nml.lstatm:
         if not nml.lstch:
             io.write(io.istor, "\n******** ATMOSPHERE BEGIN ********")  # 60
 
-    # Tabulated atmospheres give the photospheric pressure directly.
+    # Tabulated atmospheres give the photospheric pressure directly
+    # (Fortran lines 227–257).
     tabulated = False
     if nml.kttau == 3:
         # Kurucz atmospheres.
@@ -167,8 +180,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             nml.lstatm = False
         lalfail = alsurfp(teffl, gl, lprt and nml.lstatm, False)
         if lalfail:
-            # Question (see the page): gray atmospheres for the rest of
-            # the run (Teff above the table, or g outside it).
+            # Gray atmospheres until SURFBC switches back. Question (see the
+            # page): a failure in log g.
             nml.kttau = 0
             nml.lttau = True
             print(" ENVINT: Change to gray atmosphere (KTTAU=0)")
@@ -177,7 +190,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             tabulated = True
 
     if not tabulated:
-        # label 2: gray atmosphere. Guess T at an optical depth near zero.
+        # label 2: gray atmosphere. Guess T at an optical depth near zero
+        # (Fortran lines 258–268).
         errsum[1] = 0.0
         if nml.kttau == 0:
             tl = teffl - 0.031235 + 0.25 * math.log10(c.cc23)
@@ -185,9 +199,11 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             tl = teffl - 0.031235 + 0.25 * math.log10(0.550)
         elif nml.kttau == 2:
             tl = teffl + hra(c.cc23) - atmos_mod.hras
+
         # Very occasionally the start (x0) lies past the end (xlim): the
-        # starting density is then divided by 10 and the start retried.
-        # Question (see the page): no limit on retries.
+        # starting density is then divided by 10 and the start retried
+        # (Fortran lines 269–372). Suspected bug (see the page): no limit on
+        # retries.
         atmdx = nml.atmd0
         while True:                                # label 1998
             t = math.exp(c.cln * tl)
@@ -203,7 +219,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             o, ol, qod, qot = getopac(dl, tl, x, z, 0.0, 0.0, 0.0, 0.0, fxion)
             x0 = pl - gl + math.log10(o)
             y[1] = pl
-            dydx[1] = math.exp(c.cln * (gl + x0 - ol - pl))
+            # The slope includes fpl, as qatm's do (MHP 10/29/26).
+            dydx[1] = math.exp(c.cln * (gl + x0 - ol - pl)) * fpl
             if lprt and nml.lstatm:
                 if not nml.lstch:
                     io.write(io.istor,
@@ -213,7 +230,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                 beta = 1.0 - c.ca3 * (t**2)**2 / p
                 chrh = 1.0 / qdp
                 cht = -chrh * qdt
-                # Question (see the page): qcpp where qcp is meant.
+                # Suspected bug (see the page): qcpp where qcp is meant.
                 cv = qcpp - math.exp(c.cln * (pl - dl - tl)) * cht**2 / chrh
                 gam1 = chrh * qcpp / cv
                 if not nml.lstch:
@@ -223,7 +240,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                              f"{fxion[3]:6.3f}{ksaha:7d}{katm:7d}"
                              f"{gam1:12.8f}{qdp:12.8f}{qdt:12.8f}"
                              f"{beta:12.8f}{qcpp:12.5E}{cv:12.5E}")  # 20
-            # Pulsation output: the initial point (DBG).
+            # Pulsation output: the initial point (DBG) (Fortran lines
+            # 314–354).
             if lpulpt and lprt:
                 q.qqed = 0.0
                 qesum = 0.0
@@ -250,7 +268,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                                  [deltr, q.qfs, b, tl, dl, pl, taup, o, qdp,
                                   q.qqed, q.qqet, qod, qot, del_, dela, qcp,
                                   rmu, qdt, pelpf], 5)        # format 6001
-            # Integrate dP/dtau from this tau to tau = 2/3.
+            # Integrate dP/dtau from this tau to tau = 2/3 (Fortran lines
+            # 355–372).
             nv = 1
             eps = nml.atmerr
             if nml.kttau == 1:
@@ -267,13 +286,15 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                 continue                           # go to 1998
             break
 
+        # Fortran lines 375–380.
         hmax = nml.atmmax
         hmin = nml.atmmin
         h = nml.atmbeg
         stoler = intpar_mod.stolr0
         nok = 0
         nbad = 0
-        # The integration loop.
+
+        # The integration loop (Fortran lines 382–497).
         for nstep in range(1, MAXSTP + 1):
             for i in range(1, nv + 1):
                 yscal[i] = abs(y[i]) + abs(h * dydx[i]) + TINY
@@ -323,8 +344,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             else:
                 nbad = nbad + 1
             # Pulsation output: atmosphere values (also for the acoustic depth,
-            # LCLCD, JVS 02/11) (DBG).
-            # Question (see the page): taup, op, dp are set only with
+            # LCLCD, JVS 02/11) (DBG) (Fortran lines 431–476).
+            # Suspected bug (see the page): taup, op, dp are set only with
             # pulsation output; otherwise they are left from an earlier call.
             if (lpulpt and lprt) or acd.lclcd or nml.lstch:
                 q.qqed = 0.0
@@ -358,8 +379,6 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                                       q.qqod, q.qqot, del_, q.qdela, q.qqcp,
                                       q.qrmu, q.qqdt, pelpf], 5)
                 # Save in atmstruct_mod, for the stitched output (JvS).
-                # Question (see the page): stored on other switches than
-                # atmop, atmot, ...
                 atm.atmor[nstep] = deltr
                 atm.adels[1, nstep] = delr
                 atm.adels[2, nstep] = del_
@@ -367,7 +386,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                 atm.numatm = nstep
                 taup = taun
                 dp = dn
-            # Is the integration complete?
+            # Is the integration complete? (Fortran lines 479–488.)
             if abs(x0 - xlim) <= stoler:
                 io.write(io.ishort,
                          f" ATMOSPHERE INTEGRATION COMPLETE NUMBER OF STEPS "
@@ -383,30 +402,33 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                    "INTEGRATIONS.I QUIT.")         # format 50
             io.write(io.iowr, msg)
             io.write(io.ishort, msg)
-            raise SystemExit(msg)
+            raise SystemExit(1)    # STOP 1, the run-time error code
 
     # label 200 (tables come here directly). If only the photospheric pressure
-    # is wanted, stop here (G Somers 3/17).
+    # is wanted, stop here (G Somers 3/17) (Fortran lines 504–508).
     ovrtrn_mod.pphot = apr.ap
     if not nml.lcalcenv:
         return rl, istore, katm, kenv, ksaha           # go to 555
 
     # The envelope: P is the independent variable, m, T and r the
-    # dependent ones; integrate from tau = 2/3 to the model's last point.
+    # dependent ones; integrate from tau = 2/3 to the model's last point
+    # (Fortran lines 509–514).
     if lprt and nml.lstenv:
         if not nml.lstch:
             io.write(io.istor, "\n******** ENVELOPE BEGIN ********")  # 61
-    # Pulsation output: end-of-data marker for the atmosphere file (DBG).
+
+    # Pulsation output: end-of-data marker for the atmosphere file (DBG)
+    # (Fortran lines 515–525).
     if lpulpt and lprt:
         if nml.ipver == 1:
             _pulse_lines(io.iopatm, list(XYZ[1:20]), 0)
         elif nml.ipver in (2, 3):
             _pulse_lines(io.iopatm, list(XYZ[1:20]), 5)
 
+    # The envelope mass is negligible: the photosphere is the fitting point
+    # (Fortran lines 527–540).
     comp = comp_mod
     if comp.senv > -1.0e-12:
-        # The envelope mass is negligible: the photosphere is the fitting
-        # point.
         if lsbc:
             ps[ie] = apr.ap
             rs[ie] = rl
@@ -417,7 +439,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                              f"    {ps[ie]:16.12f}{ts[ie]:16.12f}"
                              f"{rs[ie]:16.12f}        {comp.senv:16.12f}")
     else:
-        # Initialize; set the numerical parameters.
+        # Initialize; set the numerical parameters (Fortran lines 542–567).
         latmo = False
         for i in range(1, 4):
             errsum[i] = 0.0
@@ -439,11 +461,14 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             istore = 0
         llstore = False
         ltest = not lsbc
-        # dy/dx at the start of the step.
+
+        # dy/dx at the start of the step (Fortran lines 568–570).
         rl, kenv, ksaha = qenv(x0, y, dydx, b, fpl, ftl, gl, latmo,
                                lderiv, locond, lprt, rl, teffl, x, z, kenv,
                                ksaha)
-        # Pulsation output: the first point of the envelope (DBG).
+
+        # Pulsation output: the first point of the envelope (DBG), and the
+        # .store table's header and first line (Fortran lines 571–623).
         pal = pualpha_mod
         if lpulpt and lprt:
             _envelope_pulse_point(rl, b, pal)
@@ -464,16 +489,21 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             eg = math.exp(c.cln * sgl)
             if not nml.lstch:
                 io.write(io.istor, _fmt260(eg, de))
-        # Store the starting values (one stored envelope point) (07/02).
+
+        # Store the starting values (one stored envelope point) (07/02)
+        # (Fortran lines 624–660). TAUCZENV is summed but never kept
+        # (unused?, as in the Fortran).
         lsurcz = False
         tauczenv = 0.0
         _store_envelope_point(1, x, z, b)
         # Gradients kept for the convection zone's edge (unused here) (JVS 10/10).
-        chdelj = epr.edel[2]                       # set, never used
-        chdeld = q.qdela                           # set, never used
+        chdelj = epr.edel[2]  # noqa: F841  (unused in the Fortran too)
+        chdeld = q.qdela  # noqa: F841  (unused in the Fortran too)
         if env.lcenv[1]:
             lsurcz = True
         env.numenv = 1
+
+        # The integration loop (Fortran lines 661–826).
         for nstep in range(1, MAXSTP + 1):
             xstart = x0
             for i in range(1, nv + 1):
@@ -530,7 +560,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                         lsurcz = True
                 elif epr.evel > 0.0:
                     dr = 10.0**env.envr[n - 1] - 10.0**env.envr[n]
-                    # Question (see the page): tauczenv is never kept.
+                    # tauczenv is never kept (unused?).
                     tauczenv = tauczenv + dr / epr.evel
             if abs(sdif) <= stoler:
                 if lsbc:
@@ -562,10 +592,11 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                    "I QUIT")                       # format 911
             io.write(io.iowr, msg)
             io.write(io.ishort, msg)
-            raise SystemExit(msg)
+            raise SystemExit(1)    # STOP 1, the run-time error code
 
-    # label 300: reverse the envelope profile, centre outward (07/02).
-    if comp.senv < -1.0e-12:
+    # label 300: reverse the envelope profile, centre outward (07/02)
+    # (Fortran lines 827–914).
+    if comp.senv <= -1.0e-12:
         n = env.numenv
         for i in range(1, n + 1):
             i1 = i
@@ -575,10 +606,9 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
             for arr in (env.envd, env.envp, env.envr, env.envs, env.envt,
                         env.envx, env.envz, env.lcenv, env.envo):
                 arr[i1], arr[i2] = arr[i2], arr[i1]
-            # Question (see the page): ENVL(I2) = DUM1 is missing, so the
-            # second half keeps its own values.
             dum1 = env.envl[i1]
             env.envl[i1] = env.envl[i2]
+            env.envl[i2] = dum1
             for arr in (env.eqdt, env.evels, env.ebetas, env.egam1,
                         env.eqcp):
                 arr[i1], arr[i2] = arr[i2], arr[i1]
@@ -587,15 +617,18 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                     env.edels[k, i2], env.edels[k, i1]
                 env.efxions[k, i1], env.efxions[k, i2] = \
                     env.efxions[k, i2], env.efxions[k, i1]
-    # Pulsation output: end-of-data marker for the envelope file (DBG).
+
+    # Pulsation output: end-of-data marker for the envelope file (DBG)
+    # (Fortran lines 915–923).
     if lpulpt and lprt:
         if nml.ipver == 1:
             _pulse_lines(io.iopenv, list(XYZ[1:20]), 0)
         elif nml.ipver in (2, 3):
             _pulse_lines(io.iopenv, list(XYZ[1:23]), 6)
 
-    # Possible bug (see the page): when the envelope is skipped,
-    # nok, nbad, sdif and y are from the atmosphere or an earlier call.
+    # Suspected bug (see the page): when the envelope is skipped,
+    # nok, nbad, sdif and y are from the atmosphere or an earlier call
+    # (Fortran lines 925–930).
     io.write(io.ishort,
              f" ENVELOPE INTEGRATION COMPLETE NUMBER OF STEPS ACCEPTED"
              f"{nok:5d} REJECTED{nbad:5d}\n"
@@ -605,7 +638,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
 
     # If the convection zone's base lies in the envelope, find it, and the
     # overturn time (not with LNEWTCZ, which computes it elsewhere) (JVS 08/13)
-    # (G Somers 3/17).
+    # (G Somers 3/17) (Fortran lines 932–973).
     if nml.lnewtcz:
         return rl, istore, katm, kenv, ksaha           # go to 555
     jenv = 0
@@ -618,8 +651,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
         dd2 = env.edels[1, jenv - 1] - env.edels[2, jenv - 1]
         dd1 = env.edels[1, jenv] - env.edels[2, jenv]
         fx = dd2 / (dd2 - dd1)
-        # Question (see the page): envczl is no longer used.
-        envczl = (env.envr[jenv - 1] + fx * (env.envr[jenv]
+        # envczl is no longer used (unused?).
+        envczl = (env.envr[jenv - 1] + fx * (env.envr[jenv]  # noqa: F841  (unused in the Fortran too)
                                              - env.envr[jenv - 1])
                   - c.crsunl)
         for i in range(1, env.numenv + 1):
@@ -631,7 +664,7 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
                             - math.exp(c.cln * env.envs[i]))
             edel1[i] = env.edels[1, i]
             edel2[i] = env.edels[2, i]
-        # Question (see the page): envg is never set.
+        # Suspected bug (see the page): envg is never set.
         taucal(envs2, envs1, env.lcenv, env.envr, env.envp, env.envd, envg,
                env.numenv, env.evels, edel1, edel2)
     return rl, istore, katm, kenv, ksaha               # label 555
@@ -640,6 +673,8 @@ def envint(b, fpl, ftl, gl, hstot, ie, lprt, lsbc, plim, rl, teffl,
 def _store_envelope_point(n, x, z, b):
     """Copy the point just integrated (envprt_mod, pulse2_mod) into entry n
     of envstruct_mod: the Fortran writes this block out twice."""
+
+    # Fortran lines 628–655 (and 755–781).
     env = envstruct_mod
     e = envprt_mod
     q = pulse2_mod
@@ -673,6 +708,8 @@ def _envelope_pulse_point(rl, b, pal):
     """DBG pulse: one envelope point to the pulsation file (FORMATs 5001,
     6001, or 6003 with the mixing-length values appended to the first
     three lines); the Fortran writes this block out twice."""
+
+    # Fortran lines 572–595 (and 703–725).
     q = pulse2_mod
     io = iounits_mod
     q.qqed = 0.0

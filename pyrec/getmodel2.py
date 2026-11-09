@@ -1,7 +1,8 @@
-"""Python version of getmodel2.f (YREC 09c3b9b): read a stellar model in
+"""Python version of getmodel2.f (YREC 7be4133): read a stellar model in
 the Model2 text format."""
 
 from pyrec import constants_mod
+import numpy as np
 from pyrec import iounits_mod
 
 
@@ -13,6 +14,7 @@ def _fields(line, spec):
     last `decimals` digits taken as decimals. (The 1P scale factor of the
     FORMATs only matters for fields without an exponent, which PUTMODEL2
     does not write, and is not applied.)"""
+
     out, pos = [], 0
     for item in spec:
         kind, w = item[0], item[1]
@@ -44,17 +46,22 @@ def _fields(line, spec):
     return out
 
 
-def getmodel2(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
-              hs, hstot, ht, iread, jcore, jenv, lc, lexcom, lrot, m, model,
-              omega, ps, rs, smass, teffl, tlumx, tril, trit, ts, atm, eos,
-              hik, ldify, ldifz, ldisk, linstb, ljdot0, alok, lovstc, lovste,
-              lovstm, lpurez, lsemic, compmix, pdisk, tdisk, wmax):
+def getmodel2(bl: float, cfenv: np.ndarray, cmixl: float, dage: float, ddage: float, ftri: float, hcomp: np.ndarray,
+              hd: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, hstot: float,
+              ht: np.ndarray, iread: int, jcore: int, jenv: int, lc: np.ndarray, lexcom: bool, lrot: bool, m: int,
+              model: int, omega: np.ndarray, ps: np.ndarray, rs: np.ndarray, smass: float, teffl: float,
+              tlumx: np.ndarray, tril: np.ndarray, trit: np.ndarray, ts: np.ndarray, atm: str, eos: str, hik: str,
+              ldify: bool, ldifz: bool, ldisk: bool, linstb: bool, ljdot0: bool, alok: str, lovstc: bool, lovste: bool,
+              lovstm: bool, lpurez: bool, lsemic: bool, compmix: str, pdisk: float, tdisk: float,
+              wmax: float) -> tuple[float, float, float, float, float, float, int, int, bool, bool, int, int, float,
+              float, str, str, str, bool, bool, bool, bool, bool, str, bool, bool, bool, bool, bool, str, float, float,
+              float]:
     """Read a Model2-format model from unit iread (rewound first): the
     header, the physics flags of the run that wrote it, the luminosities
     by source (converted to solar units if written in erg/s), the
     envelope triangle with its orientation ftri, and the shells.
 
-    Translates: getmodel2.f#GETMODEL2 (09c3b9b)
+    Translates: getmodel2.f#GETMODEL2 (7be4133)
 
     Arguments: iread (the unit); every other scalar is only set.
     Arrays changed in place: cfenv, hcomp, hd, hl, hp, hr, hs, ht, lc,
@@ -64,10 +71,16 @@ def getmodel2(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
     lrot, m, model, smass, teffl, atm, eos, hik, ldify, ldifz, ldisk,
     linstb, ljdot0, alok, lovstc, lovste, lovstm, lpurez, lsemic,
     compmix, pdisk, tdisk, wmax).
+
     """
+
+    # Fortran line 54.
     iounits_mod.rewind(iread)
 
-    # Header (FORMAT 10): A5,2I8,5F16.12,1PE18.10,0P2F16.12.
+    # Header (FORMAT 10): A5,2I8,5F16.12,1PE18.10,0P2F16.12 (Fortran lines
+    # 56–59).
+    # Suspected bug (see the page): m is not checked against 1..json
+    # before hs[m] is set.
     (atemp, model, m, smass, teffl, bl, hstot, dage, ddage, hs1,
      hsm) = _fields(iounits_mod.read(iread),
                     [('a', 5), ('i', 8), ('i', 8)] + [('f', 16, 12)] * 5
@@ -75,7 +88,7 @@ def getmodel2(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
     hs[1] = hs1
     hs[m] = hsm
 
-    # The run's physics (FORMAT 30).
+    # The run's physics (FORMAT 30) (Fortran lines 61–67).
     vals = _fields(iounits_mod.read(iread),
                    [('i', 8), ('i', 8), ('f', 16, 10), ('x', 1), ('a', 6),
                     ('x', 1)] + [('a', 4), ('x', 1)] * 3
@@ -85,7 +98,8 @@ def getmodel2(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
      ldify, ldifz, lsemic, lovstc, lovste, lovstm, lrot, linstb, ljdot0,
      ldisk, tdisk, pdisk, wmax) = vals
 
-    # Luminosities by source (FORMAT 40); in erg/s if any exceeds 1e20.
+    # Luminosities by source (FORMAT 40); in erg/s if any exceeds 1e20
+    # (Fortran lines 69–83).
     tlumx[1:8] = _fields(iounits_mod.read(iread),
                          [('x', 10)] + [('f', 17, 9)] * 7)
     # Question (see the page): the unit is guessed from the size.
@@ -96,7 +110,7 @@ def getmodel2(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
             tlumx[j] = tlumx[j] / constants_mod.clsun
 
     # The envelope triangle (FORMAT 50); a negative record number means
-    # its orientation is reversed.
+    # its orientation is reversed (Fortran lines 85–95).
     ftri = 1.0
     for i in range(1, 3 + 1):
         vals = _fields(iounits_mod.read(iread),
@@ -108,12 +122,12 @@ def getmodel2(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
         if io < 0:
             ftri = -1.0
 
-    # Three header records of the shell table.
+    # Three header records of the shell table (Fortran lines 97–100).
     iounits_mod.read(iread)
     iounits_mod.read(iread)
     iounits_mod.read(iread)
 
-    # The shells (FORMAT 60).
+    # The shells (FORMAT 60) (Fortran lines 102–108).
     spec60 = ([('i', 6), ('f', 18, 14), ('f', 18, 14), ('f', 24, 16)]
               + [('f', 18, 14)] * 3 + [('f', 24, 16), ('x', 1), ('l', 1)]
               + [('f', 12, 9)] * 3 + [('f', 16, 8)] * 12)

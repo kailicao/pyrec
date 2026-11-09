@@ -1,4 +1,4 @@
-"""Python version of getgrid.f (YREC 09c3b9b): the equally spaced grid
+"""Python version of getgrid.f (YREC 7be4133): the equally spaced grid
 for the rotational mixing and angular momentum diffusion."""
 
 import math
@@ -15,13 +15,13 @@ from pyrec.osplin import osplin
 ytab = np.zeros(dimensions_mod.json + 1)
 
 
-def getgrid(hl, hp, hs, ibeg, iend, m):
+def getgrid(hl: np.ndarray, hp: np.ndarray, hs: np.ndarray, ibeg: int, iend: int, m: int) -> None:
     """Build the equally spaced grid in
     chi = log m / D_m + L / D_L - log P / D_P over the region ibeg..iend,
     with as many points as the region has, and the mass at each grid
     point by OSPLIN's spline in chi.
 
-    Translates: getgrid.f#GETGRID (09c3b9b)
+    Translates: getgrid.f#GETGRID (7be4133)
 
     Arguments: hl (L, solar units), hp (log P), hs (log m), ibeg, iend
     (the region), m (number of shells).
@@ -29,10 +29,14 @@ def getgrid(hl, hp, hs, ibeg, iend, m):
     egrid_mod.ntot are set.
 
     Returns nothing.
+
     """
+
     e = egrid_mod
     hpttol = nmlpar_mod.hpttol
 
+    # The point-spacing criteria, and chi at the model points (Fortran
+    # lines 53–60).
     dm = hpttol[2]
     dl = hpttol[9] * hl[m]
     dp = hpttol[11]
@@ -40,14 +44,19 @@ def getgrid(hl, hp, hs, ibeg, iend, m):
     for ii in range(1, ntab + 1):
         i = ibeg + ii - 1
         e.chi[ii] = hs[i] / dm + hl[i] / dl - hp[i] / dp
-    # Question (see the page): as many grid points as model points.
+
+    # Question (see the page): as many grid points as model points
+    # (Fortran lines 61–67).
     e.ntot = ntab
     e.ntot = max(e.ntot, 3)
+
+    # The equally spaced chi (Fortran lines 68–81).
     e.dchi = (e.chi[ntab] - e.chi[1]) / float(e.ntot - 1)
     e.echi[1] = e.chi[1]
     for i in range(2, e.ntot + 1):
         e.echi[i] = e.echi[i - 1] + e.dchi
-    # log m at the grid points, then unlogged.
+
+    # log m at the grid points, then unlogged (Fortran lines 82–92).
     for i in range(1, ntab + 1):
         ytab[i] = hs[ibeg + i - 1]
     osplin(e.echi, e.es1, e.chi, ytab, ntab, e.ntot)

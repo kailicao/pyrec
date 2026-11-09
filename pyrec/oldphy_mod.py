@@ -1,7 +1,7 @@
-"""Python version of oldphy_mod.f (YREC 09c3b9b): the physics of the model
+"""Python version of oldphy_mod.f (YREC 7be4133): the physics of the model
 at the start of the step, formerly COMMON/OLDPHY/.
 
-Translates: oldphy_mod.f#OLDPHY_MOD (09c3b9b)
+Translates: oldphy_mod.f#OLDPHY_MOD (7be4133)
 
 Routines that USE OLDPHY_MOD import this module and write
 ``oldphy_mod.<name>``. Saved by hpoint, read by midmod (amuo also getw).
@@ -13,6 +13,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–39.
 delo = np.zeros(_JSON + 1)      # actual temperature gradient
 delao = np.zeros(_JSON + 1)     # adiabatic gradient
 amuo = np.zeros(_JSON + 1)      # mean molecular weight

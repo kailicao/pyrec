@@ -1,24 +1,26 @@
-"""Python version of constants_mod.f (YREC a8a5950): the physical and
+"""Python version of constants_mod.f (YREC 7be4133): the physical and
 mathematical constants, formerly COMMON/CONST/, /CONST1/, /CONST2/,
 /CONST3/ and C_2 of /CWIND/.
 
-Translates: constants_mod.f#CONSTANTS_MOD (a8a5950)
+Translates: constants_mod.f#CONSTANTS_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case (all REAL*8).
 Routines that USE CONSTANTS_MOD import this module and write
-``constants_mod.<name>``. Apart from cavog, clsun and crsun, the values are set at
-run time by setups (and cln, cc13, cc23, c_2 by parmin).
+``constants_mod.<name>``. Apart from cavog, clsun and crsun, the values
+are set at run time by setups (and cln, cc13, cc23, c_2 by parmin).
 """
 
 # Avogadro's number as the reciprocal of the atomic mass unit in g (the
-# scale of ENGEB's nuclear masses ANUC); a PARAMETER in the Fortran.
+# scale of ENGEB's nuclear masses ANUC); a PARAMETER in the Fortran
+# (Fortran line 42).
 cavog = 1.0 / 1.6605402e-24
 
+# The members set at run time, or by the namelist (Fortran lines 44–73).
 clsun = 3.8515e33       # solar luminosity (initializer; PHYSICS namelist)
 clsunl = 0.0            # log10(clsun) (setups)
 clnsun = 0.0            # ln(10)/clsun (setups)
 cmsun = 0.0             # solar mass, 1.9891e33 g (setups)
-cmsunl = 0.0            # log10(cmsun) (setups; read nowhere)
+cmsunl = 0.0            # log10(cmsun) (setups; read nowhere: unused?)
 crsun = 6.9598e10       # solar radius (initializer; PHYSICS namelist)
 crsunl = 0.0            # log10(crsun) (setups)
 cmbol = 0.0             # solar bolometric magnitude, 4.79 (setups)
@@ -32,12 +34,12 @@ cc23 = 0.0              # 2/3 (parmin, setups)
 cpi = 0.0               # pi (setups)
 cgas = 0.0              # gas constant (setups)
 ca3 = 0.0               # 4 sigma / (3 c) (setups)
-ca3l = 0.0              # log10(ca3) (setups; read nowhere)
+ca3l = 0.0              # log10(ca3) (setups; read nowhere: unused?)
 csig = 0.0              # Stefan-Boltzmann constant (setups)
 csigl = 0.0             # log10(csig)
 cgl = 0.0               # log10(G) (setups)
 cmkh = 0.0              # Saha constant (setups)
-cmkhn = 0.0             # set and read nowhere
+cmkhn = 0.0             # set and read nowhere (unused?)
 cdelrl = 0.0            # constant of the radiative gradient (setups)
 cmixl2 = 0.0            # 1/3 (setups)
 cmixl3 = 0.0            # 16 sqrt(2) sigma (setups)

@@ -1,18 +1,21 @@
-"""Python version of eq2mod.f (YREC 09c3b9b): a change of specific angular
+"""Python version of eq2mod.f (YREC 7be4133): a change of specific angular
 momentum on the even grid, mapped back onto the model's points."""
+
+import numpy as np
 
 from pyrec import egrid_mod
 from pyrec import splin_mod
 from pyrec.osplin import osplin
 
 
-def eq2mod(dj, ej, hs2, ibeg, iend, lcz, m, sumdj, hjm):
+def eq2mod(dj: np.ndarray, ej: np.ndarray, hs2: np.ndarray, ibeg: int, iend: int, lcz: np.ndarray, m: int, sumdj: float,
+           hjm: np.ndarray) -> None:
     """Interpolate Delta j / j from the even grid back to the model points
     of the region ibeg..iend (extended to the edges of convection zones it
     touches), apply it to hjm, and rescale the region so that its angular
     momentum changes by exactly sumdj.
 
-    Translates: eq2mod.f#EQ2MOD (09c3b9b)
+    Translates: eq2mod.f#EQ2MOD (7be4133)
 
     Arguments: dj, ej, the change and the angular momentum on the even
     grid; hs2, the shell masses; ibeg, iend, the region; lcz, the
@@ -20,7 +23,9 @@ def eq2mod(dj, ej, hs2, ibeg, iend, lcz, m, sumdj, hjm):
     hjm, the specific angular momentum, changed in place.
 
     Returns nothing.
+
     """
+
     chi = egrid_mod.chi
     echi = egrid_mod.echi
     ntot = egrid_mod.ntot
@@ -29,8 +34,9 @@ def eq2mod(dj, ej, hs2, ibeg, iend, lcz, m, sumdj, hjm):
     xtab = splin_mod.xtab
     ytab = splin_mod.ytab
 
-    # Extend the region to the edges of the convection zones at its ends.
-    if not lcz[ibeg] or ibeg == 1:
+    # Extend the region over the convection zones adjoining its ends
+    # (Fortran lines 57–86).
+    if ibeg == 1:
         i0 = ibeg
     else:
         i0 = 1
@@ -38,7 +44,8 @@ def eq2mod(dj, ej, hs2, ibeg, iend, lcz, m, sumdj, hjm):
             if not lcz[i]:
                 i0 = i + 1
                 break  # label 10
-    if not lcz[iend] or iend == m:
+
+    if iend == m:
         i1 = iend
     else:
         i1 = m
@@ -47,7 +54,8 @@ def eq2mod(dj, ej, hs2, ibeg, iend, lcz, m, sumdj, hjm):
                 i1 = i - 1
                 break  # label 20
 
-    # Interpolate y = dj/ej from the even grid to the model points.
+    # Interpolate y = dj/ej from the even grid to the model points
+    # (Fortran lines 87–96).
     nmod = iend - ibeg + 1
     for i in range(1, nmod + 1):
         xval[i] = chi[i]
@@ -58,7 +66,7 @@ def eq2mod(dj, ej, hs2, ibeg, iend, lcz, m, sumdj, hjm):
 
     # Apply it; the extended convective shells take the edge values.
     # Question (see the page): this assumes those zones rotate as solid
-    # bodies already.
+    # bodies already (Fortran lines 97–119).
     sumjmod = 0.0
     sumdjmod = 0.0
     if i0 < ibeg:
@@ -77,8 +85,7 @@ def eq2mod(dj, ej, hs2, ibeg, iend, lcz, m, sumdj, hjm):
             sumdjmod = sumdjmod + yval[nmod] * hjm[i] * hs2[i]
             hjm[i] = hjm[i] * (1.0 + yval[nmod])
 
-    # Rescale to conserve angular momentum.
-    # Question (see the page): with sumdj = 0, any mismatch triggers it.
+    # Rescale to conserve angular momentum (Fortran lines 120–136).
     test = abs(sumdjmod - sumdj)
     val = 1.0e-5 * abs(sumdj)
     if test > val:

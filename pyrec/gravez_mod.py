@@ -1,7 +1,7 @@
-"""Python version of gravez_mod.f (YREC 09c3b9b): the metals and their
+"""Python version of gravez_mod.f (YREC 7be4133): the metals and their
 coefficients on grsett's equally spaced grid, formerly COMMON/GRAVEZ/.
 
-Translates: gravez_mod.f#GRAVEZ_MOD (09c3b9b)
+Translates: gravez_mod.f#GRAVEZ_MOD (7be4133)
 
 Routines that USE GRAVEZ_MOD import this module and write
 ``gravez_mod.<name>``. "_h" marks the grid's midpoints.

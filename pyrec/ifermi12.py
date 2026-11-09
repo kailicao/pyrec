@@ -1,10 +1,10 @@
-"""Python version of ifermi12.f (YREC 09c3b9b): the inverse Fermi-Dirac
+"""Python version of ifermi12.f (YREC 7be4133): the inverse Fermi-Dirac
 integral of order 1/2 (Antia 1993)."""
 
 import math
 
 # DATA: Antia's coefficients (index 0 unused; the rest of the Fortran's
-# 12-element arrays is never set or used).
+# 12-element arrays is never set or used; Fortran lines 20–32).
 AN = 0.5
 M1, K1, M2, K2 = 4, 3, 6, 5
 A1 = [0.0, 1.999266880833e4, 5.702479099336e3, 6.610132843877e2,
@@ -17,15 +17,17 @@ B2 = [0.0, -9.745794806288e-3, 5.485432756838e-2, -3.299466243260e-1,
       4.077841975923e-1, -1.145531476975e0, -6.067091689181e-2]
 
 
-def ifermi12(f):
+def ifermi12(f: float) -> float:
     """The degeneracy parameter eta for which F_{1/2}(eta) = f, by Antia's
     two rational approximations, split at f = 4.
 
-    Translates: ifermi12.f#IFERMI12 (09c3b9b)
+    Translates: ifermi12.f#IFERMI12 (7be4133)
 
     Arguments: f. Returns the inverse.
+
     """
-    # Question (see the page): the normalization of F_{1/2}.
+
+    # Below f = 4: a rational function of f (Fortran lines 36–45).
     if f < 4.0:
         rn = f + A1[M1]
         for i in range(M1 - 1, 0, -1):
@@ -34,6 +36,8 @@ def ifermi12(f):
         for i in range(K1, 0, -1):
             den = den * f + B1[i]
         return math.log(f * rn / den)
+
+    # From f = 4: a rational function of f**(-2/3) (Fortran lines 48–58).
     ff = 1.0 / f**(1.0 / (1.0 + AN))
     rn = ff + A2[M2]
     for i in range(M2 - 1, 0, -1):

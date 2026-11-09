@@ -1,6 +1,7 @@
-"""Python version of runloop_mod.f (YREC 09c3b9b): per-run state of the run loop that is not in the namelist, formerly COMMON/CKIND/ and COMMON/SETT/.
+"""Python version of runloop_mod.f (YREC 7be4133): per-run state of the run
+loop that is not in the namelist, formerly COMMON/CKIND/ and COMMON/SETT/.
 
-Translates: runloop_mod.f#RUNLOOP_MOD (09c3b9b)
+Translates: runloop_mod.f#RUNLOOP_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE RUNLOOP_MOD import this module and write ``runloop_mod.<name>``.
@@ -9,6 +10,7 @@ Each array is indexed by the run (1 to 50; index 0 unused).
 
 import numpy as np
 
+# The module's variables (Fortran lines 60–63).
 # Rescaling targets: rescal[1..4, nk] = mass, X, Z, core mass (parmin;
 # changed by the calibrations setcal, setscal, chkcal, chkscal).
 rescal = np.zeros((5, 51))

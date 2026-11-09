@@ -1,6 +1,6 @@
-"""Python version of scveos_mod.f (YREC 09c3b9b): the tables of the SCV equation of state, formerly COMMON/SCVEOS/.
+"""Python version of scveos_mod.f (YREC 7be4133): the tables of the SCV equation of state, formerly COMMON/SCVEOS/.
 
-Translates: scveos_mod.f#SCVEOS_MOD (09c3b9b)
+Translates: scveos_mod.f#SCVEOS_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE SCVEOS_MOD import this module and write ``scveos_mod.<name>``.
@@ -10,10 +10,11 @@ dimension.
 
 import numpy as np
 
-# Table dimensions (PRIVATE in the Fortran).
+# Table dimensions (PRIVATE in the Fortran) (Fortran lines 28–29).
 _NPS = 76      # pressures per temperature
 _NTS = 63      # temperatures
 
+# Fortran lines 31–39.
 tlogx = np.zeros(_NTS + 1)                      # log T of the tables (setups)
 tablex = np.zeros((_NTS + 1, _NPS + 1, 13))     # hydrogen (setups; column 12 setscv)
 tabley = np.zeros((_NTS + 1, _NPS + 1, 13))     # helium

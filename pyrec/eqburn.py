@@ -1,4 +1,4 @@
-"""Python version of eqburn.f (YREC 09c3b9b): explicit hydrogen and helium
+"""Python version of eqburn.f (YREC 7be4133): explicit hydrogen and helium
 burning rates for a shell or a convection zone, with 3He and the CN cycle
 in equilibrium."""
 
@@ -13,13 +13,15 @@ from pyrec import oldmod_mod
 xsum = np.zeros(11 + 1)
 
 
-def eqburn(hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr10, hr12, hs2, ht,
-           ibegin, iend, dcdt, dodt, dxdt, dydt, xc12, xo16, x, z):
+def eqburn(hr1: np.ndarray, hr2: np.ndarray, hr3: np.ndarray, hr4: np.ndarray, hr5: np.ndarray, hr6: np.ndarray,
+           hr7: np.ndarray, hr10: np.ndarray, hr12: np.ndarray, hs2: np.ndarray, ht: np.ndarray, ibegin: int, iend: int,
+           dcdt: float, dodt: float, dxdt: float, dydt: float, xc12: float, xo16: float, x: float,
+           z: float) -> tuple[float, float, float, float, float, float, float, float]:
     """Explicit burning rates for shells ibegin..iend (mass-weighted means
     over a zone), with 3He and the CN cycle in equilibrium: an initial
     guess at the rates at the start of the step.
 
-    Translates: eqburn.f#EQBURN (09c3b9b)
+    Translates: eqburn.f#EQBURN (7be4133)
 
     Arguments: hr1..hr12, the reaction-rate arrays from RATES; hs2, the
     shell masses; ht, log T; ibegin, iend, the shell or zone; dcdt, dodt,
@@ -29,9 +31,13 @@ def eqburn(hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr10, hr12, hs2, ht,
     Returns (dcdt, dodt, dxdt, dydt, xc12, xo16, x, z): the rates of change
     of 12C, 16O, H and He (mass fraction per Gyr) and the zone's mean
     12C (its CN-equilibrium value if the CN step ran), 16O, X and Z.
+
     """
+
     tcut = nmlpar_mod.tcut
     hcompp = oldmod_mod.hcompp
+
+    # No burning below TCUT(1) (Fortran lines 51–55).
     dxdt = 0.0
     dydt = 0.0
     dcdt = 0.0
@@ -39,7 +45,7 @@ def eqburn(hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr10, hr12, hs2, ht,
     if ht[ibegin] < tcut[1]:
         return dcdt, dodt, dxdt, dydt, xc12, xo16, x, z
 
-    # Abundances: mass-weighted means over a zone.
+    # Abundances: mass-weighted means over a zone (Fortran lines 61–83).
     if ibegin != iend:
         wtsum = 0.0
         for j in range(1, 12):  # label 1
@@ -54,7 +60,7 @@ def eqburn(hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr10, hr12, hs2, ht,
         for j in range(1, 12):  # label 9
             xsum[j] = hcompp[j, ibegin]
 
-    # Rates: likewise.
+    # Rates: likewise (Fortran lines 84–157).
     if ibegin == iend:
         gr1 = hr1[ibegin]
         gr2 = hr2[ibegin]
@@ -87,6 +93,7 @@ def eqburn(hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr10, hr12, hs2, ht,
         gr10 = gr10 / wtsum
         gr12 = gr12 / wtsum
 
+    # Fortran lines 161–168.
     x = xsum[1]
     xhe3 = xsum[4]
     y = xsum[2]
@@ -96,15 +103,17 @@ def eqburn(hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr10, hr12, hs2, ht,
     xn14 = xsum[7]
     xo16 = xsum[9]
 
-    # pp chains, 3He in equilibrium (capped at its actual abundance).
-    # Question (see the page): divides by gr2 (and gr4, gr5 below).
+    # pp chains, 3He in equilibrium (capped at its actual abundance)
+    # (Fortran lines 169–184).
+    # Suspected bug (see the page): divides by gr2 (and gr4, gr5 below).
     if x > 1.0e-10 and ht[ibegin] > tcut[2]:
         r11 = gr1 * x**2
         r34 = gr3 * y
         xhe3e = 0.25 * (math.sqrt(r34**2 + 8.0 * gr2 * r11) - r34) / gr2
         xhe3 = min(xhe3, xhe3e)
         dxdt = -3.0 * r11 + 2.0 * gr2 * xhe3**2 - r34 * xhe3
-        # CN cycle in equilibrium.
+
+        # CN cycle in equilibrium (Fortran lines 185–203).
         if ht[ibegin] > tcut[3]:
             sumcno = xc12 / 12.0 + xc13 / 13.0 + xn14 / 14.0
             r1214 = gr6 / gr4
@@ -114,13 +123,13 @@ def eqburn(hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr10, hr12, hs2, ht,
             # returned and used for 12C + alpha below.
             xc12 = xn14 * r1214
             xc13 = xn14 * r1314
-            # Question (see the page): two protons for 16O + p.
+            # Two protons for 16O + p, as for 14N + p (see the page).
             dxdt = (dxdt - gr4 * x * xc12 - gr5 * x * xc13
                     - 2.0 * gr6 * x * xn14 - 2.0 * gr7 * x * xo16)
     else:
         dxdt = 0.0  # GOTO 100: the CN step is skipped
 
-    # label 100: helium burning.
+    # label 100: helium burning (Fortran lines 204–216).
     if y > 1.0e-10 and ht[ibegin] > tcut[4]:
         r3a = gr12 * y**3
         r412 = gr10 * y * xc12

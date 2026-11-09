@@ -1,13 +1,14 @@
-"""Python version of cases.f (YREC 09c3b9b): the knots of a shape-preserving
+"""Python version of cases.f (YREC 7be4133): the knots of a shape-preserving
 quadratic spline on one interval (McAllister and Roulier)."""
 
 
-def cases(p1, p2, m1, m2, q1, q2, e1, e2, v1, v2, w1, w2, z1, z2, y1, y2,
-          ncase):
+def cases(p1: float, p2: float, m1: float, m2: float, q1: float, q2: float, e1: float, e2: float, v1: float, v2: float,
+          w1: float, w2: float, z1: float, z2: float, y1: float, y2: float, ncase: int) -> tuple[float, float, float,
+          float, float, float, float, float, float, float]:
     """The knots of the quadratic spline on (p1, q1), for case ncase (1 to
     4) of McAllister and Roulier's method.
 
-    Translates: cases.f#CASES (09c3b9b)
+    Translates: cases.f#CASES (7be4133)
 
     Arguments: (p1, p2) and (q1, q2), the points of interpolation; m1, m2,
     the slopes there; ncase, which fixes the number and place of the
@@ -16,11 +17,14 @@ def cases(p1, p2, m1, m2, q1, q2, e1, e2, v1, v2, w1, w2, z1, z2, y1, y2,
     Returns (e1, e2, v1, v2, w1, w2, z1, z2, y1, y2): the knots (v1, v2),
     (w1, w2), (z1, z2), and for case 4 also (e1, e2) and (y1, y2); those a
     case does not set are returned as passed in.
+
     """
-    # Question (see the page): no check of the divisions by m2 - m1, m1, m2.
+
+    # The divisions by m2 - m1, m1, and m2 are safe for the cases CHOOSE
+    # picks (see the page).
     if ncase not in (3, 4):
         if ncase == 2:
-            # label 10: case 2.
+            # Label 10: case 2 (Fortran lines 65–71).
             z1 = (p1 + q1) / 2.0
             v1 = (p1 + z1) / 2.0
             v2 = p2 + m1 * (v1 - p1)
@@ -28,7 +32,8 @@ def cases(p1, p2, m1, m2, q1, q2, e1, e2, v1, v2, w1, w2, z1, z2, y1, y2,
             w2 = q2 + m2 * (w1 - q1)
             z2 = (v2 + w2) / 2.0
             return e1, e2, v1, v2, w1, w2, z1, z2, y1, y2
-        # Case 1 (also any NCASE other than 2, 3, 4).
+
+        # Case 1, also any NCASE other than 2, 3, 4 (Fortran lines 51–62).
         z1 = (p2 - q2 + m2 * q1 - m1 * p1) / (m2 - m1)
         ztwo = p2 + m1 * (z1 - p1)
         v1 = (p1 + z1) / 2.0
@@ -37,13 +42,17 @@ def cases(p1, p2, m1, m2, q1, q2, e1, e2, v1, v2, w1, w2, z1, z2, y1, y2,
         w2 = (ztwo + q2) / 2.0
         z2 = v2 + ((w2 - v2) / (w1 - v1)) * (z1 - v1)
         return e1, e2, v1, v2, w1, w2, z1, z2, y1, y2
-    # label 20: the parameters used in both cases 3 and 4.
+
+    # Label 20: the parameters used in both cases 3 and 4 (Fortran lines
+    # 74–81).
     c1 = p1 + (q2 - p2) / m1
     d1 = q1 + (p2 - q2) / m2
     h1 = 2.0 * c1 - p1
     j1 = 2.0 * d1 - q1
     mbar1 = (q2 - p2) / (h1 - p1)
     mbar2 = (p2 - q2) / (j1 - q1)
+
+    # Case 3 (Fortran lines 84–94).
     if ncase == 3:
         k1 = (p2 - q2 + q1 * mbar2 - p1 * mbar1) / (mbar2 - mbar1)
         if abs(m1) > abs(m2):
@@ -57,7 +66,8 @@ def cases(p1, p2, m1, m2, q1, q2, e1, e2, v1, v2, w1, w2, z1, z2, y1, y2,
         w2 = q2 + m2 * (w1 - q1)
         z2 = v2 + ((w2 - v2) / (w1 - v1)) * (z1 - v1)
         return e1, e2, v1, v2, w1, w2, z1, z2, y1, y2
-    # label 50: case 4.
+
+    # Label 50: case 4 (Fortran lines 97–108).
     y1 = (p1 + c1) / 2.0
     v1 = (p1 + y1) / 2.0
     v2 = m1 * (v1 - p1) + p2

@@ -1,19 +1,22 @@
-"""Python version of xrng4.f (YREC 09c3b9b): four consecutive table
+"""Python version of xrng4.f (YREC 7be4133): four consecutive table
 indices around an index, for 4-point interpolation."""
 
 
-def xrng4(jx, numx, jx1, jx2):
+def xrng4(jx: int, numx: int, jx1: int, jx2: int) -> tuple[int, int]:
     """Choose four consecutive indices jx1..jx2 around jx (jx-1..jx+2),
     shifted to 1..4 near the start and numx-3..numx near the end.
 
-    Translates: xrng4.f#XRNG4 (09c3b9b)
+    Translates: xrng4.f#XRNG4 (7be4133)
 
     Arguments: jx, the index; numx, the table's length; jx1 and jx2 are
     passed in with any value.
 
     Returns (jx1, jx2).
+
     """
+
     # Question (see the page): numx < 4 gives indices outside the table.
+    # The four indices (Fortran lines 13–22).
     if jx <= 2:
         jx1 = 1
         jx2 = 4

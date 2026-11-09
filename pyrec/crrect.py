@@ -1,4 +1,4 @@
-"""Python version of crrect.f (YREC 09c3b9b): the Henyey iterations that
+"""Python version of crrect.f (YREC 7be4133): the Henyey iterations that
 correct the interior model at one level of the time step."""
 
 import math
@@ -9,7 +9,6 @@ from pyrec import comp_mod
 from pyrec import constants_mod
 from pyrec import ctol_mod
 from pyrec import debhu_mod
-from pyrec import dimensions_mod  # JSON, the array sizes (USEd by the Fortran)
 from pyrec import iounits_mod
 from pyrec import nmlpar_mod
 from pyrec import oldmod_mod
@@ -23,7 +22,8 @@ from pyrec.surfbc import surfbc
 # CRRECT has SAVE. Locals kept between calls that matter: JCORE, JENV and
 # MXZON0 are set only by MIX (at ITLVL > 2), but JENV is passed to COEFFT at
 # every level; at levels 1 and 2 it keeps its value from an earlier call
-# (unset at the first call; 0 here).
+# (unset at the first call; 0 here). Suspected bug (see the page).
+# Fortran lines 52–60, 98–109.
 jcore = 0
 jenv = 0
 mxzon0 = np.zeros((13, 3), dtype=int)  # MXZON0(12,2), index 0 unused
@@ -31,23 +31,28 @@ ddage = 0.0
 lflp = False
 
 
-def _l(flag):
+def _l(flag: bool) -> str:
     """Fortran's L format of a logical."""
+
     return "T" if flag else "F"
 
 
-def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
-           trit, tril, cfenv, ps, ts, rs, ftri, istore, estore, hstot, bl,
-           teffl, hd, hha, hhb, hhc, hl, hmax, hp, hpp, hr, hs, hs1, hs2,
-           hsrf, ht, htt, hcomp, lc, nhmax, tlumx, latmo, lderiv, lmix,
-           locond, qdt, qdp, fp, ft, eta2, omega, r0, itdone, hg, hi, hjm,
-           itlvl, lcz, mxzone, qiw, hkerot, hkerot0, cmixl):
+def crrect(delts: float, m: int, niter: int, lfini: bool, large: bool, lnew: bool, lreset: bool, lsbc: bool,
+           trit: np.ndarray, tril: np.ndarray, cfenv: np.ndarray, ps: np.ndarray, ts: np.ndarray, rs: np.ndarray,
+           ftri: float, istore: int, estore: np.ndarray, hstot: float, bl: float, teffl: float, hd: np.ndarray,
+           hha: np.ndarray, hhb: np.ndarray, hhc: np.ndarray, hl: np.ndarray, hmax: np.ndarray, hp: np.ndarray,
+           hpp: np.ndarray, hr: np.ndarray, hs: np.ndarray, hs1: np.ndarray, hs2: np.ndarray, hsrf: np.ndarray,
+           ht: np.ndarray, htt: np.ndarray, hcomp: np.ndarray, lc: np.ndarray, nhmax: np.ndarray, tlumx: np.ndarray,
+           latmo: bool, lderiv: bool, lmix: bool, locond: bool, fp: np.ndarray, ft: np.ndarray, eta2: np.ndarray,
+           omega: np.ndarray, r0: np.ndarray, itdone: int, hg: np.ndarray, hi: np.ndarray, hjm: np.ndarray, itlvl: int,
+           mxzone: np.ndarray, qiw: np.ndarray, hkerot: np.ndarray, hkerot0: np.ndarray, cmixl: float) -> tuple[bool,
+           bool, bool, bool, bool, float, int, float, float, bool, bool, bool, bool, int]:
     """Henyey iteration for one level of the time step: the surface
     boundary condition (SURFBC), mixing and burning (MIX), the equations
     (COEFFT), their solution (HSOLVE), damped corrections and the
     convergence tests against HTOLER.
 
-    Translates: crrect.f#CRRECT (09c3b9b)
+    Translates: crrect.f#CRRECT (7be4133)
 
     Arguments: delts, the time step (s); m, the number of shells; niter,
     the maximum number of iterations; lfini (read: converged at the
@@ -56,42 +61,50 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
     hstot, bl, teffl; the model hd, hl, hp, hpp, hr, hs, hs1, hs2, ht, htt,
     hcomp[species, shell], lc; the Henyey work arrays hha, hhb, hhc, hsrf,
     hmax, nhmax; tlumx[1..8], the luminosity by source; latmo, lderiv,
-    lmix, locond, qdt, qdp (for COEFFT); rotation fp, ft, eta2, omega, r0,
-    hg, hi, hjm, lcz, qiw, hkerot, hkerot0; itdone, the iterations done;
+    lmix, locond (for COEFFT); rotation fp, ft, eta2, omega, r0,
+    hg, hi, hjm, qiw, hkerot, hkerot0; itdone, the iterations done;
     itlvl, the level of iteration; mxzone[12, 2], the convection zones;
     cmixl, the mixing length. Arrays have index 0 unused and are changed
     in place.
 
     Returns (lfini, large, lnew, lreset, lsbc, ftri, istore, bl, teffl,
-    latmo, lderiv, lmix, locond, qdt, qdp, itdone): converged; corrections
+    latmo, lderiv, lmix, locond, itdone): converged; corrections
     too large; the flags and triangle data SURFBC updates; the new log L
-    and log Teff; the flags and derivatives COEFFT sets; the iteration
+    and log Teff; the flags COEFFT sets; the iteration
     count.
+
     """
+
     global jcore, jenv, ddage, lflp
     nml = nmlpar_mod
     io = iounits_mod
 
+    # Fortran line 111.
     if niter <= 0:
         return (lfini, large, lnew, lreset, lsbc, ftri, istore, bl, teffl,
-                latmo, lderiv, lmix, locond, qdt, qdp, itdone)
+                latmo, lderiv, lmix, locond, itdone)
+
+    # The luminosity, and zero counters (Fortran lines 112–117).
     bl = math.log10(hl[m])
-    # Zero counters.
     kenv = 0
     katm = 0
     ksaha = 0
     comp_mod.senv = hs[m] - hstot
-    # Question (see the page): reads as lnew or (lreset and itlvl == 2).
+
+    # A new triangle for a new run or a reset (Fortran lines 118–121).
     if lnew or (lreset and itlvl == 2):
         lsbc = True
-    # Find new FP and FT if the model is rotating.
+
+    # Find new FP and FT if the model is rotating (Fortran lines 122–129).
     if nml.lrot and lsbc:
         fpl = fp[m]
         ftl = ft[m]
     else:
         fpl = 1.0
         ftl = 1.0
-    # Surface boundary condition: envelope composition, then SURFBC.
+
+    # Surface boundary condition: envelope composition, then SURFBC
+    # (Fortran lines 130–148).
     if lsbc:
         x = comp_mod.xnew
         z = comp_mod.znew
@@ -103,11 +116,14 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
             debhu_mod.zdh[1] = hcomp[5, m] + hcomp[6, m]
             debhu_mod.zdh[2] = hcomp[7, m] + hcomp[8, m]
             debhu_mod.zdh[3] = hcomp[9, m] + hcomp[10, m] + hcomp[11, m]
-        (ftri, istore, lnew, lreset, ksaha, kenv, katm, teffl,
+        # SURFBC no longer sets TEFFL (since 7be4133).
+        (ftri, istore, lnew, lreset, ksaha, kenv, katm,
          lflp) = surfbc(trit, tril, cfenv, ps, ts, rs, ftri, istore, estore,
                         lnew, lreset, ksaha, kenv, katm, hstot, bl,
                         teffl, x, z, fpl, ftl, lflp, plim, lc, m, cmixl)
-    # Reset the composition to the start of the step, then MIX (7/91).
+
+    # Reset the composition to the start of the step, then MIX (7/91)
+    # (Fortran lines 149–161).
     if itlvl > 2 and delts > 0.0:
         nspec = 11
         if nml.lexcom:
@@ -118,32 +134,40 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
         ddage, jcore, jenv = mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2,
                                  hstot, ht, itlvl, lc, m, ddage, jcore, jenv,
                                  mxzone, mxzon0, teffl, cmixl)
-    # Question (see the page): the call to OVROT is commented out.
-    # Converged at the previous level and the triangle not flipped: done.
+
+    # Converged at the previous level and the triangle not flipped: done
+    # (Fortran lines 162–168; the call to OVROT is commented out).
     if lsbc and not lflp and lfini:
         return (lfini, large, lnew, lreset, lsbc, ftri, istore, bl, teffl,
-                latmo, lderiv, lmix, locond, qdt, qdp, itdone)
+                latmo, lderiv, lmix, locond, itdone)
+
+    # The iterations (Fortran lines 169–310).
     lfini = False
     for iter_ in range(1, niter + 1):  # loop 100
-        # Henyey reduction.
+        # Henyey reduction (Fortran lines 171–179).
         hmax[1] = 0.0
         hmax[2] = 0.0
         hmax[3] = 0.0
         hmax[4] = 0.0
-        # Question (see the page): jenv is stale at levels 1 and 2.
-        (latmo, lderiv, lmix, locond, qdt, qdp,
+        # Suspected bug (see the page): jenv is unset or stale at levels 1
+        # and 2.
+        (latmo, lderiv, lmix, locond,
          ksaha) = coefft(delts, m, hd, hha, hhb, hhc, hl, hmax, hp, hpp, hr,
                          hs, hs1, hs2, ht, htt, hcomp, lc, tlumx, latmo,
-                         lderiv, lmix, locond, qdt, qdp, ksaha, fp, ft,
+                         lderiv, lmix, locond, ksaha, fp, ft,
                          hkerot, hkerot0, jenv, teffl, cmixl)
-        # Renormalize TLUMX (not during the helium flash).
+
+        # Renormalize TLUMX (not during the helium flash) (Fortran lines
+        # 180–189).
         thl = (tlumx[1] + tlumx[2] + tlumx[3] + tlumx[4] + tlumx[5]
                + tlumx[6] + tlumx[7] + tlumx[8])
         if not nml.lkuthe and thl > 0.0:
             temp = hl[m] / thl
             for j in range(1, 9):
                 tlumx[j] = tlumx[j] * temp
-        # Residuals of the P and T equations (not the boundary equations).
+
+        # Residuals of the P and T equations (not the boundary equations)
+        # (Fortran lines 190–202).
         # Question (see the page): converged without solving.
         if iter_ > 1:
             if (hmax[1] <= nml.htoler[5, 1] and hmax[2] <= nml.htoler[5, 2]
@@ -156,8 +180,10 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
                          f"{itdone + 1:4d}  ITERATIONS")  # format 75
                 lfini = True
                 return (lfini, large, lnew, lreset, lsbc, ftri, istore, bl,
-                        teffl, latmo, lderiv, lmix, locond, qdt, qdp, itdone)
-        # Henyey coefficients for the surface, from the envelope fit.
+                        teffl, latmo, lderiv, lmix, locond, itdone)
+
+        # Henyey coefficients for the surface, from the envelope fit
+        # (Fortran lines 203–210).
         hsrf[1] = -cfenv[1]
         hsrf[2] = -cfenv[2]
         hsrf[3] = cfenv[1] * hp[m] + cfenv[2] * ht[m] + cfenv[3] - hr[m]
@@ -165,9 +191,11 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
         hsrf[4] = -temp * cfenv[4]
         hsrf[5] = -temp * cfenv[5]
         hsrf[6] = temp * (cfenv[4] * hp[m] + cfenv[5] * ht[m] + cfenv[6] - bl)
-        # Back solution for the corrections.
+
+        # Back solution for the corrections (Fortran lines 211–212).
         hsolve(m, hha, hhb, hsrf)
-        # Largest corrections, and where.
+
+        # Largest corrections, and where (Fortran lines 213–241).
         for j in range(1, 5):
             hmax[j] = abs(hhb[j, 1])
             nhmax[j] = 1
@@ -190,7 +218,9 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
                 hmax[4] = test
                 nhmax[4] = i
         hlmax = hmax[4]
-        # Converged below HTOLER(.,1); too large above HTOLER(.,2).
+
+        # Converged below HTOLER(.,1); too large above HTOLER(.,2) (Fortran
+        # lines 242–252).
         lfini = (hmax[1] < nml.htoler[1, 1] and hmax[2] < nml.htoler[2, 1]
                  and hmax[3] < nml.htoler[3, 1]
                  and hmax[4] < nml.htoler[4, 1])
@@ -199,15 +229,20 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
         for j in range(1, 5):
             ij = nhmax[j]
             hmax[j] = hhb[j, ij]
+
+        # The damping, raised each iteration; in the helium flash, by the
+        # size of the L correction (Fortran lines 253–259).
         if nml.fcorr0 > 0.0:
             ctol_mod.fcorr = min(1.0, ctol_mod.fcorr + nml.fcorri)
-        # Helium flash: damping by the size of the L correction.
         fact = ctol_mod.fcorr
         if nml.lkuthe:
             if hlmax <= 5.0e-1:
                 fact = 8.0e-1
             if hlmax <= 5.0e-3:
                 fact = 1.0
+
+        # The corrections printed; stop if too large (Fortran lines
+        # 260–280).
         tlumh = tlumx[1] + tlumx[2] + tlumx[3] + tlumx[4]
         tlumhe = tlumx[5] + tlumx[8]
         if nml.lcorr:
@@ -225,8 +260,9 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
             io.write(io.iowr, " -----CORRECTIONS EXCEEDED TOLERANCES")
             io.write(io.ishort, " -----CORRECTIONS EXCEEDED TOLERANCES")
             return (lfini, large, lnew, lreset, lsbc, ftri, istore, bl,
-                    teffl, latmo, lderiv, lmix, locond, qdt, qdp, itdone)
-        # Apply the corrections, damped by fact.
+                    teffl, latmo, lderiv, lmix, locond, itdone)
+
+        # Apply the corrections, damped by fact (Fortran lines 281–291).
         for i in range(1, m + 1):
             temp = fact * hhb[1, i]
             hp[i] = hp[i] + temp
@@ -236,16 +272,24 @@ def crrect(delts, m, niter, lfini, large, lnew, lreset, lsbc,
             htt[i] = htt[i] + temp
             hr[i] = hr[i] + fact * hhb[3, i]
             hl[i] = hl[i] + fact * hhb[4, i]
+
+        # The new log L and log Teff, and the rotation (Fortran lines
+        # 292–307).
         bl = math.log10(hl[m])
         teffl = cfenv[7] * hp[m] + cfenv[8] * ht[m] + cfenv[9]
         if nml.lrot:
-            getrot(hd, hjm, hr, hs, hs2, lcz, m, eta2, hi, omega, qiw, r0)
+            # The convective flags LCZO from OVROT, stored by HPOINT (or
+            # STARIN, for the starting model) (MHP via Claude, 10/29/26).
+            getrot(hd, hjm, hr, hs, hs2, oldmod_mod.lczo, m, eta2, hi, omega,
+                   qiw, r0)
             fpft(hd, hr, hs, m, omega, eta2, fp, ft, hg, r0)
             for i in range(1, m + 1):
                 hj = hjm[i] * hs2[i]
                 hkerot[i] = 0.5 * omega[i] * hj
+
+        # Fortran lines 308–310.
         itdone = itdone + 1
         if lfini:
             break
     return (lfini, large, lnew, lreset, lsbc, ftri, istore, bl, teffl,
-            latmo, lderiv, lmix, locond, qdt, qdp, itdone)
+            latmo, lderiv, lmix, locond, itdone)

@@ -1,4 +1,4 @@
-"""Python version of sneut.f (YREC 09c3b9b): the thermal neutrino
+"""Python version of sneut.f (YREC 7be4133): the thermal neutrino
 energy-loss rate from the fits of Itoh et al. (1996, ApJS 102, 411), with
 its derivatives."""
 
@@ -10,7 +10,7 @@ from pyrec.zfermim12 import zfermim12
 # The Fortran SAVEs all its locals, but each is set before it is read, so
 # no state is kept between calls here.
 
-# Mathematical constants (PARAMETER).
+# Mathematical constants (PARAMETER, Fortran lines 94–104).
 pi = 3.1415926535897932384
 fac1 = 5.0 * pi / 3.0
 fac2 = 10.0 * pi
@@ -23,15 +23,17 @@ iln10 = 4.342944819032518e-1
 
 # Weinberg angle, number of neutrino flavors and the coupling factors
 # (PARAMETER): tfac1 = C+, tfac2 = C-, tfac3 = C-/C+, tfac4 = C+/2,
-# tfac5 = C-/2.
+# tfac5 = C-/2 (Fortran lines 108–129).
 theta = 0.2319
+# Question (see the page): the comment says 3.02 flavors.
 xnufam = 3.0
 cv = 0.5 + 2.0 * theta
 cvp = 1.0 - cv
 ca = 0.5
 cap = 1.0 - ca
 tfac1 = cv*cv + ca*ca + (xnufam-1.0) * (cvp*cvp+cap*cap)
-# Question (see the page): cap-cap (= 0) where cap*cap is expected.
+# Suspected bug (see the page): cvp*cvp - cap-cap, that is cvp**2 - 1, where
+# cvp*cvp - cap*cap is expected.
 tfac2 = cv*cv - ca*ca + (xnufam-1.0) * (cvp*cvp - cap-cap)
 tfac3 = tfac2/tfac1
 tfac4 = 0.5 * tfac1
@@ -39,70 +41,80 @@ tfac5 = 0.5 * tfac2
 tfac6 = cv*cv + 1.5*ca*ca + (xnufam - 1.0)*(cvp*cvp + 1.5*cap*cap)
 
 
-def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
+def sneut(temp: float, den: float, abar: float, zbar: float, snu: float, dsnudt: float, dsnudd: float, dsnuda: float,
+          dsnudz: float) -> tuple[float, float, float, float, float]:
     """The thermal neutrino loss of stellar matter, the sum of pair,
     plasma, photo, bremsstrahlung and recombination neutrinos, with its
     derivatives by the chain rule; zero below 1e7 K.
 
-    Translates: sneut.f#SNEUT (09c3b9b)
+    Translates: sneut.f#SNEUT (7be4133)
 
     Arguments: temp (K), den (g/cm^3), abar and zbar (mean atomic weight
     and charge); snu and its derivatives are only set.
 
     Returns (snu, dsnudt, dsnudd, dsnuda, dsnudz): the loss in erg/g/s and
     its derivatives with respect to temp, den, abar and zbar.
+
     """
-    # Initialize.
+
+    # Initialize (Fortran lines 137–141).
     spair = 0.0
     spairdt = 0.0
     spairdd = 0.0
     spairda = 0.0
     spairdz = 0.0
 
+    # Fortran lines 144–148.
     splas = 0.0
     splasdt = 0.0
     splasdd = 0.0
     splasda = 0.0
     splasdz = 0.0
 
+    # Fortran lines 151–155.
     sphot = 0.0
     sphotdt = 0.0
     sphotdd = 0.0
     sphotda = 0.0
     sphotdz = 0.0
 
+    # Fortran lines 158–162.
     sbrem = 0.0
     sbremdt = 0.0
     sbremdd = 0.0
     sbremda = 0.0
     sbremdz = 0.0
 
+    # Fortran lines 165–169.
     sreco = 0.0
     srecodt = 0.0
     srecodd = 0.0
     srecoda = 0.0
     srecodz = 0.0
 
+    # Fortran lines 172–176.
     snu = 0.0
     dsnudt = 0.0
     dsnudd = 0.0
     dsnuda = 0.0
     dsnudz = 0.0
 
+    # Fortran line 179.
     if temp < 1.0e7:
         return snu, dsnudt, dsnudd, dsnuda, dsnudz
 
-    # Some frequent factors.
+    # Some frequent factors (Fortran lines 184–187).
     deni = 1.0/den
     tempi = 1.0/temp
     abari = 1.0/abar
     zbari = 1.0/zbar
 
     # Electron mole number and mean molecular weight per electron.
+    # Fortran lines 192–193.
     ye = zbar*abari
-    xmue = abar*zbari  # unused, as in the Fortran
+    xmue = abar*zbari  # noqa: F841  (unused in the Fortran too)
 
-    # Temperature and its powers; xl = kT/(m_e c^2).
+    # Temperature and its powers; xl = kT/(m_e c^2) (Fortran lines 200–216).
     t9 = temp * 1.0e-9
     xl = t9 * con1
     xldt = 1.0e-9 * con1
@@ -121,14 +133,14 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     xlm3 = xlm1*xlm2
     xlm4 = xlm1*xlm3
 
-    # rho * ye and its derivatives.
+    # rho * ye and its derivatives (Fortran lines 219–223).
     rm = den*ye
     rmdd = ye
     rmda = -rm*abari
     rmdz = den*abari
     rmi = 1.0/rm
 
-    # zeta = (rho ye / 1e9)^(1/3) / lambda.
+    # zeta = (rho ye / 1e9)^(1/3) / lambda (Fortran lines 226–233).
     a0 = rm * 1.0e-9
     a1 = a0**oneth
     zeta = a1 * xlm1
@@ -138,18 +150,20 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     zetada = a2 * rmda
     zetadz = a2 * rmdz
 
+    # Fortran lines 235–236.
     zeta2 = zeta * zeta
     zeta3 = zeta2 * zeta
 
     # ---- Pair neutrinos ----
-    # g(lambda), eq. 2.8.
+    # g(lambda), eq. 2.8 (Fortran lines 247–248).
     gl = 1.0 - 13.04*xl2 + 133.5*xl4 + 1534.0*xl6 + 918.6*xl8
     gldt = xldt*(-26.08*xl + 534.0*xl3 + 9204.0*xl5 + 7348.8*xl7)
 
-    # f(pair), eq. 2.7: numerator.
+    # f(pair), eq. 2.7: numerator (Fortran lines 254–255).
     a1 = 6.002e19 + 2.084e20*zeta + 1.872e21*zeta2
     a2 = 2.084e20 + 2.0*1.872e21*zeta
 
+    # Fortran lines 258–264.
     if t9 < 10.0:
         b1 = exp(-5.5924*zeta)
         b2 = -b1*5.5924
@@ -157,6 +171,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         b1 = exp(-4.9924*zeta)
         b2 = -b1*4.9924
 
+    # Fortran lines 266–271.
     xnum = a1 * b1
     c = a2*b1 + a1*b2
     xnumdt = c*zetadt
@@ -164,7 +179,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     xnumda = c*zetada
     xnumdz = c*zetadz
 
-    # Denominator.
+    # Denominator (Fortran lines 274–280).
     if t9 < 10.0:
         a1 = 9.383e-1*xlm1 - 4.141e-1*xlm2 + 5.829e-2*xlm3
         a2 = -9.383e-1*xlm2 + 2.0*4.141e-1*xlm3 - 3.0*5.829e-2*xlm4
@@ -172,14 +187,17 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         a1 = 1.2383*xlm1 - 8.141e-1*xlm2
         a2 = -1.2383*xlm2 + 2.0*8.141e-1*xlm3
 
+    # Fortran line 283.
     b1 = 3.0*zeta2
 
+    # Fortran lines 286–290.
     xden = zeta3 + a1
     xdendt = b1*zetadt + a2*xldt
     xdendd = b1*zetadd
     xdenda = b1*zetada
     xdendz = b1*zetadz
 
+    # Fortran lines 293–298.
     a1 = 1.0/xden
     fpair = xnum*a1
     fpairdt = (xnumdt - fpair*xdendt)*a1
@@ -187,43 +205,49 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     fpairda = (xnumda - fpair*xdenda)*a1
     fpairdz = (xnumdz - fpair*xdendz)*a1
 
-    # q(pair), eq. 2.6.
+    # q(pair), eq. 2.6 (Fortran lines 303–306).
     a1 = 10.7480*xl2 + 0.3967*xlp5 + 1.005
     a2 = xldt*(2.0*10.7480*xl + 0.5*0.3967*xlmp5)
     xnum = 1.0/a1
     xnumdt = -xnum*xnum*a2
 
+    # Fortran lines 309–310.
     a1 = 7.692e7*xl3 + 9.715e6*xlp5
     a2 = xldt*(3.0*7.692e7*xl2 + 0.5*9.715e6*xlmp5)
 
+    # Fortran lines 313–314.
     c = 1.0/a1
     b1 = 1.0 + rm*c
 
+    # Fortran line 317.
     xden = b1**(-0.3)
 
+    # Fortran lines 320–324.
     d = -0.3*xden/b1
     xdendt = -d*rm*c*c*a2
     xdendd = d*rmdd*c
     xdenda = d*rmda*c
     xdendz = d*rmdz*c
 
+    # Fortran lines 327–331.
     qpair = xnum*xden
     qpairdt = xnumdt*xden + xnum*xdendt
     qpairdd = xnum*xdendd
     qpairda = xnum*xdenda
     qpairdz = xnum*xdendz
 
-    # Eq. 2.5: exp(-2/lambda) * f(pair) ...
+    # Eq. 2.5: exp(-2/lambda) * f(pair) (Fortran lines 337–338) ...
     a1 = exp(-2.0*xlm1)
     a2 = a1*2.0*xlm2*xldt
 
+    # Fortran lines 341–345.
     spair = a1*fpair
     spairdt = a2*fpair + a1*fpairdt
     spairdd = a1*fpairdd
     spairda = a1*fpairda
     spairdz = a1*fpairdz
 
-    # ... times g(lambda) ...
+    # ... times g(lambda) (Fortran lines 348–353) ...
     a1 = spair
     spair = gl*a1
     spairdt = gl*spairdt + gldt*a1
@@ -231,10 +255,11 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     spairda = gl*spairda
     spairdz = gl*spairdz
 
-    # ... times (C+ + C- q(pair)) / 2.
+    # ... times (C+ + C- q(pair)) / 2 (Fortran lines 356–357).
     a1 = tfac4*(1.0 + tfac3 * qpair)
     a2 = tfac4*tfac3
 
+    # Fortran lines 360–365.
     a3 = spair
     spair = a1*a3
     spairdt = a1*spairdt + a2*qpairdt*a3
@@ -243,31 +268,36 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     spairdz = a1*spairdz + a2*qpairdz*a3
 
     # ---- Plasma neutrinos ----
-    # gamma, eq. 4.6.
+    # gamma, eq. 4.6 (Fortran lines 376–378).
     a1 = 1.019e-6*rm
     a2 = a1**twoth
     a3 = twoth*a2/a1
 
+    # Fortran lines 381–382.
     b1 = sqrt(1.0 + a2)
     b2 = 1.0/b1
 
+    # Fortran line 384.
     c00 = 1.0/(temp*temp*b1)
 
+    # Fortran line 387.
     gl2 = 1.1095e11 * rm * c00
 
+    # Fortran lines 390–394.
     gl2dt = -2.0*gl2*tempi
     d = rm*c00*b2*0.5*b2*a3*1.019e-6
     gl2dd = 1.1095e11 * (rmdd*c00 - d*rmdd)
     gl2da = 1.1095e11 * (rmda*c00 - d*rmda)
     gl2dz = 1.1095e11 * (rmdz*c00 - d*rmdz)
 
+    # Fortran lines 398–402.
     gl = sqrt(gl2)
     gl12 = sqrt(gl)
     gl32 = gl * gl12
     gl72 = gl2 * gl32
     gl6 = gl2 * gl2 * gl2
 
-    # Transverse, eq. 4.7.
+    # Transverse, eq. 4.7 (Fortran lines 407–413).
     ft = 2.4 + 0.6*gl12 + 0.51*gl + 1.25*gl32
     gum = 1.0/gl2
     a1 = (0.25*0.6*gl12 + 0.5*0.51*gl + 0.75*1.25*gl32)*gum
@@ -276,26 +306,30 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     ftda = a1*gl2da
     ftdz = a1*gl2dz
 
-    # Longitudinal, eq. 4.8.
+    # Longitudinal, eq. 4.8 (Fortran lines 418–419).
     a1 = 8.6*gl2 + 1.35*gl72
     a2 = 8.6 + 1.75*1.35*gl72*gum
 
+    # Fortran lines 422–423.
     b1 = 225.0 - 17.0*gl + gl2
     b2 = -0.5*17.0*gl*gum + 1.0
 
+    # Fortran lines 426–427.
     c = 1.0/b1
     fl = a1*c
 
+    # Fortran lines 430–434.
     d = (a2 - fl*b2)*c
     fldt = d*gl2dt
     fldd = d*gl2dd
     flda = d*gl2da
     fldz = d*gl2dz
 
-    # xnum and xden, eqs. 4.9 and 4.10.
+    # xnum and xden, eqs. 4.9 and 4.10 (Fortran lines 439–440).
     cc = log10(2.0*rm)
     xlnt = log10(temp)
 
+    # Fortran lines 443–448.
     xnum = sixth * (17.5 + cc - 3.0*xlnt)
     xnumdt = -iln10*0.5*tempi
     a2 = iln10*sixth*rmi
@@ -303,13 +337,14 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     xnumda = a2*rmda
     xnumdz = a2*rmdz
 
+    # Fortran lines 451–455.
     xden = sixth * (-24.5 + cc + 3.0*xlnt)
     xdendt = iln10*0.5*tempi
     xdendd = a2*rmdd
     xdenda = a2*rmda
     xdendz = a2*rmdz
 
-    # The correction fxy, eq. 4.11.
+    # The correction fxy, eq. 4.11 (Fortran lines 460–472).
     if abs(xnum) > 0.7 or xden < 0.0:
         fxy = 1.0
         fxydt = 0.0
@@ -320,9 +355,11 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         a1 = 0.39 - 1.25*xnum - 0.35*sin(4.5*xnum)
         a2 = -1.25 - 4.5*0.35*cos(4.5*xnum)
 
+        # Fortran lines 475–476.
         b1 = 0.3 * exp(-1.0*(4.5*xnum + 0.9)**2)
         b2 = -b1*2.0*(4.5*xnum + 0.9)*4.5
 
+        # Fortran lines 479–490.
         c = min(0.0, xden - 1.6 + 1.25*xnum)
         if c == 0.0:
             dumdt = 0.0
@@ -335,33 +372,37 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
             dumda = xdenda + 1.25*xnumda
             dumdz = xdendz + 1.25*xnumdz
 
+        # Fortran lines 493–495.
         d = 0.57 - 0.25*xnum
         a3 = c/d
         c00 = exp(-1.0*a3**2)
 
+        # Fortran lines 498–502.
         f1 = -c00*2.0*a3/d
         c01 = f1*(dumdt + a3*0.25*xnumdt)
         c02 = f1*(dumdd + a3*0.25*xnumdd)
         c03 = f1*(dumda + a3*0.25*xnumda)
         c04 = f1*(dumdz + a3*0.25*xnumdz)
 
+        # Fortran lines 505–509.
         fxy = 1.05 + (a1 - b1)*c00
         fxydt = (a2*xnumdt - b2*xnumdt)*c00 + (a1-b1)*c01
         fxydd = (a2*xnumdd - b2*xnumdd)*c00 + (a1-b1)*c02
         fxyda = (a2*xnumda - b2*xnumda)*c00 + (a1-b1)*c03
         fxydz = (a2*xnumdz - b2*xnumdz)*c00 + (a1-b1)*c04
 
-    # Eqs. 4.1 and 4.5: (ft + fl) * fxy ...
+    # Eqs. 4.1 and 4.5: (ft + fl) * fxy (Fortran lines 518–522) ...
     splas = (ft + fl) * fxy
     splasdt = (ftdt + fldt)*fxy + (ft+fl)*fxydt
     splasdd = (ftdd + fldd)*fxy + (ft+fl)*fxydd
     splasda = (ftda + flda)*fxy + (ft+fl)*fxyda
     splasdz = (ftdz + fldz)*fxy + (ft+fl)*fxydz
 
-    # ... times exp(-gamma) ...
+    # ... times exp(-gamma) (Fortran lines 525–526) ...
     a2 = exp(-gl)
     a3 = -0.5*a2*gl*gum
 
+    # Fortran lines 529–534.
     a1 = splas
     splas = a2*a1
     splasdt = a2*splasdt + a3*gl2dt*a1
@@ -369,10 +410,11 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     splasda = a2*splasda + a3*gl2da*a1
     splasdz = a2*splasdz + a3*gl2dz*a1
 
-    # ... times gamma^6 ...
+    # ... times gamma^6 (Fortran lines 537–538) ...
     a2 = gl6
     a3 = 3.0*gl6*gum
 
+    # Fortran lines 541–546.
     a1 = splas
     splas = a2*a1
     splasdt = a2*splasdt + a3*gl2dt*a1
@@ -380,10 +422,11 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     splasda = a2*splasda + a3*gl2da*a1
     splasdz = a2*splasdz + a3*gl2dz*a1
 
-    # ... times the prefactor and lambda^9.
+    # ... times the prefactor and lambda^9 (Fortran lines 550–551).
     a2 = 0.93153 * 3.0e21 * xl9
     a3 = 0.93153 * 3.0e21 * 9.0*xl8*xldt
 
+    # Fortran lines 554–559.
     a1 = splas
     splas = a2*a1
     splasdt = a2*splasdt + a3*a1
@@ -393,6 +436,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
 
     # ---- Photoneutrinos ----
     # tau (eq. 3.8), cc (eq. 3.6) and table 2, for three temperature ranges.
+    # Fortran lines 570–608.
     if temp >= 1.0e7 and temp < 1.0e8:
         tau = log10(temp * 1.0e-7)
         cc = 0.5654 + tau
@@ -433,6 +477,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         dd24 = -4.222e9
         dd25 = -1.560e9
 
+    # Fortran lines 611–649.
     elif temp >= 1.0e8 and temp < 1.0e9:
         tau = log10(temp * 1.0e-8)
         cc = 1.5654
@@ -473,6 +518,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         dd24 = -3.035e9
         dd25 = -1.598e9
 
+    # Fortran lines 652–691.
     elif temp >= 1.0e9:
         tau = log10(t9)
         cc = 1.5654
@@ -513,9 +559,11 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         dd24 = -4.489e9
         dd25 = -2.185e9
 
+    # Fortran line 694.
     taudt = iln10*tempi
 
     # The trigonometric terms of eq. 3.7, computed once.
+    # Fortran lines 699–704.
     cos1 = cos(fac1*tau)
     cos2 = cos(fac1*2.0*tau)
     cos3 = cos(fac1*3.0*tau)
@@ -523,6 +571,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     cos5 = cos(fac1*5.0*tau)
     last = cos(fac2*tau)
 
+    # Fortran lines 707–712.
     sin1 = sin(fac1*tau)
     sin2 = sin(fac1*2.0*tau)
     sin3 = sin(fac1*3.0*tau)
@@ -531,56 +580,64 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     xast = sin(fac2*tau)
 
     # The three fit functions a0, a1, a2 and their temperature
-    # derivatives f0, f1, f2.
+    # derivatives f0, f1, f2 (Fortran lines 715–718).
     a0 = (0.5*c00
           + c01*cos1 + dd01*sin1 + c02*cos2 + dd02*sin2
           + c03*cos3 + dd03*sin3 + c04*cos4 + dd04*sin4
           + c05*cos5 + dd05*sin5 + 0.5*c06*last)
 
+    # Fortran lines 721–725.
     f0 = (taudt*fac1*(-c01*sin1 + dd01*cos1 - c02*sin2*2.0
                       + dd02*cos2*2.0 - c03*sin3*3.0 + dd03*cos3*3.0
                       - c04*sin4*4.0 + dd04*cos4*4.0
                       - c05*sin5*5.0 + dd05*cos5*5.0)
           - 0.5*c06*xast*fac2*taudt)
 
+    # Fortran lines 728–731.
     a1 = (0.5*c10
           + c11*cos1 + dd11*sin1 + c12*cos2 + dd12*sin2
           + c13*cos3 + dd13*sin3 + c14*cos4 + dd14*sin4
           + c15*cos5 + dd15*sin5 + 0.5*c16*last)
 
+    # Fortran lines 734–737.
     f1 = (taudt*fac1*(-c11*sin1 + dd11*cos1 - c12*sin2*2.0
                       + dd12*cos2*2.0 - c13*sin3*3.0 + dd13*cos3*3.0
                       - c14*sin4*4.0 + dd14*cos4*4.0 - c15*sin5*5.0
                       + dd15*cos5*5.0) - 0.5*c16*xast*fac2*taudt)
 
+    # Fortran lines 740–743.
     a2 = (0.5*c20
           + c21*cos1 + dd21*sin1 + c22*cos2 + dd22*sin2
           + c23*cos3 + dd23*sin3 + c24*cos4 + dd24*sin4
           + c25*cos5 + dd25*sin5 + 0.5*c26*last)
 
+    # Fortran lines 746–749.
     f2 = (taudt*fac1*(-c21*sin1 + dd21*cos1 - c22*sin2*2.0
                       + dd22*cos2*2.0 - c23*sin3*3.0 + dd23*cos3*3.0
                       - c24*sin4*4.0 + dd24*cos4*4.0 - c25*sin5*5.0
                       + dd25*cos5*5.0) - 0.5*c26*xast*fac2*taudt)
 
-    # f(photo), eq. 3.4: numerator ...
+    # f(photo), eq. 3.4: numerator (Fortran lines 753–757) ...
     dum = a0 + a1*zeta + a2*zeta2
     dumdt = f0 + f1*zeta + a1*zetadt + f2*zeta2 + 2.0*a2*zeta*zetadt
     dumdd = a1*zetadd + 2.0*a2*zeta*zetadd
     dumda = a1*zetada + 2.0*a2*zeta*zetada
     dumdz = a1*zetadz + 2.0*a2*zeta*zetadz
 
+    # Fortran line 760.
     z = exp(-cc*zeta)
 
+    # Fortran lines 763–767.
     xnum = dum*z
     xnumdt = dumdt*z - dum*z*cc*zetadt
     xnumdd = dumdd*z - dum*z*cc*zetadd
     xnumda = dumda*z - dum*z*cc*zetada
     xnumdz = dumdz*z - dum*z*cc*zetadz
 
-    # ... denominator ...
+    # ... denominator (Fortran line 770) ...
     xden = zeta3 + 6.290e-3*xlm1 + 7.483e-3*xlm2 + 3.061e-4*xlm3
 
+    # Fortran lines 773–778.
     dum = 3.0*zeta2
     xdendt = dum*zetadt - xldt*(6.290e-3*xlm2
                                 + 2.0*7.483e-3*xlm3 + 3.0*3.061e-4*xlm4)
@@ -588,6 +645,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     xdenda = dum*zetada
     xdendz = dum*zetadz
 
+    # Fortran lines 781–786.
     dum = 1.0/xden
     fphot = xnum*dum
     fphotdt = (xnumdt - fphot*xdendt)*dum
@@ -595,16 +653,17 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     fphotda = (xnumda - fphot*xdenda)*dum
     fphotdz = (xnumdz - fphot*xdendz)*dum
 
-    # q(photo), eq. 3.3: numerator ...
+    # q(photo), eq. 3.3: numerator (Fortran lines 791–793) ...
     a0 = 1.0 + 2.045 * xl
     xnum = 0.666*a0**(-2.066)
     xnumdt = -2.066*xnum/a0 * 2.045*xldt
 
-    # ... denominator ...
+    # ... denominator (Fortran lines 796–798) ...
     dum = 1.875e8*xl + 1.653e8*xl2 + 8.449e8*xl3 - 1.604e8*xl4
     dumdt = xldt*(1.875e8 + 2.0*1.653e8*xl + 3.0*8.449e8*xl2
                   - 4.0*1.604e8*xl3)
 
+    # Fortran lines 801–806.
     z = 1.0/dum
     xden = 1.0 + rm*z
     xdendt = -rm*z*z*dumdt
@@ -612,6 +671,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     xdenda = rmda*z
     xdendz = rmdz*z
 
+    # Fortran lines 809–815.
     z = 1.0/xden
     qphot = xnum*z
     qphotdt = (xnumdt - qphot*xdendt)*z
@@ -620,14 +680,14 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     qphotda = dum*xdenda
     qphotdz = dum*xdendz
 
-    # Eq. 3.2: lambda^5 * f(photo) ...
+    # Eq. 3.2: lambda^5 * f(photo) (Fortran lines 819–823) ...
     sphot = xl5 * fphot
     sphotdt = 5.0*xl4*xldt*fphot + xl5*fphotdt
     sphotdd = xl5*fphotdd
     sphotda = xl5*fphotda
     sphotdz = xl5*fphotdz
 
-    # ... times rho*ye ...
+    # ... times rho*ye (Fortran lines 826–831) ...
     a1 = sphot
     sphot = rm*a1
     sphotdt = rm*sphotdt
@@ -635,10 +695,11 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     sphotda = rm*sphotda + rmda*a1
     sphotdz = rm*sphotdz + rmdz*a1
 
-    # ... times (C+ - C- q(photo)) / 2.
+    # ... times (C+ - C- q(photo)) / 2 (Fortran lines 834–835).
     a1 = tfac4*(1.0 - tfac3 * qphot)
     a2 = -tfac4*tfac3
 
+    # Fortran lines 838–843.
     a3 = sphot
     sphot = a1*a3
     sphotdt = a1*sphotdt + a2*qphotdt*a3
@@ -646,6 +707,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     sphotda = a1*sphotda + a2*qphotda*a3
     sphotdz = a1*sphotdz + a2*qphotdz*a3
 
+    # Fortran lines 846–852.
     if sphot <= 0.0:
         sphot = 0.0
         sphotdt = 0.0
@@ -654,6 +716,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         sphotdz = 0.0
 
     # ---- Bremsstrahlung neutrinos ----
+    # Powers of T8 and rho/1e6 (Fortran lines 866–878).
     den6 = den * 1.0e-6
     t8 = temp * 1.0e-8
     t812 = sqrt(t8)
@@ -668,14 +731,16 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
     t8m5 = t8m3*t8m2
     t8m6 = t8m5*t8m1
 
-    # The Fermi temperature, eq. 4.3.
+    # The Fermi temperature, eq. 4.3 (Fortran line 882).
     tfermi = 5.9302e9*(sqrt(1.0+1.018*(den6*ye)**twoth)-1.0)
 
+    # Fortran lines 889–894.
     if temp > 0.01 * tfermi:
         # "Weak" degenerate electrons only; eta, eq. 5.3.
         dum = 7.05e6 * t832 + 5.12e4 * t83
         dumdt = (1.5*7.05e6*t812 + 3.0*5.12e4*t82)*1.0e-8
 
+        # Fortran lines 897–902.
         z = 1.0/dum
         eta = rm*z
         etadt = -rm*z*z*dumdt
@@ -683,15 +748,17 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         etada = rmda*z
         etadz = rmdz*z
 
+        # Fortran lines 905–907.
         etam1 = 1.0/eta
         etam2 = etam1 * etam1
         etam3 = etam2 * etam1
 
-        # F, eq. 5.2.
+        # F, eq. 5.2 (Fortran lines 912–914).
         a0 = 23.5 + 6.83e4*t8m2 + 7.81e8*t8m5
         f0 = (-2.0*6.83e4*t8m3 - 5.0*7.81e8*t8m6)*1.0e-8
         xnum = 1.0/a0
 
+        # Fortran lines 917–922.
         dum = 1.0 + 1.47*etam1 + 3.29e-2*etam2
         z = -1.47*etam2 - 2.0*3.29e-2*etam3
         dumdt = z*etadt
@@ -699,6 +766,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         dumda = z*etada
         dumdz = z*etadz
 
+        # Fortran lines 925–930.
         c00 = 1.26 * (1.0+etam1)
         z = -1.26*etam2
         c01 = z*etadt
@@ -706,6 +774,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         c03 = z*etada
         c04 = z*etadz
 
+        # Fortran lines 932–937.
         z = 1.0/dum
         xden = c00*z
         xdendt = (c01 - xden*dumdt)*z
@@ -713,16 +782,18 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         xdenda = (c03 - xden*dumda)*z
         xdendz = (c04 - xden*dumdz)*z
 
+        # Fortran lines 940–944.
         fbrem = xnum + xden
         fbremdt = -xnum*xnum*f0 + xdendt
         fbremdd = xdendd
         fbremda = xdenda
         fbremdz = xdendz
 
-        # G, eq. 5.9.
+        # G, eq. 5.9 (Fortran lines 949–950).
         a0 = 230.0 + 6.7e5*t8m2 + 7.66e9*t8m5
         f0 = (-2.0*6.7e5*t8m3 - 5.0*7.66e9*t8m6)*1.0e-8
 
+        # Fortran lines 953–959.
         z = 1.0 + rm*1.0e-9
         dum = a0*z
         dumdt = f0*z
@@ -731,6 +802,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         dumda = z*rmda
         dumdz = z*rmdz
 
+        # Fortran lines 962–967.
         xnum = 1.0/dum
         z = -xnum*xnum
         xnumdt = z*dumdt
@@ -738,15 +810,19 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         xnumda = z*dumda
         xnumdz = z*dumdz
 
+        # Fortran lines 970–971.
         c00 = 7.75e5*t832 + 247.0*t8**(3.85)
         dd00 = (1.5*7.75e5*t812 + 3.85*247.0*t8**(2.85))*1.0e-8
 
+        # Fortran lines 974–975.
         c01 = 4.07 + 0.0240 * t8**(1.4)
         dd01 = 1.4*0.0240*t8**(0.4)*1.0e-8
 
+        # Fortran lines 978–979.
         c02 = 4.59e-5 * t8**(-0.110)
         dd02 = -0.11*4.59e-5 * t8**(-1.11)*1.0e-8
 
+        # Fortran lines 982–988.
         z = den**(0.656)
         dum = c00*rmi + c01 + c02*z
         dumdt = dd00*rmi + dd01 + dd02*z
@@ -755,6 +831,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         dumda = z*rmda
         dumdz = z*rmdz
 
+        # Fortran lines 991–996.
         xden = 1.0/dum
         z = -xden*xden
         xdendt = z*dumdt
@@ -762,19 +839,21 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         xdenda = z*dumda
         xdendz = z*dumdz
 
+        # Fortran lines 999–1003.
         gbrem = xnum + xden
         gbremdt = xnumdt + xdendt
         gbremdd = xnumdd + xdendd
         gbremda = xnumda + xdenda
         gbremdz = xnumdz + xdendz
 
-        # Eq. 5.1.
+        # Eq. 5.1 (Fortran lines 1008–1012).
         dum = 0.5738*zbar*ye*t86*den
         dumdt = 0.5738*zbar*ye*6.0*t85*den*1.0e-8
         dumdd = 0.5738*zbar*ye*t86
         dumda = -dum*abari
         dumdz = 0.5738*2.0*ye*t86*den
 
+        # Fortran lines 1015–1020.
         z = tfac4*fbrem - tfac5*gbrem
         sbrem = dum * z
         sbremdt = dumdt*z + dum*(tfac4*fbremdt - tfac5*gbremdt)
@@ -782,18 +861,21 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         sbremda = dumda*z + dum*(tfac4*fbremda - tfac5*gbremda)
         sbremdz = dumdz*z + dum*(tfac4*fbremdz - tfac5*gbremdz)
 
+    # Fortran lines 1030–1032.
     else:
         # Liquid metal, with C12 parameters (not too different for other
         # elements); u, eqs. 5.18 and 5.16.
         u = fac3 * (log10(den) - 3.0)
         a0 = iln10*fac3*deni
 
+        # Fortran lines 1036–1040.
         cos1 = cos(u)
         cos2 = cos(2.0*u)
         cos3 = cos(3.0*u)
         cos4 = cos(4.0*u)
         cos5 = cos(5.0*u)
 
+        # Fortran lines 1043–1047.
         sin1 = sin(u)
         sin2 = sin(2.0*u)
         sin3 = sin(3.0*u)
@@ -801,6 +883,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         sin5 = sin(5.0*u)
 
         # fb (eq. 5.21), with its density derivative c00.
+        # Fortran lines 1051–1056.
         fb = (0.5 * 0.17946 + 0.00945*u + 0.34529
               - 0.05821*cos1 - 0.04969*sin1
               - 0.01089*cos2 - 0.01584*sin2
@@ -808,6 +891,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
               - 0.00656*cos4 - 0.00281*sin4
               - 0.00519*cos5)
 
+        # Fortran lines 1059–1064.
         c00 = a0*(0.00945
                   + 0.05821*sin1 - 0.04969*cos1
                   + 0.01089*sin2*2.0 - 0.01584*cos2*2.0
@@ -815,7 +899,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
                   + 0.00656*sin4*4.0 - 0.00281*cos4*4.0
                   + 0.00519*sin5*5.0)
 
-        # ft (eq. 5.22), with its derivative c01.
+        # ft (eq. 5.22), with its derivative c01 (Fortran lines 1069–1074).
         ft = (0.5 * 0.06781 - 0.02342*u + 0.24819
               - 0.00944*cos1 - 0.02213*sin1
               - 0.01289*cos2 - 0.01136*sin2
@@ -823,6 +907,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
               - 0.00404*cos4 - 0.00131*sin4
               - 0.00330*cos5)
 
+        # Fortran lines 1077–1082.
         c01 = a0*(-0.02342
                   + 0.00944*sin1 - 0.02213*cos1
                   + 0.01289*sin2*2.0 - 0.01136*cos2*2.0
@@ -830,7 +915,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
                   + 0.00404*sin4*4.0 - 0.00131*cos4*4.0
                   + 0.00330*sin5*5.0)
 
-        # gb (eq. 5.23), with its derivative c02.
+        # gb (eq. 5.23), with its derivative c02 (Fortran lines 1087–1092).
         gb = (0.5 * 0.00766 - 0.01259*u + 0.07917
               - 0.00710*cos1 + 0.02300*sin1
               - 0.00028*cos2 - 0.01078*sin2
@@ -838,6 +923,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
               + 0.00044*cos4 - 0.00089*sin4
               + 0.00158*cos5)
 
+        # Fortran lines 1095–1100.
         c02 = a0*(-0.01259
                   + 0.00710*sin1 + 0.02300*cos1
                   + 0.00028*sin2*2.0 - 0.01078*cos2*2.0
@@ -845,7 +931,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
                   - 0.00044*sin4*4.0 - 0.00089*cos4*4.0
                   - 0.00158*sin5*5.0)
 
-        # gt (eq. 5.24), with its derivative c03.
+        # gt (eq. 5.24), with its derivative c03 (Fortran lines 1105–1110).
         gt = (-0.5 * 0.00769 - 0.00829*u + 0.05211
               + 0.00356*cos1 + 0.01052*sin1
               - 0.00184*cos2 - 0.00354*sin2
@@ -853,6 +939,7 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
               + 0.00031*cos4 - 0.00018*sin4
               + 0.00069*cos5)
 
+        # Fortran lines 1113–1118.
         c03 = a0*(-0.00829
                   - 0.00356*sin1 + 0.01052*cos1
                   + 0.00184*sin2*2.0 - 0.00354*cos2*2.0
@@ -860,13 +947,14 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
                   - 0.00031*sin4*4.0 - 0.00018*cos4*4.0
                   - 0.00069*sin5*5.0)
 
-        # dum and the powers of its inverse.
+        # dum and the powers of its inverse (Fortran lines 1122–1126).
         dum = 2.275e-1 * zbar * zbar*t8m1 * (den6*abari)**oneth
         dumdt = -dum*tempi
         dumdd = oneth*dum*deni
         dumda = -oneth*dum*abari
         dumdz = 2.0*dum*zbari
 
+        # Fortran lines 1128–1133.
         gm1 = 1.0/dum
         gm2 = gm1*gm1
         gm13 = gm1**oneth
@@ -875,32 +963,36 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         gm53 = gm23*gm1
 
         # v and w, eqs. 5.25 and 5.26, with their derivatives a0, a1.
+        # Fortran lines 1138–1139.
         v = -0.05483 - 0.01946*gm13 + 1.86310*gm23 - 0.78873*gm1
         a0 = oneth*0.01946*gm43 - twoth*1.86310*gm53 + 0.78873*gm2
 
+        # Fortran lines 1142–1143.
         w = -0.06711 + 0.06859*gm13 + 1.74360*gm23 - 0.74498*gm1
         a1 = -oneth*0.06859*gm43 - twoth*1.74360*gm53 + 0.74498*gm2
 
-        # Eqs. 5.19 and 5.20.
+        # Eqs. 5.19 and 5.20 (Fortran lines 1148–1152).
         fliq = v*fb + (1.0 - v)*ft
         fliqdt = a0*dumdt*(fb - ft)
         fliqdd = a0*dumdd*(fb - ft) + v*c00 + (1.0 - v)*c01
         fliqda = a0*dumda*(fb - ft)
         fliqdz = a0*dumdz*(fb - ft)
 
+        # Fortran lines 1155–1159.
         gliq = w*gb + (1.0 - w)*gt
         gliqdt = a1*dumdt*(gb - gt)
         gliqdd = a1*dumdd*(gb - gt) + w*c02 + (1.0 - w)*c03
         gliqda = a1*dumda*(gb - gt)
         gliqdz = a1*dumdz*(gb - gt)
 
-        # Eq. 5.17.
+        # Eq. 5.17 (Fortran lines 1164–1168).
         dum = 0.5738*zbar*ye*t86*den
         dumdt = 0.5738*zbar*ye*6.0*t85*den*1.0e-8
         dumdd = 0.5738*zbar*ye*t86
         dumda = -dum*abari
         dumdz = 0.5738*2.0*ye*t86*den
 
+        # Fortran lines 1171–1176.
         z = tfac4*fliq - tfac5*gliq
         sbrem = dum * z
         sbremdt = dumdt*z + dum*(tfac4*fliqdt - tfac5*gliqdt)
@@ -909,27 +1001,29 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         sbremdz = dumdz*z + dum*(tfac4*fliqdz - tfac5*gliqdz)
 
     # ---- Recombination neutrinos ----
-    # Eq. 6.11, solved for nu.
+    # Eq. 6.11, solved for nu (Fortran lines 1188–1192).
     xnum = 1.10520e8 * den * ye / (temp*sqrt(temp))
     xnumdt = -1.50*xnum*tempi
     xnumdd = xnum*deni
     xnumda = -xnum*abari
     xnumdz = xnum*zbari
 
-    # The chemical potential nu ...
+    # The chemical potential nu (Fortran line 1196) ...
     nu = ifermi12(xnum)
 
     # ... and its derivatives, through the integral of order -1/2.
+    # Fortran lines 1200–1204.
     a0 = 1.0/(0.5*zfermim12(nu))
     nudt = a0*xnumdt
     nudd = a0*xnumdd
     nuda = a0*xnumda
     nudz = a0*xnumdz
 
+    # Fortran lines 1207–1208.
     nu2 = nu * nu
     nu3 = nu2 * nu
 
-    # Table 12.
+    # Table 12 (Fortran lines 1212–1232).
     if nu >= -20.0 and nu < 0.0:
         a1 = 1.51e-2
         a2 = 2.42e-1
@@ -951,15 +1045,18 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         f2 = 2.29e-2
         f3 = -1.04e-3
 
+    # The recombination loss, for -20 <= nu <= 10 only (Fortran lines
+    # 1236–1301).
     # Question (see the page): zero outside -20 <= nu <= 10.
     if nu >= -20.0 and nu <= 10.0:
-        # Eqs. 6.7, 6.13 and 6.14.
+        # Eqs. 6.7, 6.13 and 6.14 (Fortran lines 1240–1244).
         zeta = 1.579e5*zbar*zbar*tempi
         zetadt = -zeta*tempi
         zetadd = 0.0
         zetada = 0.0
         zetadz = 2.0*zeta*zbari
 
+        # Fortran lines 1247–1253.
         c00 = 1.0/(1.0 + f1*nu + f2*nu2 + f3*nu3)
         c01 = f1 + f2*2.0*nu + f3*3.0*nu2
         dum = zeta*c00
@@ -968,12 +1065,14 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         dumda = zeta*c01*nuda
         dumdz = zetadz*c00 + zeta*c01*nudz
 
+        # Fortran lines 1257–1261.
         z = 1.0/dum
         dd00 = dum**(-2.25)
         dd01 = dum**(-4.55)
         c00 = a1*z + a2*dd00 + a3*dd01
         c01 = -(a1*z + 2.25*a2*dd00 + 4.55*a3*dd01)*z
 
+        # Fortran lines 1265–1271.
         z = exp(c*nu)
         dd00 = b*z*(1.0 + d*dum)
         gum = 1.0 + dd00
@@ -982,22 +1081,24 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         gumda = dd00*c*nuda + b*z*d*dumda
         gumdz = dd00*c*nudz + b*z*d*dumdz
 
-        # Eq. 6.5.
+        # Eq. 6.5 (Fortran lines 1275–1276).
         z = exp(nu)
         a1 = 1.0/gum
 
+        # Fortran lines 1279–1283.
         bigj = c00 * z * a1
         bigjdt = c01*dumdt*z*a1 + c00*z*nudt*a1 - c00*z*a1*a1 * gumdt
         bigjdd = c01*dumdd*z*a1 + c00*z*nudd*a1 - c00*z*a1*a1 * gumdd
         bigjda = c01*dumda*z*a1 + c00*z*nuda*a1 - c00*z*a1*a1 * gumda
         bigjdz = c01*dumdz*z*a1 + c00*z*nudz*a1 - c00*z*a1*a1 * gumdz
 
-        # Eq. 6.5.
+        # Eq. 6.5 (Fortran lines 1288–1291).
         z = exp(zeta + nu)
         dum = 1.0 + z
         a1 = 1.0/dum
         a2 = 1.0/bigj
 
+        # Fortran lines 1294–1298.
         sreco = tfac6 * 2.649e-18 * ye * zbar**13 * den * bigj*a1
         srecodt = sreco*(bigjdt*a2 - z*(zetadt + nudt)*a1)
         srecodd = sreco*(1.0*deni + bigjdd*a2 - z*(zetadd + nudd)*a1)
@@ -1005,42 +1106,47 @@ def sneut(temp, den, abar, zbar, snu, dsnudt, dsnudd, dsnuda, dsnudz):
         srecodz = sreco*(14.0*zbari + bigjdz*a2 - z*(zetadz+nudz)*a1)
 
     # Convert from erg/cm^3/s to erg/g/s (comment these out to duplicate
-    # the Itoh et al. plots).
+    # the Itoh et al. plots; Fortran lines 1309–1313).
     spair = spair*deni
     spairdt = spairdt*deni
     spairdd = spairdd*deni - spair*deni
     spairda = spairda*deni
     spairdz = spairdz*deni
 
+    # Fortran lines 1316–1320.
     splas = splas*deni
     splasdt = splasdt*deni
     splasdd = splasdd*deni - splas*deni
     splasda = splasda*deni
     splasdz = splasdz*deni
 
+    # Fortran lines 1323–1327.
     sphot = sphot*deni
     sphotdt = sphotdt*deni
     sphotdd = sphotdd*deni - sphot*deni
     sphotda = sphotda*deni
     sphotdz = sphotdz*deni
 
+    # Fortran lines 1330–1334.
     sbrem = sbrem*deni
     sbremdt = sbremdt*deni
     sbremdd = sbremdd*deni - sbrem*deni
     sbremda = sbremda*deni
     sbremdz = sbremdz*deni
 
+    # Fortran lines 1337–1341.
     sreco = sreco*deni
     srecodt = srecodt*deni
     srecodd = srecodd*deni - sreco*deni
     srecoda = srecoda*deni
     srecodz = srecodz*deni
 
-    # The total and its derivatives.
+    # The total and its derivatives (Fortran lines 1346–1350).
     snu = splas + spair + sphot + sbrem + sreco
     dsnudt = splasdt + spairdt + sphotdt + sbremdt + srecodt
     dsnudd = splasdd + spairdd + sphotdd + sbremdd + srecodd
     dsnuda = splasda + spairda + sphotda + sbremda + srecoda
     dsnudz = splasdz + spairdz + sphotdz + sbremdz + srecodz
 
+    # Fortran line 1354.
     return snu, dsnudt, dsnudd, dsnuda, dsnudz

@@ -1,7 +1,7 @@
-"""Python version of envstruct_mod.f (YREC 09c3b9b): the envelope's
+"""Python version of envstruct_mod.f (YREC 7be4133): the envelope's
 structure, point by point, formerly COMMON/ENVSTRUCT/.
 
-Translates: envstruct_mod.f#ENVSTRUCT_MOD (09c3b9b)
+Translates: envstruct_mod.f#ENVSTRUCT_MOD (7be4133)
 
 Routines that USE ENVSTRUCT_MOD import this module and write
 ``envstruct_mod.<name>``. Filled by envint (point 1 at the bottom after it
@@ -14,6 +14,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–45.
 envp = np.zeros(_JSON + 1)              # log P
 envt = np.zeros(_JSON + 1)              # log T
 envs = np.zeros(_JSON + 1)              # log(m/M)

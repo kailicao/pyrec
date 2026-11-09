@@ -1,4 +1,4 @@
-"""Python version of kcsurfp.f (YREC development, 09c3b9b)."""
+"""Python version of kcsurfp.f (YREC development, 7be4133)."""
 
 import numpy as np
 
@@ -10,19 +10,21 @@ from pyrec.inter3 import inter3
 from pyrec.kspline import kspline
 from pyrec.ksplint import ksplint
 
-# Parameters NTC and NGC for the tabulated surface pressures.
+# Parameters NTC and NGC for the tabulated surface pressures (Fortran
+# line 27).
 NTC = 76
 NGC = 11
 
 
 def _spline4(qg, ptab, x):
     """KSPLINE then KSPLINT on four points: the spline's value at x."""
+
     yg = np.zeros(5)
     kspline(qg, ptab, yg)
     return ksplint(qg, ptab, yg, x, 0.0)
 
 
-def kcsurfp(teffl, gl, lprt):
+def kcsurfp(teffl: float, gl: float, lprt: bool) -> None:
     """Gas pressure at T = Teff from the Kurucz/Castelli atmosphere table.
 
     The version of SURFP for the newer Kurucz/Castelli tables (76 x 11):
@@ -31,7 +33,7 @@ def kcsurfp(teffl, gl, lprt):
     depending on the temperature), then in log Teff by a 4-point natural
     spline. Called only by ENVINT.
 
-    Translates: kcsurfp.f#KCSURFP (09c3b9b)
+    Translates: kcsurfp.f#KCSURFP (7be4133)
 
     Parameters
     ----------
@@ -45,7 +47,10 @@ def kcsurfp(teffl, gl, lprt):
     Sets ``atmprt_mod.ap`` (log P) and ``atmprt_mod.at`` (log Teff), and
     ``fac_mod.jp`` and ``fac_mod.kp[1..4]`` (the table corner used).
     Nothing is returned.
+
     """
+
+    # The local arrays (Fortran lines 43–44).
     qt = np.zeros(5)
     pp = np.zeros(5)
     qs = np.zeros(4)
@@ -57,16 +62,17 @@ def kcsurfp(teffl, gl, lprt):
     atmtlc = atmos2c_mod.atmtlc
     atmglc = atmos2c_mod.atmglc
 
-    # Check that the point is within the table.
+    # Check that the point is within the table (Fortran lines 52–60).
     # Question (see the page): hard-coded bounds; no upper bounds checked.
     if teffl < 3.5 or gl < -0.5:
         for unit in (iounits_mod.iowr, iounits_mod.ishort):
             iounits_mod.write(unit, " DESIRED ATMOSPHERE OUTSIDE TABLE RANGE")
             iounits_mod.write(unit, f" LOG TEFF{teffl:10.6f} LOG G{gl:10.6f}")
             iounits_mod.write(unit, " RUN STOPPED")  # format 911
-        raise SystemExit
+        raise SystemExit(1)    # STOP 1, the run-time error code
 
-    # Temperature interpolation: the four table points around teffl.
+    # Temperature interpolation: the four table points around teffl
+    # (Fortran lines 61–73).
     for j in range(1, NTC + 1):
         if teffl <= atmtlc[j]:
             break  # to label 10
@@ -78,7 +84,9 @@ def kcsurfp(teffl, gl, lprt):
         qt[k] = atmtlc[jj + k - 1]
     fac_mod.jp = jj
 
-    # Gravity interpolation at each of the four temperatures (loop 20).
+    # Gravity interpolation at each of the four temperatures (loop 20,
+    # Fortran lines 74–146).
+    # Hot temperatures: the highest gravities only (Fortran lines 79–96).
     for j in range(jj, jj + 4):
         n = j - jj + 1
         if atmtlc[j] > 4.5:
@@ -100,8 +108,9 @@ def kcsurfp(teffl, gl, lprt):
                 fac_mod.kp[n] = NGC - 2
             continue
 
-        # Question (see the page): this branch and the search below use
-        # NGC, not IMINMAX2(J), so missing top entries can enter.
+        # Suspected bug (see the page): this branch and the search below use
+        # NGC, not IMINMAX2(J), so missing top entries can enter (Fortran
+        # lines 97–111).
         if gl >= atmglc[NGC - 1]:
             # Above the second-highest gravity: the top four.
             for kk in range(1, 5):
@@ -111,7 +120,8 @@ def kcsurfp(teffl, gl, lprt):
             fac_mod.kp[n] = NGC - 3
             continue
 
-        # General case: the four nearest valid gravities.
+        # General case: the four nearest valid gravities (Fortran lines
+        # 112–132).
         found = False
         for k in range(fac_mod.iminmax2[j] - 3, fac_mod.imin2[j] - 1, -1):
             if atmglc[k + 2] > gl >= atmglc[k + 1]:
@@ -127,18 +137,19 @@ def kcsurfp(teffl, gl, lprt):
         if found:
             continue
 
-        # Below the second valid gravity: the lowest four valid ones.
+        # Below the second valid gravity: the lowest four valid ones
+        # (Fortran lines 133–145).
         for k in range(1, 5):
             qg[k] = atmglc[k + fac_mod.imin2[j] - 1]
             ptab[k] = atmplc[j, k + fac_mod.imin2[j] - 1]
         pp[n] = _spline4(qg, ptab, gl)
         fac_mod.kp[n] = fac_mod.imin2[j]
 
-    # Interpolate in temperature to find log P.
+    # Interpolate in temperature to find log P (Fortran lines 147–152).
     atmprt_mod.ap = _spline4(qt, pp, teffl)
     atmprt_mod.at = teffl
 
-    # Write the result to the model file.
+    # Write the result to the model file (Fortran lines 153–162).
     if lprt:
         for unit in (iounits_mod.ishort, iounits_mod.istor):
             iounits_mod.write(unit, "********PRESSURE AT T=TEFF INTERPOLATED "

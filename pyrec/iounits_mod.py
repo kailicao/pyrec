@@ -1,8 +1,8 @@
-"""Python version of iounits_mod.f (YREC 09c3b9b): the logical unit numbers
+"""Python version of iounits_mod.f (YREC 7be4133): the logical unit numbers
 of every file, formerly COMMON/IOUNITS/ (and before it /LUOUT/, /LUNUM/
 and eight other blocks).
 
-Translates: iounits_mod.f#IOUNITS_MOD (09c3b9b)
+Translates: iounits_mod.f#IOUNITS_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case (all INTEGER*4;
 parmin assigns them). Routines that USE IOUNITS_MOD import this module and
@@ -18,6 +18,7 @@ import builtins
 import os
 import sys
 
+# The unit numbers (Fortran lines 24–52).
 ilast = 0           # last model (11)
 idebug = 0          # debugging output (18)
 itrack = 0          # track (19)
@@ -36,6 +37,7 @@ iopatm = 0          # pulsation output, atmosphere (26)
 isnu = 0            # neutrino fluxes (33)
 ialex06 = 0         # Alexander 2006 opacities (90)
 iclcd = 0           # acoustic-depth output (91, only with lacout)
+# Suspected bug (see the page): ijlast is never assigned.
 ijlast = 0          # used by wrtout (ljlast), assigned nowhere
 iopurez = 0         # pure-CN opacities (62)
 icondopacp = 0      # Potekhin conductive opacities (75); IcondOpacP
@@ -60,7 +62,9 @@ def open(unit, name, status='UNKNOWN', form='FORMATTED', access='SEQUENTIAL'):
     status is Fortran's: 'OLD' (must exist), 'NEW' (must not exist),
     'REPLACE', 'SCRATCH' or 'UNKNOWN' (kept if it exists, positioned at its
     start). form and access are accepted and ignored (formatted, sequential).
+
     """
+
     close(unit)
     name = str(name).strip()
     status = status.upper()
@@ -78,6 +82,7 @@ def open(unit, name, status='UNKNOWN', form='FORMATTED', access='SEQUENTIAL'):
 def _file(unit):
     """The file of a unit, connecting an unopened unit to fort.<unit> as
     Fortran does."""
+
     if unit not in _units:
         open(unit, f'fort.{unit}')
     return _units[unit]
@@ -85,6 +90,7 @@ def _file(unit):
 
 def close(unit):
     """CLOSE(unit)."""
+
     f = _units.pop(unit, None)
     if f is not None:
         f.close()
@@ -92,6 +98,7 @@ def close(unit):
 
 def rewind(unit):
     """REWIND(unit)."""
+
     if unit in _units:
         _units[unit].seek(0)
 
@@ -100,6 +107,7 @@ def read(unit):
     """READ(unit, ...): the next record as a string, without its newline,
     or None at the end of the file (Fortran's END= branch). Unit 5 is
     standard input."""
+
     if unit == 5:
         line = sys.stdin.readline()
     else:
@@ -113,6 +121,7 @@ def write(unit, text):
     """WRITE(unit, ...): write text as one or more records. Units 6 and '*'
     are the screen. As in a sequential file, what follows the record just
     written is cut off."""
+
     if unit in (6, '*') and unit not in _units:
         print(text)
         return

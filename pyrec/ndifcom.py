@@ -1,7 +1,8 @@
-"""Python version of ndifcom.f (YREC 09c3b9b): composition mixed across
+"""Python version of ndifcom.f (YREC 7be4133): composition mixed across
 each region made unstable by rotation, through MIXGRID and MIXCOM."""
 
 from pyrec.mixcom import mixcom
+import numpy as np
 from pyrec.mixgrid import mixgrid
 
 # The Fortran's locals (SAVE).
@@ -9,15 +10,17 @@ ldum = False
 ldum2 = False
 
 
-def ndifcom(dt, cod2, ecod2, em, hd, hl, hp, hr, hs, hs1, hs2, hstot, hv,
-            ibeg, iend, imax, imin, lcz, lok, m, hcomp, jbeg, jend):
+def ndifcom(dt: float, cod2: np.ndarray, ecod2: np.ndarray, em: np.ndarray, hd: np.ndarray, hl: np.ndarray,
+            hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, hs1: np.ndarray, hs2: np.ndarray, hstot: float,
+            hv: np.ndarray, ibeg: int, iend: int, imax: int, imin: int, lcz: np.ndarray, lok: bool, m: int,
+            hcomp: np.ndarray, jbeg: int, jend: int) -> tuple[int, int]:
     """Before the final iteration (lok False), mix rows jbeg..jend over the
     region found earlier (ibeg..iend, with its grid ecod2, em). On the
     final iteration, find each run of interfaces with hv > 0 between imin
     and imax, set up its grid (MIXGRID) and mix it (MIXCOM); regions of a
     single unstable interface are skipped.
 
-    Translates: ndifcom.f#NDIFCOM (09c3b9b)
+    Translates: ndifcom.f#NDIFCOM (7be4133)
 
     Arguments: the step dt (s); the coefficients cod2 at the model points;
     ecod2 and em on the equal grid (kept between calls by the caller); the
@@ -28,15 +31,18 @@ def ndifcom(dt, cod2, ecod2, em, hd, hl, hp, hr, hs, hs1, hs2, hstot, hv,
     Sets in place: hcomp, and ecod2, em for the last region.
 
     Returns (ibeg, iend), the last region.
+
     """
+
     global ldum, ldum2
+
+    # Before the final call: the region the caller found (Fortran lines 64–66).
     if not lok:
-        # Question (see the page): only the last region before the final
-        # call.
         mixcom(dt, ecod2, em, hs2, ibeg, iend, lcz, lok, m, hcomp, jbeg, jend)
         return ibeg, iend
+
     # Find the unstable regions in order: ibeg is the zone below the first
-    # non-zero v, iend the zone above the last.
+    # non-zero v, iend the zone above the last (Fortran lines 74–100).
     ldum = False
     istart = imin
     while True:                                          # label 60
@@ -64,16 +70,20 @@ def ndifcom(dt, cod2, ecod2, em, hd, hl, hp, hr, hs, hs1, hs2, hstot, hv,
         # label 80: no non-zero v, exit.
         if not ltest:
             break                                        # GOTO 90
+
+        # The region's grid; a single unstable interface is skipped (Fortran lines 102–112).
+        # Question (see the page): a single unstable interface is skipped.
         ldum2 = mixgrid(cod2, hd, hl, hp, hr, hs, hs1, hs2, hstot, ibeg,
                         iend, lcz, m, ecod2, em, ldum2)
-        # Question (see the page): a single unstable interface is skipped.
         if ldum2:
             if istart <= imax:
                 continue                                 # GOTO 60
             break                                        # GOTO 90
+
+        # Mix the region, then back for the next one, if any (Fortran lines 117–120).
         mixcom(dt, ecod2, em, hs2, ibeg, iend, lcz, lok, m, hcomp, jbeg, jend)
-        # Back for the next region, if any.
         if istart > imax:
             break
+
     # label 90
     return ibeg, iend

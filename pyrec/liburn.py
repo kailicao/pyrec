@@ -1,4 +1,4 @@
-"""Python version of liburn.f (YREC development, 09c3b9b)."""
+"""Python version of liburn.f (YREC development, 7be4133)."""
 
 import math
 
@@ -18,17 +18,21 @@ from pyrec import prevcz_mod
 from pyrec import scrtch_mod
 from pyrec.ratext import ratext
 
-# DATA: the numbers of substeps tried, and the relative tolerances.
+# DATA: the numbers of substeps tried, and the relative tolerances
+# (Fortran lines 93–94).
 NSTEPE = [0, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96]
 YTOL = [0.0, 1.0e-6, 1.0e-6, 1.0e-6]
 
 
-def _converged(yest, yerr):
-    """Loops 30 and 110: relative errors of the extrapolation within YTOL.
+def _converged(yest: np.ndarray, yerr: np.ndarray) -> bool:
+    """Loops 30 and 110: relative errors of the extrapolation within YTOL
+    (Fortran lines 257–263 and 472–478).
 
     Abundances below 1e-24 are not tested. ``yerr`` is made relative in
     place, as in the Fortran.
+
     """
+
     ldone = True
     for k2 in range(1, 4):
         if yest[k2] < 1.0e-24:
@@ -39,15 +43,20 @@ def _converged(yest, yerr):
     return ldone
 
 
-def _write_911(i, yerr):
-    """Format 911: convergence failure of the extrapolation."""
+def _write_911(i: int, yerr: np.ndarray) -> None:
+    """Format 911: convergence failure of the extrapolation (Fortran lines
+    274–276 and 487).
+
+    """
+
     iounits_mod.write(iounits_mod.ishort,
                       f" ***LIBURN CONVERGENCE FAILURE IN SHELL {i:4d}ERRORS ")
     iounits_mod.write(iounits_mod.ishort,
                       "".join(f"{yerr[k2]:10.3E}" for k2 in range(1, 4)))
 
 
-def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
+def liburn(delts: float, hcomp: np.ndarray, hr: np.ndarray, hs1: np.ndarray, hs2: np.ndarray, ht: np.ndarray,
+           jnenv: int, jnenv0: int, m: int) -> None:
     """Burn Li6, Li7 and Be9 over one time step (non-rotating mixing).
 
     The radiative interior is burned shell by shell and the surface
@@ -57,12 +66,13 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     size. Points left behind by a retreating zone are burned once with a
     blended rate.
 
-    Translates: liburn.f#LIBURN (09c3b9b)
+    Translates: liburn.f#LIBURN (7be4133)
 
     Parameters
     ----------
     delts : float
-        The time step (main.f passes seconds; see the page, question 1).
+        The time step (main.f passes seconds; see the page's question on
+        the comments' units).
     hcomp : ndarray, shape (16, JSON + 1)
         Composition; rows 13, 14, 15 (Li6, Li7, Be9) updated in place.
     hr : ndarray
@@ -78,10 +88,14 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     m : int
         Number of points.
 
-    Also changes ``newrat_mod`` (the bottom point's rates, question 8) and
+    Also changes ``newrat_mod`` (the bottom point's rates, a suspected
+    bug on the page) and
     ``prevcz_mod`` (``rbase0``, ``bli6old``, ``bli7old``, ``bbe9old``,
-    ``jenvos``). Nothing is returned.
+    ``lbliold``, ``jenvos``). Nothing is returned.
+
     """
+
+    # Module data (Fortran lines 12–45).
     json = dimensions_mod.json
     cln = constants_mod.cln
     rli6 = newrat_mod.rli6
@@ -93,7 +107,8 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     hro = oldmod_mod.hro
     sdel = scrtch_mod.sdel
 
-    # SAVE in the Fortran: no local is read before it is set in a call.
+    # Local arrays (Fortran lines 89–96). SAVE in the Fortran: no local is
+    # read before it is set in a call.
     hsav = np.zeros((4, json + 1))
     ratli6 = np.zeros(json + 1)
     ratli7 = np.zeros(json + 1)
@@ -103,13 +118,15 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     yext = np.zeros(4)
     fx = 0.0
 
+    # Save the original abundances (loop 10, Fortran lines 107–112).
     for i in range(1, m + 1):  # loop 10
         hsav[1, i] = hcomp[13, i]
         hsav[2, i] = hcomp[14, i]
         hsav[3, i] = hcomp[15, i]
 
     # The base of the convection zone: the offset fx (in zones) where
-    # del_ad - del_rad crosses zero, between jnenv - 1 and jnenv.
+    # del_ad - del_rad crosses zero, between jnenv - 1 and jnenv (Fortran
+    # lines 113–189).
     if 1 < jnenv < m:
         if nmlpar_mod.lrot and nmlpar_mod.linstb:
             ddj = mdphy_mod.delam[jnenv] - mdphy_mod.delrm[jnenv]
@@ -123,10 +140,15 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
             jenv = jnenv
             jenv0 = jnenv0
         else:
-            # Envelope overshoot: move both bases down by PSCAL0, PSCAL1.
+            # Envelope overshoot: move both bases down by PSCAL0, PSCAL1;
+            # the start of the step (Fortran lines 137–161).
             if prevcz_mod.rbase0 == 0.0:
-                prevcz_mod.rbase0 = 0.5 * (math.exp(cln * hro[jnenv0])
-                                           + math.exp(cln * hro[jnenv0 - 1]))
+                # The radius below shell 1 is zero (the centre).
+                if jnenv0 > 1:
+                    prevcz_mod.rbase0 = 0.5 * (math.exp(cln * hro[jnenv0])
+                                               + math.exp(cln * hro[jnenv0 - 1]))
+                else:
+                    prevcz_mod.rbase0 = 0.5 * math.exp(cln * hro[1])
                 ros = prevcz_mod.rbase0 - liov_mod.pscal0
                 jenv0 = 1
                 for j in range(jnenv0 - 1, 0, -1):
@@ -136,6 +158,9 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
                         break  # to label 11
             else:
                 jenv0 = prevcz_mod.jenvos
+
+            # The end of the step, from the true base (Fortran lines
+            # 162–183).
             dr = math.exp(cln * hr[jnenv]) - math.exp(cln * hr[jnenv - 1])
             rbase = (0.5 * (math.exp(cln * hr[jnenv])
                             + math.exp(cln * hr[jnenv - 1])) - fx * dr)
@@ -146,8 +171,7 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
                 r = math.exp(cln * hr[j])
                 if r < ros:
                     jenv = j + 1
-                    # Question (see the page): HRO, the old radius, here.
-                    dr = math.exp(cln * hro[j + 1]) - r
+                    dr = math.exp(cln * hr[j + 1]) - r
                     fx = 0.5 - ((ros - r) / dr)
                     fx = max(-0.5, fx)
                     fx = min(0.5, fx)
@@ -157,7 +181,8 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
         jenv0 = jnenv0
     prevcz_mod.jenvos = jenv
 
-    # The radiative interior, below both bases (loop 50).
+    # The radiative interior, below both bases (loop 50, Fortran lines
+    # 190–286).
     minj = min(jenv, jenv0)
     maxj = max(jenv, jenv0)
     for i in range(1, minj):
@@ -172,6 +197,9 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
             hcomp[14, i] = 0.0
             hcomp[15, i] = 0.0
             continue
+
+        # Substeps of 1/2, 1/4, ... 1/96 of the step, extrapolated to zero
+        # (loop 40, Fortran lines 203–271).
         ldone = False
         for j in range(1, 12):  # loop 40
             frac = 1.0 / float(NSTEPE[j])
@@ -179,13 +207,18 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
             hcomp[13, i] = hsav[1, i]
             hcomp[14, i] = hsav[2, i]
             hcomp[15, i] = hsav[3, i]
-            # log rates, started half a substep before the step.
+
+            # log rates, started half a substep before the step (Fortran
+            # lines 214–220).
             tli6 = (math.log(rli60[i])
                     - 0.5 * frac * (math.log(rli6[i]) - math.log(rli60[i])))
             tli7 = (math.log(rli70[i])
                     - 0.5 * frac * (math.log(rli7[i]) - math.log(rli70[i])))
             tbe9 = (math.log(rbe90[i])
                     - 0.5 * frac * (math.log(rbe9[i]) - math.log(rbe90[i])))
+
+            # Burn, the rates rising linearly in their logs (loop 20,
+            # Fortran lines 221–247).
             for k in range(1, NSTEPE[j] + 1):  # loop 20
                 tli6 = tli6 + frac * (math.log(rli6[i]) - math.log(rli60[i]))
                 tli7 = tli7 + frac * (math.log(rli7[i]) - math.log(rli70[i]))
@@ -205,6 +238,8 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
                     hcomp[15, i] = hcomp[15, i] / math.exp(ratbe9[i])
                 else:
                     hcomp[15, i] = 0.0
+
+            # Extrapolate to zero step and test (Fortran lines 248–270).
             yest[1] = hcomp[13, i]
             yest[2] = hcomp[14, i]
             yest[3] = hcomp[15, i]
@@ -214,9 +249,11 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
                 ldone = _converged(yest, yerr)
                 if ldone:
                     break  # to label 45
+
+        # Convergence failure (Fortran lines 272–276); label 45, the new
+        # abundances (Fortran lines 277–284).
         if not ldone:
             _write_911(i, yerr)
-        # label 45
         hcomp[13, i] = yext[1]
         if hcomp[13, i] < 1.0e-24:
             hcomp[13, i] = 0.0
@@ -227,11 +264,14 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
         if hcomp[15, i] < 1.0e-24:
             hcomp[15, i] = 0.0
 
-    # label 60: the convection zone.
+    # label 60: the convection zone; skipped if it does not burn (Fortran
+    # lines 286–296).
     if rbe90[jenv0] <= 1.0e-32 or rbe9[jenv] <= 1.0e-32:
+        prevcz_mod.lbliold = False
         return  # label 200
 
-    # Mean abundances over the zone at the start of the step (loop 65).
+    # Mean abundances over the zone at the start of the step (loop 65,
+    # Fortran lines 297–311).
     fli60 = 0.0
     fli70 = 0.0
     fbe90 = 0.0
@@ -244,8 +284,10 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     fli60 = fli60 / fm0
     fli70 = fli70 / fm0
     fbe90 = fbe90 / fm0
-    # log of the zone's mean start rates, or the previous step's end ones.
-    if prevcz_mod.bli6old <= 0.0:
+
+    # log of the zone's mean start rates, or the previous step's end ones
+    # (Fortran lines 312–333).
+    if not prevcz_mod.lbliold:
         bli60 = 0.0
         bli70 = 0.0
         bbe90 = 0.0
@@ -261,8 +303,9 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
         bli70 = prevcz_mod.bli7old
         bbe90 = prevcz_mod.bbe9old
 
-    # The bottom point's mass and rates adjusted for the offset fx.
-    # Question (see the page): the rates are not restored afterwards.
+    # The bottom point's mass and rates adjusted for the offset fx
+    # (Fortran lines 334–343).
+    # Suspected bug (see the page): the rates are not restored afterwards.
     hs2sav = hs2[jenv]
     if 1 < jenv < m:
         hs2[jenv] = hs2[jenv] + fx * (hs1[jenv] - hs1[jenv - 1])
@@ -270,7 +313,8 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
         rli7[jenv] = rli7[jenv] + 0.5 * fx * (rli7[jenv - 1] - rli7[jenv])
         rbe9[jenv] = rbe9[jenv] + 0.5 * fx * (rbe9[jenv - 1] - rbe9[jenv])
 
-    # Mean abundances and rates over the zone at the end (loop 70).
+    # Mean abundances and rates over the zone at the end, then the mass
+    # restored (loop 70, Fortran lines 344–372).
     fli6 = 0.0
     fli7 = 0.0
     fbe9 = 0.0
@@ -294,12 +338,15 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     bbe9 = math.log(bbe9 / fm)
     hs2[jenv] = hs2sav
 
-    # A deepened zone starts from the end-of-step mean.
+    # A deepened zone starts from the end-of-step mean (Fortran lines
+    # 373–379).
     if jenv < jenv0:
         fli60 = fli6
         fli70 = fli7
         fbe90 = fbe9
 
+    # Substeps and extrapolation for the zone (loop 120, Fortran lines
+    # 380–484).
     ldone = False
     for j in range(1, 12):  # loop 120
         frac = 1.0 / float(NSTEPE[j])
@@ -310,7 +357,9 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
         czli6 = bli60 - 0.5 * frac * (bli6 - bli60)
         czli7 = bli70 - 0.5 * frac * (bli7 - bli70)
         czbe9 = bbe90 - 0.5 * frac * (bbe9 - bbe90)
-        # Accretion: material of composition COMPACC added each substep.
+
+        # Accretion: material of composition COMPACC added each substep
+        # (Fortran lines 396–408).
         if nmlpar_mod.lmdot and nmlpar_mod.dmdt0 > 0.0:
             ldoacc = True
             fli6a = 0.0
@@ -318,6 +367,8 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
             fbe9a = 0.0
         else:
             ldoacc = False
+
+        # Burn in substeps (loop 100, Fortran lines 409–448).
         for k in range(1, NSTEPE[j] + 1):  # loop 100
             czli6 = czli6 + frac * (bli6 - bli60)
             czli7 = czli7 + frac * (bli7 - bli70)
@@ -344,13 +395,17 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
             if fbe9 < 1.0e-24:
                 fbe9 = 0.0
             if ldoacc:
-                # Accreted material burns half a substep on arrival.
+                # Accreted material burns half a substep on arrival (Fortran
+                # lines 435–447).
                 fli6add = nmlpar_mod.compacc[13] * frac / math.exp(0.5 * dli6)
                 fli6a = fli6a / math.exp(dli6) + fli6add
                 fli7add = nmlpar_mod.compacc[14] * frac / math.exp(0.5 * dli7)
                 fli7a = fli7a / math.exp(dli7) + fli7add
                 fbe9add = nmlpar_mod.compacc[15] * frac / math.exp(0.5 * dbe9)
                 fbe9a = fbe9a / math.exp(dbe9) + fbe9add
+
+        # Mass-weighted mean with the accreted matter (Fortran lines
+        # 449–461).
         if ldoacc:
             fmassacc = deuter_mod.fmassacc
             print("".join(f"{v:12.3E}" for v in (fli60, fli6, fli6a, fli70,
@@ -358,6 +413,8 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
             fli6 = (fli6 * fm + fli6a * fmassacc) / (fm + fmassacc)
             fli7 = (fli7 * fm + fli7a * fmassacc) / (fm + fmassacc)
             fbe9 = (fbe9 * fm + fbe9a * fmassacc) / (fm + fmassacc)
+
+        # Extrapolate to zero step and test (Fortran lines 462–483).
         yest[1] = fli6
         yest[2] = fli7
         yest[3] = fbe9
@@ -367,9 +424,11 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
             ldone = _converged(yest, yerr)
             if ldone:
                 break  # to label 125
+
+    # Convergence failure (Fortran lines 485–487); label 125, the new
+    # abundances (Fortran lines 488–495).
     if not ldone:
         _write_911(jenv, yerr)
-    # label 125
     fli6 = yext[1]
     if fli6 < 1.0e-24:
         fli6 = 0.0
@@ -379,17 +438,24 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     fbe9 = yext[3]
     if fbe9 < 1.0e-24:
         fbe9 = 0.0
-    # Question (see the page): from maxj, so points newly in a deepened
-    # zone keep their old abundances.
+
+    # The zone's new abundances (loop 130, Fortran lines 496–500).
+    # Suspected bug (see the page): from maxj, so points newly in a
+    # deepened zone keep their old abundances.
     for i in range(maxj, m + 1):  # loop 130
         hcomp[13, i] = fli6
         hcomp[14, i] = fli7
         hcomp[15, i] = fbe9
+
+    # The end rates, for the start of the next step (Fortran lines
+    # 501–505).
     prevcz_mod.bli6old = bli6
     prevcz_mod.bli7old = bli7
     prevcz_mod.bbe9old = bbe9
+    prevcz_mod.lbliold = True
 
-    # The region left by a retreating zone: burned once, blended rate.
+    # The region left by a retreating zone: burned once, blended rate
+    # (Fortran lines 506–540).
     if jenv <= jenv0:
         return  # label 200
     if jenv0 > 1:
@@ -397,7 +463,8 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
     else:
         hsbeg = 0.0
     hsend = 0.5 * (hs1[jenv] + hs1[jenv - 1])
-    # Question (see the page): dmass < 0 here, so frad lies in (-1, 0).
+    # Suspected bug (see the page): dmass < 0 here, so frad lies in (-1, 0),
+    # and the weights are the other way round from the comment.
     dmass = hsbeg - hsend
     for i in range(jenv0, jenv):  # loop 140
         if rbe9[i] <= 1.0e-32:
@@ -412,19 +479,23 @@ def liburn(delts, hcomp, hr, hs1, hs2, ht, jnenv, jnenv0, m):
         hcomp[14, i] = safedivexp(hcomp[14, i], dli7)
         if hcomp[14, i] < 1.0e-24:
             hcomp[14, i] = 0.0
-        # Question (see the page): Be9 is not guarded by SAFEDIVEXP.
+        # Suspected bug (see the page): Be9 is not guarded by SAFEDIVEXP
+        # (math.exp raises OverflowError where the Fortran's EXP overflows).
         hcomp[15, i] = hcomp[15, i] / math.exp(dbe9)
         if hcomp[15, i] < 1.0e-24:
             hcomp[15, i] = 0.0
 
 
-def safedivexp(numerator, exponent):
+def safedivexp(numerator: float, exponent: float) -> float:
     """KC's guard (2025-05-31): numerator / exp(exponent), or 0 on overflow.
 
-    Translates: liburn.f#SAFEDIVEXP (09c3b9b)
+    Translates: liburn.f#SAFEDIVEXP (7be4133)
 
     Returns ``numerator``, the Fortran's in-out argument.
+
     """
+
+    # Fortran lines 554–558.
     if exponent < 709.7827:
         numerator = numerator / math.exp(exponent)
     else:

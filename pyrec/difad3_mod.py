@@ -1,8 +1,8 @@
-"""Python version of difad3_mod.f (YREC 09c3b9b): the Zahn-type factors of
+"""Python version of difad3_mod.f (YREC 7be4133): the Zahn-type factors of
 the diffusion-plus-advection treatment of angular momentum, formerly
 COMMON/DIFAD3/.
 
-Translates: difad3_mod.f#DIFAD3_MOD (09c3b9b)
+Translates: difad3_mod.f#DIFAD3_MOD (7be4133)
 
 Routines that USE DIFAD3_MOD import this module and write
 ``difad3_mod.<name>``. All arrays have JSON + 1 elements, index 0 unused.
@@ -14,6 +14,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–48.
 facd2 = np.zeros(_JSON + 1)     # setupv; read by vcirc
 facd3 = np.zeros(_JSON + 1)     # setupv; read by vcirc
 vesd2 = np.zeros(_JSON + 1)     # vcirc; read nowhere else

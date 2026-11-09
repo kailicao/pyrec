@@ -1,4 +1,4 @@
-"""Python version of rhoofp06.f (YREC 09c3b9b): the density for a given X,
+"""Python version of rhoofp06.f (YREC 7be4133): the density for a given X,
 T6 and pressure, from the OPAL 2006 equation of state."""
 
 from pyrec import aeos06_mod
@@ -12,20 +12,23 @@ NT = 197
 SIGMACC = 1.8914785e-3    # DATA: a/3 in the table's units (Mb per T6**4)
 
 
-def rhoofp06(x, t6, p, irad):
+def rhoofp06(x: float, t6: float, p: float, irad: int) -> float:
     """Invert the OPAL 2006 EOS: find the density whose gas pressure
     matches p (less the radiation pressure when irad is 1), by bisection
     in the table's X and T6 grids, then up to 11 steps of regula falsi on
     esac06 called without radiation.
 
-    Translates: rhoofp06.f#RHOOFP06 (09c3b9b)
+    Translates: rhoofp06.f#RHOOFP06 (7be4133)
 
     Arguments: x (X), t6 (T in 1e6 K), p (pressure, Mb), irad (1: p
     includes radiation). None is set.
 
     Returns the density, or -999.0 on failure (out of the table, no
     convergence, or esac06's alternate return).
+
     """
+
+    # The gas pressure (Fortran lines 44–47).
     a = aeos06_mod
     eos = eos06misc_mod.eos
     nra = eos06misc_mod.nra
@@ -35,7 +38,7 @@ def rhoofp06(x, t6, p, irad):
         pr = 4.0 / 3.0 * rat * t6**4    # Mb
     pnr = p - pr
 
-    # Bisection for the composition index (label 8).
+    # Bisection for the composition index (label 8) (Fortran lines 49–60).
     ilo = 2
     ihi = MX
     while ihi - ilo > 1:
@@ -46,7 +49,8 @@ def rhoofp06(x, t6, p, irad):
             ilo = imd
     mlo = ilo
 
-    # Bisection for the temperature index (label 11), from the top.
+    # Bisection for the temperature index (label 11), from the top (Fortran
+    # lines 62–77).
     ilo = NT
     ihi = 2
     while ilo - ihi > 1:
@@ -60,11 +64,13 @@ def rhoofp06(x, t6, p, irad):
             ilo = imd
     klo = ilo                                       # label 14
 
+    # The table's pressure range at this temperature (Fortran lines 79–87).
     pmax = a.xz[mlo, 1, klo, nra[klo]] * t6 * a.rho[nra[klo]]
     pmin = a.xz[mlo, 1, klo, 1] * t6 * a.rho[1]
     if pnr > 1.25 * pmax or pnr < pmin:
         return -999.0                               # go to 999
 
+    # Two first guesses (Fortran lines 89–108).
     rhog1 = a.rho[nra[klo]] * pnr / pmax
     if esac06(x, t6, rhog1, 1, 0):
         return -999.0
@@ -86,7 +92,7 @@ def rhoofp06(x, t6, p, irad):
             return -999.0
         p2 = eos[1]
 
-    # Regula falsi (label 1), at most 11 steps.
+    # Regula falsi (label 1), at most 11 steps (Fortran lines 110–139).
     icount = 0
     while True:
         icount = icount + 1

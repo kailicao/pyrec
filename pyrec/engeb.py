@@ -1,4 +1,4 @@
-"""Python version of engeb.f (YREC a8a5950): nuclear energy generation at
+"""Python version of engeb.f (YREC 7be4133): nuclear energy generation at
 one point, its derivatives, the reaction rates, the solar neutrino fluxes
 and the neutrino losses."""
 
@@ -9,9 +9,7 @@ import numpy as np
 from pyrec import constants_mod
 from pyrec import cross_mod
 from pyrec import deuter_mod
-from pyrec import dimensions_mod  # JSON, the array sizes (USEd by the Fortran)
 from pyrec import fluxes_mod
-from pyrec import grab_mod
 from pyrec import nmlpar_mod
 from pyrec import ovrtrn_mod
 from pyrec.neutrino import neutrino
@@ -64,7 +62,7 @@ C21 = 5.240358e-8
 
 # ---- SAVE: locals kept between calls ----
 # Below TCUT(1) the routine jumps to label 200, and these keep the previous
-# call's values there (see the page, question 5).
+# call's values there. Suspected bug (see the page): the stale values.
 xfrac = np.zeros(NELEM + 1)
 rate = np.zeros(NRXNS + 1)
 dratro = np.zeros(NRXNS + 1)
@@ -84,23 +82,26 @@ convert = 0.0  # set above TCUT(1); read at label 200 on every path
 def _screen_weak_or_int(uwk, z86, amu, xtr):
     """Weak screening, or Graboske et al.'s intermediate form (as used for
     Be7 + p and He3 + p): UWK if at most WEAKSCREENING, else UINT."""
+
     if uwk <= nmlpar_mod.weakscreening:
         return uwk
     return 0.38 * xxl8 * xtr * z86 / (amu * z58 * z28)
 
 
-def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
-          tl, x, y, xhe3, xc12, xc13, xn14, xo16,
-          xo18, xh2, iu, hr1, hr2, hr3, hr4, hr5, hr6, hr7,
-          hr8, hr9, hr10, hr11, hr12, hr13, hf1, hf2, be7massfraction,
-          ealpca, enu):
+def engeb(epp1: float, epp2: float, epp3: float, ecn: float, e3al: float, pep: float, pet: float, sum1: float,
+          dl: float, tl: float, x: float, y: float, xhe3: float, xc12: float, xc13: float, xn14: float, xo16: float,
+          xo18: float, xh2: float, iu: int, hr1: np.ndarray, hr2: np.ndarray, hr3: np.ndarray, hr4: np.ndarray,
+          hr5: np.ndarray, hr6: np.ndarray, hr7: np.ndarray, hr8: np.ndarray, hr9: np.ndarray, hr10: np.ndarray,
+          hr11: np.ndarray, hr12: np.ndarray, hr13: np.ndarray, hf1: np.ndarray, hf2: np.ndarray,
+          be7massfraction: float, ealpca: float, enu: float) -> tuple[float, float, float, float, float, float, float,
+          float, float, float, float]:
     """Nuclear energy generation at one point: screening, the pp/CNO rates
     with S-factor scaling, the Be7 and N15 branchings, alpha captures,
     deuterium burning, energies net of neutrinos, the derivatives PEP and
     PET, the per-reaction rates HR1-HR13, the solar neutrino fluxes and
     the neutrino losses.
 
-    Translates: engeb.f#ENGEB (a8a5950)
+    Translates: engeb.f#ENGEB (7be4133)
 
     Arguments: dl, tl (log rho, log T); the mass fractions x, y, xhe3,
     xc12, xc13, xn14, xo16, xo18, xh2; iu, the point's index; hr1-hr13,
@@ -112,17 +113,22 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
     triple alpha; d eps/d ln rho and d eps/d ln T; the total (erg/g/s);
     the Be7 mass fraction (set only with LSNU and X > 1e-6); the energy
     from alpha captures; the neutrino losses (negative). Also sets
-    fluxes_mod.flux, grab_mod.enghe3 and grab_mod.he3all.
+    fluxes_mod.flux.
+
     """
+
     global f1, f2, f3, f4, rho, t9, t9m1, t9m12, t9m13, t9m23, t9p13
     global tm1, xxl8, z58, z28, be7proton, be7electron, convert
     c = constants_mod
     nml = nmlpar_mod
     cr = cross_mod
 
+    # Fortran lines 465–466.
     enu = 0.0
     ealpca = 0.0
-    # Mass fractions of the 13 isotopes (n, 3H, Ne, Mg taken as zero).
+
+    # Mass fractions of the 13 isotopes (n, 3H, Ne, Mg taken as zero)
+    # (Fortran lines 472–486).
     xfrac[1] = 0.0
     xfrac[2] = x
     xfrac[3] = xh2
@@ -136,7 +142,9 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
     xfrac[11] = xo18
     xfrac[12] = 0.0
     xfrac[13] = 0.0
-    # 1/mu_I, 1/mu_e, the sum for intermediate screening, and zeta.
+
+    # 1/mu_I, 1/mu_e, the sum for intermediate screening, and zeta
+    # (Fortran lines 507–517).
     amu = 0.0
     emu = 0.0
     xtr = 0.0
@@ -147,16 +155,20 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
         emu = emu + trm * ZNUC[i]
         xtr = xtr + trm * ZNUC[i]**1.58
         zet = zet + trm * ZNUC[i]**2
+
+    # Fortran lines 528–533.
     rwe = math.exp(c.cln * dl) * emu
     dd = dl
 
+    # Fortran lines 537–550.
     low_t = tl <= nml.tcut[1]
     if low_t:
         # Below TCUT(1): no burning; jump to label 200.
-        # Question (see the page): SUM1, F1, F3 and the Be7 terms are stale.
+        # Suspected bug (see the page): SUM1, F1, F3 and the Be7 terms are
+        # stale.
         dgdeut = 0.0
         qrtdeut = 0.0
-        en = -20.0
+        en = -20.0  # noqa: F841  (unused in the Fortran too)
         pep = 0.0
         pet = 0.0
         for i in range(1, NRXNS + 1):  # loop 20
@@ -164,6 +176,7 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
             rate[i] = 0.0
             dg[i] = 0.0
     else:
+        # Fortran lines 555–564.
         rho = math.exp(c.cln * dd)
         t9 = math.exp(c.cln * (tl - 9.0))
         t9p13 = t9**c.cc13
@@ -175,7 +188,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
         t9m12 = 1.0 / math.sqrt(t9)
         t9m32 = t9m1 * t9m12
 
-        # Deuterium burning, as in DEUTRATE (MHP 5/02).
+        # Deuterium burning, as in DEUTRATE (MHP 5/02) (Fortran lines
+        # 571–603).
         if xh2 <= 1.0e-11:
             rdeut = 0.0
             qrtdeut = 0.0
@@ -189,7 +203,6 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
             tfacdeut2 = 0.112 * t9p13 + 6.76 * t9p23 + 7.95 * t9
             qrtdeut = c.cc13 * ((tfacdeut2 / tfacdeut) - 2.0 - zz)
             # Cap in the surface convection zone by the overturn time.
-            # Question (see the page): IU is never set by main.f's call.
             if iu >= deuter_mod.jcz and ovrtrn_mod.taucz > 1.0:
                 rdeutmax = c.cavog / ANUC[3] / ovrtrn_mod.taucz
                 rdeut2 = rdeut * x
@@ -197,7 +210,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                     if x > 1.0e-6:
                         rdeut = rdeutmax / x
 
-        # Degeneracy factor f'/f, a fit to Salpeter's figure 1.
+        # Degeneracy factor f'/f, a fit to Salpeter's figure 1 (Fortran
+        # lines 618–630).
         pfmc2 = 1.017677e-4 * rwe**c.cc23
         efmkt = 5.92986 * t9m1 * (math.sqrt(1.0 + pfmc2) - 1.0)
         if efmkt <= 1.0e-2:
@@ -211,7 +225,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                         + 0.12535 * degd**3 + 0.1203 * degd**4
                         - 0.012857 * degd**5 - 0.014768 * degd**6)
 
-        # Screening: weak, intermediate or strong, for each reaction.
+        # Screening: weak, intermediate or strong, for each reaction
+        # (Fortran lines 658–709).
         xxl = 5.9426e-6 * t9m32 * math.sqrt(rho * amu)
         xxl6 = xxl**c.cc23
         xxl8 = xxl**0.86
@@ -247,7 +262,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                         dscr[i] = 0.43 * uint
                         dsct[i] = -1.29 * uint
 
-        # pp chain and CNO, reactions 1-7 (none without hydrogen).
+        # pp chain and CNO, reactions 1-7 (none without hydrogen) (Fortran
+        # lines 716–767).
         if x == 0.0:
             nz = 1
             f1 = 0.0
@@ -272,14 +288,15 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                     # factors as R1.
                     dratt[i] = (dsct[i] - (Q6[i] * t9m13
                                            + (2.0 * t9m23 + Q1[i] * t9m13
-                                              - cr.qs0ee[i] * Q3[i] * t9p13
+                                              - cr.qs0e[i] * Q3[i] * t9p13
                                               - cr.qqs0ee[i]
                                               * (2.0 * Q4[i] * t9p23
                                                  + 3.0 * Q5[i] * t9)) / r1)
                                 / 3.0
                                 + 2.0 * (Q8[i] * t9)**2)
 
-            # Be7: electron capture against proton capture.
+            # Be7: electron capture against proton capture (Fortran lines
+            # 795–831).
             be7electron = (1.752e-10 * t9m12
                            * (1.0 + 0.004 * (1000.0 * t9 - 16.0)))
             be7electron = be7electron * emu * nml.sstandard[15]
@@ -298,7 +315,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
             f1 = be7electron / (be7electron + be7proton)
             f2 = be7proton / (be7electron + be7proton)
 
-            # N15 + p: (p,alpha) to C12 against (p,gamma) to O16.
+            # N15 + p: (p,alpha) to C12 against (p,gamma) to O16 (Fortran
+            # lines 856–869).
             o16gamma = (t9m23 + 0.0273016 * t9m13 + 0.14374
                         + 0.027490 * t9p13 + 6.14685 * t9p23 + 2.98940 * t9)
             o16gamma = o16gamma * 64 * cr.fo16
@@ -308,15 +326,16 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
             f3 = c12alpha / (c12alpha + o16gamma)
             f4 = 1.0 - f3
 
+        # Fortran lines 871–875.
         for i in range(nz, NRXNS + 1):  # label 50, loop 60
             rate[i] = 0.0
             dratro[i] = 0.0
             dratt[i] = 0.0
 
-        # Alpha captures, above TCUT(4).
-        # Question (see the page): the derivatives DRATT(8, 10, 11).
+        # Alpha captures, above TCUT(4) (Fortran line 884).
+        # Suspected bug (see the page): the derivatives DRATT(8, 10, 11).
         if tl >= nml.tcut[4]:
-            # C13(alpha,n)O16.
+            # C13(alpha,n)O16 (Fortran lines 886–898).
             r1 = t9m23 + 0.0129 * t9m13 + 2.04 + 0.184 * t9p13
             a1 = 6.77e15 * math.exp(-32.329 * t9m13 - (t9 / 1.284)**2)
             a2 = 3.82e5 * math.exp(-9.373 * t9m1)
@@ -332,7 +351,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                 dr1 * a1 + r1 * da1
                 + a2 * (9.373 * t9m1 - 1.5) + a3 * (11.873 * t9m1 - 1.5)
                 + a4 * (20.409 * t9m1 - 1.5) + a5 * (29.283 * t9m1 - 1.5))
-            # C12(alpha,gamma)O16.
+
+            # C12(alpha,gamma)O16 (Fortran lines 900–912).
             r1 = 1.0 / (1.0 + 0.0489 * t9m23)
             r2 = 1.0 / (1.0 + 0.2654 * t9m23)
             a1 = t9m2 * math.exp(-32.120 * t9m13)
@@ -348,7 +368,9 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                       + a2 * (r1 * c.cc13 * 0.1956 - 2.0 * (t9 / 3.496)**2)
                       + a3 * (c.cc13 * 1.0616 * r2))
                 + a4 * (27.499 * t9m1 - 1.5) + a5 * (5.0 + 15.541 * t9m1))
-            # N14(alpha,gamma)F18, F18 -> O18 + e+ + nu.
+
+            # N14(alpha,gamma)F18, F18 -> O18 + e+ + nu (Fortran lines
+            # 914–927).
             r1 = (t9m23 + 0.012 * t9m13 + 1.45 + 0.177 * t9p13
                   + 1.97 * t9p23 + 0.406 * t9)
             a1 = 7.78e9 * math.exp(-36.031 * t9m13 - (t9 / 0.881)**2)
@@ -364,13 +386,14 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
             dratt[11] = dsct[11] + rho / rate[11] * (
                 dr1 * a1 + r1 * da1 + a2 * (2.798 * t9m1 - 1.5)
                 + a3 * (5.054 * t9m1 - 1.5) + a4 * (12.310 * t9m1 - c.cc23))
-            # Triple alpha.
+
+            # Triple alpha (Fortran lines 929–932).
             rate[12] = (1.565315e21 * rho**2 * t9m1 * t9m2 * 2.79e-8
                         * math.exp(-4.4027 * t9m1 + utot[12]))
             dratro[12] = 2.0 + dscr[12]
             dratt[12] = -3.0 + dsct[12] + 4.4027 * t9m1
 
-        # Label 100: rates times abundances.
+        # Label 100: rates times abundances (Fortran lines 938–955).
         eg[1] = rate[1] * x * x
         if xh2 > 1.0e-11:
             egdeut = rdeut * x * xh2
@@ -387,7 +410,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
         eg[11] = rate[11] * y * xn14
         eg[12] = rate[12] * y**3
 
-        # Energies, MeV net of neutrinos, converted to erg.
+        # Energies, MeV net of neutrinos, converted to erg (Fortran lines
+        # 971–1003).
         convert = 1.602177e-6
         dg[1] = eg[1] * 6.664 * convert
         if xh2 > 1.0e-11:
@@ -402,11 +426,11 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
         dg[7] = eg[7] * 3.553 * convert
         dg[8] = eg[8] * 2.216 * convert
         dg[10] = eg[10] * 7.162 * convert
-        dg[11] = eg[11] * 5.815 * convert
+        # N14(a,g)F18(e+ nu)O18: Q = 6.071 MeV less <E_nu> = 0.425 MeV.
+        dg[11] = eg[11] * 5.646 * convert
         dg[12] = eg[12] * 7.275 * convert
-        grab_mod.enghe3 = dg[2]
-        grab_mod.he3all = dg[2] + dg[3]
-        # Reactions 9 and 13 are zeroed.
+
+        # Reactions 9 and 13 are zeroed (Fortran lines 1012–1017).
         dratro[9] = 0.0
         dratt[9] = 0.0
         dg[9] = 0.0
@@ -414,8 +438,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
         dratt[13] = 0.0
         dg[13] = 0.0
 
-        # Total, and its absolute derivatives d eps/d ln rho, d eps/d ln T.
-        # Question (see the page): the comment says relative derivatives.
+        # Total, and its absolute derivatives d eps/d ln rho, d eps/d ln T
+        # (Fortran lines 1019–1042).
         sum1 = 0.0
         sum2 = 0.0
         sum3 = 0.0
@@ -426,9 +450,11 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
         sum1 = sum1 + dgdeut
         sum2 = sum2 + dgdeut
         sum3 = sum3 + dgdeut * qrtdeut
-        # Question (see the page): the hard-coded thresholds.
+
+        # Question (see the page): the comment says relative derivatives;
+        # the hard-coded thresholds (Fortran lines 1043–1071).
         if sum1 <= 1.0e-12:
-            en = -20.0
+            en = -20.0  # noqa: F841  (unused in the Fortran too)
             pep = 0.0
             pet = 0.0
             for i in range(1, NRXNS + 1):  # loop 120
@@ -440,8 +466,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
             if rate[i] <= 1.0e-5:
                 rate[i] = 0.0
 
-    # Label 200: rates per Gyr per amu, for the abundance routines.
-    # Question (see the page): main.f passes an IU it never sets.
+    # Label 200: rates per Gyr per amu, for the abundance routines
+    # (Fortran lines 1081–1095).
     hr1[iu] = rate[1] * C21
     hr2[iu] = rate[2] * C21
     hr3[iu] = rate[3] * C21
@@ -458,7 +484,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
     hf1[iu] = f3
     hf2[iu] = f1
 
-    # Energy by branch: pp I (with deuterium), pp II, pp III; CNO.
+    # Energy by branch: pp I (with deuterium), pp II, pp III; CNO (Fortran
+    # lines 1113–1131).
     epp1 = dg[1] + dg[2] + dgdeut
     epp3 = eg[3] * f2 * (1.586 + 11.499) * convert
     epp2 = dg[3] - epp3
@@ -466,7 +493,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
     e3al = dg[12]
     ealpca = dg[8] + dg[10] + dg[11]
 
-    # Solar neutrino fluxes per gram at 1 AU, in 1e10 cm^-2 s^-1.
+    # Solar neutrino fluxes per gram at 1 AU, in 1e10 cm^-2 s^-1 (Fortran
+    # lines 1132–1219).
     flux = fluxes_mod.flux
     if nml.lsnu:
         if x <= 1.0e-6:
@@ -500,26 +528,32 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                 if temp <= 0.0:
                     flux[k] = 0.0
 
-    # Neutrino losses, above TCUT(5).
+    # Neutrino losses, above TCUT(5) (Fortran line 1228).
     if tl <= nml.tcut[5]:
         return (epp1, epp2, epp3, ecn, e3al, pep, pet, sum1,
                 be7massfraction, ealpca, enu)
+
+    # Fortran lines 1231–1234.
     zc = xc12 + xc13
     zo = xo16 + xo18
     t = 10.0**tl
     d = 10.0**dl
+
     if nml.lnulos1:
-        # Itoh et al. 1996, through NEUTRINO (Grant Newsham 9/06).
+        # Itoh et al. 1996, through NEUTRINO (Grant Newsham 9/06) (Fortran
+        # lines 1240–1256).
         snu, dsnudt, dsnudd = neutrino(t, d, x, y, zc, zo, 0.0, 0.0, 0.0)
         enu = -snu
-        # Question (see the page): relative derivatives added to absolute.
+        # Suspected bug (see the page): relative derivatives added to
+        # absolute ones.
         dsnudt = -dsnudt * t / enu
         dsnudd = -dsnudd * d / enu
         sum1 = sum1 + enu
         pep = pep + dsnudd
-        pet = pep + dsnudt  # Question (see the page): PEP, not PET.
+        pet = pep + dsnudt  # Suspected bug (see the page): PEP, not PET.
     else:
-        # The old fits: pair, photo- and plasma neutrinos.
+        # The old fits: pair, photo- and plasma neutrinos (Fortran lines
+        # 1262–1292).
         el = t9 / 5.9302
         eli = 1.0 / el
         ez = math.exp(c.cc13 * c.cln * (dl - 9.0)) * eli * (0.7937 + 0.2063 * x)
@@ -543,7 +577,8 @@ def engeb(epp1, epp2, epp3, ecn, e3al, pep, pet, sum1, dl,
                * polx31 / polx32)
         enu = -(ex1 + ex2 + ex3)
         sum1 = sum1 + enu
-        # Derivatives of the losses.
+
+        # Derivatives of the losses (Fortran lines 1293–1315).
         qetnx = 0.0
         qednx = 0.0
         if t9 >= 0.2:

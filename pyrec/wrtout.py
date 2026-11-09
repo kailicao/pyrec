@@ -1,4 +1,4 @@
-"""Python version of wrtout.f (YREC 09c3b9b): the output of each converged
+"""Python version of wrtout.f (YREC 7be4133): the output of each converged
 model (summary block, track lines, last model, detailed profiles), with
 the summary quantities computed on the way."""
 
@@ -26,13 +26,14 @@ from pyrec.wrtmil import wrtmil
 from pyrec.wrtmod import wrtmod
 
 # DATA: the track's cross sections for the Cl and Ga rates (SNU), for the
-# fluxes pp, pep, hep, Be7, B8, N13, O15, F17.
+# fluxes pp, pep, hep, Be7, B8, N13, O15, F17 (Fortran lines 165–171).
 GASNUF = np.array([0.0, 1.18e1, 2.15e2, 7.14e4, 7.17e1, 2.40e4, 6.04e1,
                    1.137e2, 1.139e2])
 CLSNUF = np.array([0.0, 0.0, 1.6e1, 4.26e4, 2.4, 1.14e4, 1.7, 6.8, 6.9])
 
 # SAVE: locals that a call can use before setting them, so their values
-# come from an earlier model (see the page's questions 1, 3 and 5).
+# come from an earlier model (see the page: the unused CORER, bug 1, and the
+# acoustic-depth line) (Fortran lines 173–174).
 icheck = 0  # DATA ICHECK/0/
 fx = 0.0
 czsurf_rl = 0.0
@@ -41,7 +42,7 @@ rotv = 0.0
 hicz = 0.0
 sss1 = sss2 = sss3 = 0.0
 rrr1 = rrr2 = rrr3 = 0.0
-ksaha = 0  # Question (see the page): never set.
+ksaha = 0  # KSAHA: a counter EQSAHA increments; never set or read here.
 
 
 # --- Fortran edit descriptors -------------------------------------------
@@ -50,6 +51,7 @@ def _e(v, w, d, e=2, scale=1):
     """Fortran Ew.d (Ee) under the scale factor 1P (scale=1: d.ddd) or 0P
     (scale=0: 0.ddd). With e = 2 an exponent beyond 99 drops the 'E', as
     Fortran does; a field too narrow is filled with '*'."""
+
     digits = d + 1 if scale == 1 else d
     m, x = f"{v:.{digits - 1}E}".split('E')
     x = int(x)
@@ -66,11 +68,13 @@ def _e(v, w, d, e=2, scale=1):
 
 def _es(values, w, d, e=2, scale=1):
     """A repeated E descriptor."""
+
     return ''.join(_e(v, w, d, e, scale) for v in values)
 
 
 def _f(v, w, d):
     """Fortran Fw.d (Fw.0 keeps its decimal point)."""
+
     text = f"{v:.{d}f}" + ('.' if d == 0 else '')
     return text.rjust(w) if len(text) <= w else '*' * w
 
@@ -85,23 +89,27 @@ def _model_block(model, m, dage, bl, rl, gl, teffl, corem, czsurf_m,
                  w, d, e):
     """The common start of FORMATs 1499, 1500, 1800: 1X,2I8, then seven E
     fields (DAGE ... CZsurf_M)."""
+
     return (f" {model:8d}{m:8d}"
             + _es([dage, bl, rl, gl, teffl, corem, czsurf_m], w, d, e))
 
 
 def _hcomp_columns(hcomp, m):
     """HCOMP(4..11,1), HCOMP(4..15,M), HCOMP(1..3,M), Z/X at the surface."""
+
     return ([hcomp[i, 1] for i in range(4, 12)]
             + [hcomp[i, m] for i in range(4, 16)]
             + [hcomp[i, m] for i in range(1, 4)]
             + [hcomp[3, m] / hcomp[1, m]])
 
 
-def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
-           ddage, smass, teffl, bl, gl, lshell, jxbeg, jxmid, jxend, jcore,
-           jenv, tlumx, trit, tril, ps, ts, rs, cfenv, ftri, hstot, omega,
-           lpunch, fp, ft, eta2, r0, hjm, hi, sjtot, skerot, hs2, cmixl,
-           xmsol, compmix):
+def wrtout(hcomp: np.ndarray, hd: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray,
+           hs1: np.ndarray, ht: np.ndarray, lc: np.ndarray, m: int, model: int, dage: float, ddage: float, smass: float,
+           teffl: float, bl: float, gl: float, lshell: bool, jxbeg: int, jxmid: int, jxend: int, jcore: int, jenv: int,
+           tlumx: np.ndarray, trit: np.ndarray, tril: np.ndarray, ps: np.ndarray, ts: np.ndarray, rs: np.ndarray,
+           cfenv: np.ndarray, ftri: float, hstot: float, omega: np.ndarray, lpunch: bool, fp: np.ndarray,
+           ft: np.ndarray, eta2: np.ndarray, r0: np.ndarray, hjm: np.ndarray, hi: np.ndarray, sjtot: float,
+           skerot: float, hs2: np.ndarray, cmixl: float, xmsol: float, compmix: str) -> tuple[float, bool]:
     """Write the output of a converged model: the summary block to ISHORT,
     the track line(s) to ITRACK (by ITRVER), the last model to ILAST, and at
     intervals the detailed profiles (PUTSTORE, or WRTMIL and WRTMOD) and the
@@ -109,7 +117,7 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
     finds the central conditions and the base of the surface convection
     zone (stored in CENT_MOD), and the neutrino capture rates.
 
-    Translates: wrtout.f#WRTOUT (09c3b9b)
+    Translates: wrtout.f#WRTOUT (7be4133)
 
     Arguments: the model (hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, the
     rotation arrays omega, fp, ft, eta2, r0, hjm, hi, hs2), its run data
@@ -119,7 +127,9 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
     WRTLST/PUTSTORE (trit, tril, ps, ts, rs, cfenv, ftri), and cmixl, xmsol,
     compmix, passed on. Returns (gl, lpunch): log g, set here, and lpunch,
     cleared when the model is stored.
+
     """
+
     global icheck, fx, czsurf_rl, rotp, rotv, hicz
     global sss1, sss2, sss3, rrr1, rrr2, rrr3
     n = nmlpar_mod
@@ -132,10 +142,11 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
     itrack = iounits_mod.itrack
     w = iounits_mod.write
 
-    # Question (see the page): LTSCAL is set and never used.
-    ltscal = False
+    # LTSCAL is set and never used (Fortran line 176).
+    ltscal = False  # noqa: F841  (unused in the Fortran too)
 
-    # Rescale the luminosity terms to the surface luminosity.
+    # Rescale the luminosity terms to the surface luminosity (Fortran lines
+    # 177–185). Question (see the page): the unscaled sum.
     if not n.lkuthe:
         thl = 0.0
         for i in range(1, 9):
@@ -144,7 +155,7 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
         for i in range(1, 9):  # label 10
             tlumx[i] = tlumx[i] * temp
 
-    # The summary block on ISHORT: global properties and the center.
+    # The summary block on ISHORT: the model line (Fortran lines 186–203).
     w(ishort, "\n " + '*' * 127)  # 21
     if not n.lkuthe:
         step = _f(ddage, 12, 0)  # 30
@@ -154,27 +165,30 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
               f"{_f(comp_mod.xnew, 11, 9)},{_f(comp_mod.znew, 11, 9)})  "
               f"AGE(GYRS){_f(dage, 14, 8)} STEP(YRS)={step}")
 
-    # The convective core's mass.
+    # The convective core's mass (Fortran lines 204–210).
     if jcore > 1:
         corem = hs1[jcore] / c.cmsun
     else:
         corem = 0.0
-    # Its radius (JVS 10/11).
+
+    # Its radius (JVS 10/11), never used: FX2 is 1 (or 0/0), and FX is
+    # left from the previous model (Fortran lines 212–221).
     if jcore > 1:
-        # Question (see the page): FX2 is 1 (or 0/0), and FX is used.
-        fx2 = ((sc.sdel[3, jcore + 1] - sc.sdel[1, jcore])
+        fx2 = ((sc.sdel[3, jcore + 1] - sc.sdel[1, jcore])  # noqa: F841  (unused in the Fortran too)
                / (sc.sdel[3, jcore + 1] - sc.sdel[1, jcore]))
         corerl = hr[jcore] + fx * (hr[jcore + 1] - hr[jcore]) - c.crsunl
-        corer = math.exp(c.cln * corerl)
+        corer = math.exp(c.cln * corerl)  # noqa: F841  (unused in the Fortran too)
     else:
-        corer = 0.0
+        corer = 0.0  # noqa: F841  (unused in the Fortran too)
 
-    # Bolometric magnitude, radius and gravity.
+    # Bolometric magnitude, radius and gravity (Fortran lines 223–225).
+    # Question (see the page): CMBOL = 4.79.
     bolm = c.cmbol - 2.5 * bl
     rl = 0.5 * (bl + c.clsunl - c.c4pil - c.csigl - 4.0 * teffl)
     gl = c.cgl + comp_mod.stotal - rl - rl
 
-    # Central conditions, extrapolated from shell 1.
+    # Central conditions, extrapolated from shell 1, then EQSTAT (Fortran
+    # lines 226–258).
     temp = 0.5 * math.exp(c.cln * (c.cc13 * (c.c4pi3l + hd[1] - hs[1])
                                    + hd[1] + c.cgl + hs[1]))
     p = math.exp(c.cln * hp[1])
@@ -194,7 +208,6 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
         dh.zdh[2] = hcomp[7, 1] + hcomp[8, 1]
         dh.zdh[3] = hcomp[9, 1] + hcomp[10, 1] + hcomp[11, 1]
     fxion = np.zeros(4)
-    # Question (see the page): KSAHA is never set here.
     (t, p, dl, d, beta, betai, beta14, rmu, amu, emu, eta, qdt, qdp, qcp,
      dela, qdtt, qdtp, qat, qap, qcpt, qcpp, _) = eqstat(
         tl, 0.0, pl, p, dl, 0.0, x, z, 0.0, 0.0, 0.0, fxion, 0.0, 0.0,
@@ -205,7 +218,7 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
     ce.dcenter = dl
 
     # The base of the surface convection zone, where DEL_rad - DEL_ad
-    # changes sign between JENV-1 and JENV.
+    # changes sign between JENV-1 and JENV (Fortran lines 259–302).
     if jenv < m:
         if jenv > 1:
             dd2 = sc.sdel[1, jenv - 1] - sc.sdel[3, jenv - 1]
@@ -238,6 +251,8 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
         czsurf_d = 0.0
         czsurf_p = 0.0
         czsurf_o = 0.0
+
+    # The summary lines 50, 60, 70, 80 (Fortran lines 303–351).
     w(ishort, f" SHELLS={m:5d}  (X0,Z0)=({_f(label_mod.xenv0, 9, 7)},"
               f"{_f(label_mod.zenv0, 9, 7)})  CONV. ZONE MASSES(MSUN): CORE"
               f"{_f(corem, 10, 7)} ENV.{_f(ce.czsurf_m, 10, 7)}"
@@ -256,7 +271,8 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
               f"  HE-C{_e(tlumx[8], 13, 6)}  NEUTRINOS{_e(tlumx[6], 13, 6)}"
               f"  GRAV{_e(tlumx[7], 13, 6)}")
 
-    # The hydrogen shell and the temperature maximum.
+    # The hydrogen shell and the temperature maximum (Fortran lines
+    # 352–399).
     ss3 = 0.0
     ss4 = 0.0
     if lshell:
@@ -303,12 +319,13 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                 w(ishort, f" CONVECTION = {_l(lcmax)}     LOG(R) MAX-T ="
                           f"{_f(rlmax, 8, 5)}")  # 150
 
-    # Neutrino fluxes and detector capture rates.
+    # Neutrino fluxes and detector capture rates (Fortran lines 400–426).
+    # Suspected bug (see the page): the labels give them in erg.
     fluxtot = fl.fluxtot
     w(ishort, " NEUTRINOS 1E10ERG/CM^2 PP,PEP,HEP,BE7,B8,N13,O15,F17:"
               + _es(fluxtot[1:9], 9, 2))  # 160
     # Question (see the page): these cross sections differ from CLSNUF and
-    # GASNUF, and the line calls the rates "energies".
+    # GASNUF.
     f = fluxtot
     fl7li = (0.0 * f[1] + 665.0 * f[2] + 8.4e4 * f[3] + 9.6 * f[4]
              + 3.9e4 * f[5] + 42.4 * f[6] + 246.0 * f[7] + 249.0 * f[8])
@@ -326,13 +343,15 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
               f" 37Cl={_e(fl37cl, 9, 2)} 71Ga={_e(fl71ga, 9, 2)}"
               f" 81Br={_e(fl81br, 9, 2)} 98Mo={_e(fl98mo, 9, 2)}"
               f" 115In={_e(fl115in, 9, 2)}")  # 2160
+
+    # The fitting point, and the closing line (Fortran lines 427–430).
     fitmas = hs1[m] / c.cmsun
     w(ishort, f" FIT-POINT    M/MSUN={_f(fitmas, 16, 12)}     (P,T,R) ="
               f"{_f(hp[m], 12, 7)}{_f(ht[m], 12, 7)}{_f(hr[m], 12, 7)}")
     w(ishort, " " + '*' * 127)  # 20
 
     if n.ltrack:
-        # The total moment of inertia.
+        # The total moment of inertia (Fortran lines 431–448).
         hitot = 0.0
         if not n.lrot:
             for i in range(1, m + 1):
@@ -342,7 +361,8 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                 hitot = hitot + hi[i]
 
         if n.itrver == 0:
-            # The Cl and Ga rates in SNU.
+            # The Cl and Ga rates in SNU; without LSNU the fluxes are zeroed
+            # (Fortran lines 450–463).
             fl.clsnu = 0.0
             fl.gasnu = 0.0
             if n.lsnu:
@@ -350,10 +370,11 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                     fl.clsnu = fl.clsnu + CLSNUF[i] * fluxtot[i]
                     fl.gasnu = fl.gasnu + GASNUF[i] * fluxtot[i]
             else:
-                # Question (see the page): FLUXTOT zeroed for later readers.
                 for i in range(1, 11):
                     fluxtot[i] = 0.0
-            # Rotation period (days), velocity (km/s), the zone's inertia.
+
+            # Rotation period (days), velocity (km/s), the zone's inertia
+            # (Fortran lines 464–486).
             hicz = 0.0
             if n.lrot:
                 # Question (see the page): the old cap of 9999 days.
@@ -369,13 +390,19 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                     for k in range(jenv, m + 1):
                         hicz = hicz + c.cc23 * hs2[k] * math.exp(
                             2.0 * c.cln * hr[k])
+
+            # The hydrogen shell's location (Fortran lines 487–502).
             _shell_location(lshell, jxbeg, jxmid, jxend, hs1, hr, rl)
-            # tau_cz and P_phot; GETTAU also sets CZsurf_R.
+
+            # tau_cz and P_phot; GETTAU also sets CZsurf_R (Fortran lines
+            # 549–555).
             ce.czsurf_r = gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl,
                                  hstot, bl, m, lc, ce.czsurf_r, cmixl)
             ovrtrn_mod.taucz0 = ovrtrn_mod.taucz
             ovrtrn_mod.pphot0 = ovrtrn_mod.pphot
-            # FORMAT 1499 (E17.8E3, for three-digit exponents) (MCR 12/25).
+
+            # FORMAT 1499 (E17.8E3, for three-digit exponents) (MCR 12/25)
+            # (Fortran lines 557–568).
             w(itrack, _model_block(model, m, dage, bl, rl, gl, teffl, corem,
                                    ce.czsurf_m, 17, 8, 3)
                       + _es([ce.czsurf_r, czsurf_t, czsurf_d, czsurf_p,
@@ -390,6 +417,8 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                                sss1, sss2, sss3, rrr1, rrr2, rrr3,
                                ovrtrn_mod.pphot, smass], 17, 8, 3))
         elif n.itrver == 1 or n.itrver == 2:
+            # The model, the center and the luminosities (Fortran lines
+            # 569–578).
             w(itrack, _model_block(model, m, dage, bl, rl, gl, teffl, corem,
                                    ce.czsurf_m, 16, 8, 2)
                       + _f(ce.czsurf_r, 8, 4)
@@ -399,6 +428,9 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                                  hcomp[2, 1], hcomp[3, 1], hitot], 16, 8))
             w(itrack, " " + _es(list(tlumx[1:6])
                                 + [tlumx[8], tlumx[7], tlumx[6]], 16, 8))
+
+            # The Cl and Ga rates in SNU, the fluxes, the central and surface
+            # abundances (Fortran lines 580–593).
             fl.clsnu = 0.0
             fl.gasnu = 0.0
             for i in range(1, 9):
@@ -410,8 +442,10 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
             surf = _hcomp_columns(hcomp, m)[8:]
             w(itrack, " " + _es(surf[:8], 16, 8) + "\n "
                       + _es(surf[8:], 16, 8))  # 1520
-            # Question (see the page): without rotation ROTP, ROTV and HICZ
-            # keep earlier values, and version 2 writes them.
+
+            # Rotation (Fortran lines 594–608). Suspected bug (see the
+            # page): without rotation ROTP, ROTV and HICZ keep earlier
+            # values, and version 2 writes them.
             if n.lrot:
                 rotp = 0.5 * c.c4pi / omega[m] / 8.64e4
                 rotv = omega[m] * math.exp(c.cln * (rl + c.crsunl)) * 1.0e-5
@@ -421,31 +455,37 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                         hicz = hicz + hi[k]
                 else:
                     hicz = 0.0
+
+            # The hydrogen shell's location (Fortran lines 609–626).
             _shell_location(lshell, jxbeg, jxmid, jxend, hs1, hr, rl)
             w(itrack, " " + _es([sss1, sss2, sss3, rrr1, rrr2, rrr3],
                                 16, 8))  # 1530
+
         if n.itrver == 2:
             # FORMAT 1540, (1X,1P6E13.5,0P,2F11.5,1E13.5): the last field
-            # is under 0P, so it prints as 0.ddddd.
+            # is under 0P, so it prints as 0.ddddd (Fortran lines 628–635).
             w(itrack, " " + _es([sjtot, skerot, hitot, hicz, omega[m],
                                  omega[1]], 13, 5)
                       + _f(rotp, 11, 5) + _f(rotv, 11, 5)
                       + _e(ovrtrn_mod.taucz, 13, 5, scale=0))
+
         if n.itrver == 3:
+            # FORMAT 1501 (Fortran lines 636–643).
             w(itrack, f" {model:8d}{m:8d}"
                       + _es([dage, bl, rl, gl, teffl], 13, 5)
                       + _es([corem, ce.czsurf_m], 11, 3)
                       + _f(ce.czsurf_r, 8, 4)
                       + _e(comp_mod.xnew, 13, 5))  # 1501
 
-    # The last model, every time.
+    # The last model, every time (Fortran lines 659–669).
     iwrite = iounits_mod.ilast
     wrtlst(iwrite, hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps,
            ts, rs, cfenv, ftri, tlumx, jcore, jenv, model, m, smass, teffl,
            bl, hstot, dage, ddage, omega, cmixl, compmix)
 
     # The detailed output every NPRTMOD models (PUTSTORE also writes the
-    # stitched profile); otherwise the pulsation files.
+    # stitched profile); otherwise the pulsation files (Fortran lines
+    # 670–691).
     stored = n.lstore and model % n.nprtmod == 0
     if stored:
         putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps,
@@ -459,10 +499,12 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
         wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl,
                fp, ft, hs, dage, cmixl, xmsol)
 
-    # Acoustic depths, and a second track line (JVS).
+    # Acoustic depths, and a second track line (JVS); LACOUT is never set
+    # (Fortran lines 693–728).
     if ac.lacout:
         if jenv > 1 and ac.ladon:
-            # Question (see the page): CZsurf_RL may be from an earlier model.
+            # Question (see the page): CZsurf_RL may be from an earlier
+            # model.
             calcad(hr, czsurf_rl, m, hd, hp, ht, bl, fp, ft, hstot, teffl,
                    hcomp, dage, jenv, cmixl)
         elif jenv == 1:
@@ -497,7 +539,8 @@ def wrtout(hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
 def _shell_location(lshell, jxbeg, jxmid, jxend, hs1, hr, rl):
     """The hydrogen shell's base, middle and top, in mass (Msun) and in
     radius (fraction of R), for the track (the block both track versions
-    repeat)."""
+    repeat: Fortran lines 487–502 and 609–624)."""
+
     global sss1, sss2, sss3, rrr1, rrr2, rrr3
     c = constants_mod
     if lshell:

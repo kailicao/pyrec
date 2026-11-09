@@ -1,12 +1,12 @@
-"""Python version of errmom_mod.f (YREC 09c3b9b): the tolerance of the
+"""Python version of errmom_mod.f (YREC 7be4133): the tolerance of the
 moment-of-inertia iteration, formerly COMMON/ERRMOM/.
 
-Translates: errmom_mod.f#ERRMOM_MOD (09c3b9b)
+Translates: errmom_mod.f#ERRMOM_MOD (7be4133)
 
 Routines that USE ERRMOM_MOD import this module and write
 ``errmom_mod.toleri``.
 """
 
-# Question (see the page): no routine gives toleri a value; checkj only
-# relaxes it temporarily. Zero here, as the Fortran's static storage.
-toleri = 0.0
+# Given a value in the module; checkj only relaxes it temporarily (Fortran
+# line 28).
+toleri = 1.0e-12

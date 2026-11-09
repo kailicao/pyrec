@@ -1,4 +1,4 @@
-"""Python version of putstore.f (YREC 09c3b9b): writes a verbose model to
+"""Python version of putstore.f (YREC 7be4133): writes a verbose model to
 the .store file."""
 
 import math
@@ -19,7 +19,8 @@ from pyrec.wrtmil import wrtmil
 from pyrec.wrtmod import wrtmod
 
 # Locals kept between calls (SAVE). ATM keeps its last value when KTTAU is
-# not 0-4; JXBEG, JXEND, LSHELL are never set (see question 1).
+# not 0-4; JXBEG, JXEND, LSHELL are never set (see the page, bug 3)
+# (Fortran lines 51–52, 131).
 atm = None
 jxbeg = 0
 jxend = 0
@@ -28,7 +29,7 @@ lshell = False
 _ATM_LABELS = {0: 'EDD ', 1: 'KS  ', 2: 'HRA ', 3: 'KUR ', 4: 'ALL '}
 
 # Output formats are approximate: Fortran's 0PE (0.ddd) is written as
-# Python's E (d.ddd).
+# Python's E (d.ddd). FORMATs 1013 and 1014 (Fortran lines 200–209).
 _FMT1013 = ('# JCORE  JENV  CMIXL  EOS  ATM  ALOK HIK  LPUREZ  COMPMIX'
             '  LEXCOM  LDIFY  LDIFZ  LSEMIC  LOVSTC  LOVSTE  LOVSTM'
             '  LROT  LINSTB  LJDOT0  LDISK  TDISK  PDISK  WMAX  LSTORE'
@@ -39,6 +40,8 @@ _FMT1014 = (
     'O17 O18 H2 Li6 Li7 Be9 OPACITY GRAV DELR DEL DELAD V_CONV GAM1 HII HEII HEIII '
     'BETA ETA PPI PPII PPIII CNO TRIPLE_ALPHA E_NUC E_NEU E_GRAV CP DLNRHODLNT A '
     'RP/RE FP FT J/M MOMENT DEL_KE V_ES V_GSF V_SS VTOT ')
+# FORMAT 55 (Fortran lines 267–278). Suspected bug (see the page): '3HE'
+# names the triple-alpha column.
 _FMT55 = (
     '\n'
     ' SHELL       MASS             RADIUS             LUMINOSITY            '
@@ -56,11 +59,13 @@ _FMT55 = (
 
 def _l(flag):
     """Fortran's L1."""
+
     return 'T' if flag else 'F'
 
 
 def _flags_line(jcore, jenv, cmixl, eos, alok, hik, compmix):
     """FORMATs 29 and 30 (29 adds a leading '#'): the physics flags."""
+
     n = nmlpar_mod
     return (f"{jcore:8d}{jenv:8d}{cmixl:16.10f} {eos:6s} {atm:4s} "
             f"{alok:4s} {hik:4s} {_l(n.lpurez)} {compmix:4s} "
@@ -73,10 +78,12 @@ def _flags_line(jcore, jenv, cmixl, eos, alok, hik, compmix):
                 n.lstrot)))
 
 
-def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
-             cfenv, ftri, tlumx, jcore, jenv, model, m, smass, teffl, bl,
-             hstot, dage, ddage, omega, hs1, eta2, r0, fp, ft, hjm, hi,
-             cmixl, xmsol, compmix):
+def putstore(hcomp: np.ndarray, hd: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray,
+             ht: np.ndarray, lc: np.ndarray, trit: np.ndarray, tril: np.ndarray, ps: np.ndarray, ts: np.ndarray,
+             rs: np.ndarray, cfenv: np.ndarray, ftri: float, tlumx: np.ndarray, jcore: int, jenv: int, model: int,
+             m: int, smass: float, teffl: float, bl: float, hstot: float, dage: float, ddage: float, omega: np.ndarray,
+             hs1: np.ndarray, eta2: np.ndarray, r0: np.ndarray, fp: np.ndarray, ft: np.ndarray, hjm: np.ndarray,
+             hi: np.ndarray, cmixl: float, xmsol: float, compmix: str) -> None:
     """Write the model to the .store file (unit ISTOR): either the
     "stitched" format through stitch (LSTCH), or the older one: a MOD2
     header, the flags, TLUMX, the envelope lines and, with LSTMOD, a line
@@ -84,7 +91,7 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
     (LSTROT) columns; then, with LSTATM or LSTENV, the envelope and
     atmosphere through wrtmil (LMILNE) and wrtmod.
 
-    Translates: putstore.f#PUTSTORE (09c3b9b)
+    Translates: putstore.f#PUTSTORE (7be4133)
 
     Arguments: the model's arrays (hcomp ... lc, omega, hs1, eta2, r0, fp,
     ft, hjm, hi; index 0 unused), the envelope triangle (trit, tril, ps,
@@ -92,7 +99,9 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
     mixing length cmixl, xmsol (passed to wrtmod) and compmix, the initial
     mixture's code. Arrays changed in place: tlumx (converted to erg/s if
     given in solar units). Nothing is returned.
+
     """
+
     global atm
     n = nmlpar_mod
     c = constants_mod
@@ -100,18 +109,19 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
     sc = scrtch_mod
     t2 = temp2_mod
 
-    # Physics flags. Atmosphere flag ATM.
-    # Question (see the page): KTTAU = 5 has no label.
+    # Physics flags. Atmosphere flag ATM (Fortran lines 133–145).
+    # Suspected bug (see the page): KTTAU = 5 has no label.
     if n.kttau in _ATM_LABELS:
         atm = _ATM_LABELS[n.kttau]
-    # Equation of state flag EOS.
+
+    # Equation of state flag EOS (Fortran lines 146–163).
     eos = 'SAHA  '
     if n.ldh:
         eos = 'SAH+DH'
     if n.lscv:
         eos = 'SCV   '
         if n.ldh:
-            # Question (see the page): overwritten on the next line.
+            # Suspected bug (see the page): overwritten on the next line.
             if n.lopale06:
                 eos = 'SCV+O6'
             eos = 'SCV+DH'
@@ -122,19 +132,24 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
             eos = 'OPAL06'
             if n.ldh:
                 eos = 'OP6+DH'
-    # Low-temperature opacity flag (question 7: always NONE).
+
+    # Low-temperature opacity flag, always NONE (Fortran lines 164–169).
+    # Question (see the page): no label for LALEX06.
     alok = 'NONE'
-    # High-temperature opacity flag.
+
+    # High-temperature opacity flag (Fortran lines 170–174).
     hik = 'NONE'
     if n.lopal95:
         hik = 'OP95'
 
+    # Never true: no branch sets ' ? ' (Fortran lines 176–180).
     if atm == ' ? ':
         iounits_mod.write(iounits_mod.ishort,
                           '*** YREC7 input file, flags, etc., have been '
                           'defaulted.  ***')
 
-    # The stitched format, or the old one, not both (JvS 09/25).
+    # The stitched format, or the old one, not both (JvS 09/25) (Fortran
+    # lines 182–210).
     if n.lstch:
         if ccout_mod.lphhd:
             iounits_mod.write(istor, _FMT1013)
@@ -146,7 +161,8 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
                fp, ft, teffl, hstot, bl, m, lc, model, cmixl)
         return
 
-    # Header record (FORMATs 10-13): the decimals depend on DAGE's size.
+    # Header record (FORMATs 10-13): the decimals depend on DAGE's size
+    # (Fortran lines 212–229).
     if dage < 1.0e3:
         head = "".join(f"{v:16.11f}" for v in (smass, teffl, bl, hstot, dage))
     else:
@@ -161,12 +177,13 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
     iounits_mod.write(istor, f"MOD2 {model:8d}{m:8d}" + head
                       + f"{ddage:18.10E}{hs[1]:16.12f}{hs[m]:16.12f}")
 
-    # Physics flags (FORMAT 30).
+    # Physics flags (FORMAT 30) (Fortran lines 231–237).
     iounits_mod.write(istor, _flags_line(jcore, jenv, cmixl, eos, alok,
                                          hik, compmix))
 
     # Luminosities: if TLUMX are in solar units, convert to erg/s (decided
-    # by comparing with 1e20).
+    # by comparing with 1e20), in place (Fortran lines 239–251).
+    # Question (see the page): duplicated code.
     cccmax = max(tlumx[1], tlumx[2], tlumx[3], tlumx[4], tlumx[5],
                  abs(tlumx[6]), tlumx[7])
     if cccmax <= 1.0e20:
@@ -175,7 +192,7 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
     iounits_mod.write(istor, 'TLUMX     '
                       + "".join(f"{tlumx[j]:17.9E}" for j in range(1, 8)))
 
-    # Envelope data (FORMAT 50).
+    # Envelope data (FORMAT 50) (Fortran lines 253–260).
     for i in range(1, 4):
         i0 = i
         if ftri < 0.0:
@@ -185,24 +202,28 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
             f"{ps[i]:16.12f}{ts[i]:16.12f}{rs[i]:16.12f}"
             + "".join(f"{cfenv[3 * i - 3 + j]:20.12E}" for j in range(1, 4)))
 
-    # Which shells to print. Question (see the page): jxbeg, jxend and
-    # lshell are never set.
+    # Which shells to print (Fortran line 262). Suspected bug (see the
+    # page): jxbeg, jxend and lshell are never set.
     id_ = np.zeros(len(hs), dtype=int)
     idm = pindex(jxbeg, jxend, lshell, m, id_, 0)
 
+    # One line per selected shell (Fortran lines 264–339).
     if n.lstmod:
         iounits_mod.write(istor, _FMT55)
         cg = math.exp(c.cln * c.cgl)
         for ii in range(1, idm + 1):
             i = id_[ii]
-            # The basic columns, led by MODEL (FORMAT 62).
+
+            # The basic columns, led by MODEL (FORMAT 62) (Fortran lines
+            # 284–303).
             line = (f"{model:6d} {i:6d}{hs[i]:18.14f}{hr[i]:18.14f}"
                     f"{hl[i]:24.16E}{hp[i]:18.14f} {ht[i]:18.14f} "
                     f"{hd[i]:18.14f}{omega[i]:24.16E} {_l(lc[i])}"
                     + "".join(f"{hcomp[j, i]:12.9f}" for j in range(1, 4))
                     + "".join(f"{hcomp[j, i]:16.8E}" for j in range(4, 16))
                     + "  ")
-            # Additional physics (FORMAT 63).
+
+            # Additional physics (FORMAT 63) (Fortran lines 304–316).
             if n.lstphys:
                 sg = math.exp(c.cln * (c.cgl - 2.0 * hr[i])) * hs1[i]
                 # Question (see the page): the ionization fractions are
@@ -220,7 +241,8 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
                      + "".join(f" {v:9.5f}" for v in vals[7:12])
                      + "".join(f"{v:12.4E}" for v in vals[12:17])
                      + "".join(f"{v:13.5E}" for v in vals[17:20]))
-            # Additional rotation info (FORMAT 64).
+
+            # Additional rotation info (FORMAT 64) (Fortran lines 317–328).
             if n.lstrot and n.lrot:
                 fm = math.exp(c.cln * hs[i])
                 duma = c.cc13 * omega[i]**2 / (cg * fm) * 5.0 / (2.0 + eta2[i])
@@ -236,11 +258,12 @@ def putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts, rs,
                      + "".join(f"{v:11.3E}" for v in rot[7:]))
             iounits_mod.write(istor, line)
 
-    # The envelope and atmosphere.
+    # The envelope and atmosphere (Fortran lines 340–349).
     if n.lstatm or n.lstenv:
         if n.lmilne:
             wrtmil(hcomp, hd, hl, hp, hr, hs1, m, model)
         wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl,
                fp, ft, hs, dage, cmixl, xmsol)
 
-    iounits_mod.write(istor, '\n\n')   # FORMAT 65, (/,/)
+    # FORMAT 65, (/,/) (Fortran lines 351–352).
+    iounits_mod.write(istor, '\n\n')

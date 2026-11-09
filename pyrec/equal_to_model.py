@@ -1,4 +1,4 @@
-"""Python version of equal_to_model.f (YREC 09c3b9b): the settling
+"""Python version of equal_to_model.f (YREC 7be4133): the settling
 changes from the equally spaced grid back to the model points."""
 
 import numpy as np
@@ -9,10 +9,14 @@ from pyrec import nmlpar_mod
 from pyrec.intrp2 import intrp2
 
 
-def _scale_metals(hcomp, i, zz):
+def _scale_metals(hcomp: np.ndarray, i: int, zz: float) -> None:
     """Set Z of shell i to zz, scale the metal species (rows 5-11) by
-    Z_new/Z_old, and give helium the rest."""
-    # Question (see the page): a shell with Z = 0 divides by zero.
+    Z_new/Z_old, and give helium the rest (Fortran lines 52–57, 103–108,
+    122–127).
+
+    """
+
+    # Suspected bug (see the page): a shell with Z = 0 divides by zero.
     zz2 = zz / hcomp[3, i]
     hcomp[3, i] = zz
     for j in range(5, 11 + 1):
@@ -20,31 +24,37 @@ def _scale_metals(hcomp, i, zz):
     hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
 
 
-def equal_to_model(dt, er, ex, ibegin, iend, npt, hcomp, hqpr, hru, hs1,
-                   htu, m, stot):
+def equal_to_model(dt: float, er: np.ndarray, ex: np.ndarray, ibegin: int, iend: int, npt: int, hcomp: np.ndarray,
+                   hqpr: np.ndarray, hru: np.ndarray, hs1: np.ndarray, htu: np.ndarray, m: int,
+                   stot: float) -> tuple[float, float]:
     """Apply the changes in X (and, with nmlpar_mod.ldifz, in Z) found on
     the equally spaced grid to the model points, by four-point Lagrange
     interpolation inside the grid and the end values outside it, within
     the composition limits; then convert the model back from the
     solver's units.
 
-    Translates: equal_to_model.f#EQUAL_TO_MODEL (09c3b9b)
+    Translates: equal_to_model.f#EQUAL_TO_MODEL (7be4133)
 
     Arguments: er, ex (grid radii and changes in X, npt points); ibegin,
     iend (the model points bounding the grid); m (number of shells).
     Arrays changed in place: hcomp, hqpr, hru, hs1, htu.
 
     Returns (dt, stot), back in physical units.
+
     """
+
     tabler = np.zeros(4 + 1)
     facinterp = np.zeros(4 + 1)
     ez = gravez_mod.ez
 
-    # Below the grid: the change at the first grid point.
+    # Below the grid: the change at the first grid point (Fortran lines
+    # 41–44).
     xminim = 0.0
     for i in range(ibegin, 0, -1):  # label 10
         hcomp[1, i] = max(hcomp[1, i] + ex[1], xminim)
-    # Metals sink and hydrogen rises, so the failsafes are opposite.
+
+    # Metals sink and hydrogen rises, so the failsafes are opposite
+    # (Fortran lines 48–63).
     if nmlpar_mod.ldifz:
         for i in range(ibegin, 0, -1):
             zmax = 1.0 - hcomp[1, i] - hcomp[4, i]
@@ -54,12 +64,12 @@ def equal_to_model(dt, er, ex, ibegin, iend, npt, hcomp, hqpr, hru, hs1,
         for i in range(ibegin, 0, -1):
             hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
 
-    # Inside the grid: four-point Lagrange interpolation.
+    # Inside the grid: four-point Lagrange interpolation (Fortran lines
+    # 64–112).
     jmin = 2
     for i in range(ibegin + 1, iend):  # label 20
         for j in range(jmin, npt + 1):  # label 30
-            if j == 0:
-                # Question (see the page): never true.
+            if j == 0:  # never true
                 print(' line 47 etm')
             if er[j] >= hru[i]:
                 k0 = max(j - 2, 1)
@@ -90,10 +100,13 @@ def equal_to_model(dt, er, ex, ibegin, iend, npt, hcomp, hqpr, hru, hs1,
         else:
             hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
 
-    # Above the grid: the change at the last grid point.
+    # Above the grid: the change at the last grid point (Fortran lines
+    # 113–116).
     for i in range(iend, m + 1):  # label 60
         xmax = 1.0 - hcomp[3, i] - hcomp[4, i]
         hcomp[1, i] = min(hcomp[1, i] + ex[npt], xmax)
+
+    # Fortran lines 118–133.
     if nmlpar_mod.ldifz:
         zmin = 0.0
         for i in range(iend, m + 1):
@@ -103,7 +116,7 @@ def equal_to_model(dt, er, ex, ibegin, iend, npt, hcomp, hqpr, hru, hs1,
         for i in range(iend, m + 1):
             hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
 
-    # Back to physical units.
+    # Back to physical units (Fortran lines 134–142).
     for i in range(1, m + 1):  # label 70
         hru[i] = hru[i] / confac_mod.con_rad
         htu[i] = htu[i] / confac_mod.con_temp
@@ -111,4 +124,5 @@ def equal_to_model(dt, er, ex, ibegin, iend, npt, hcomp, hqpr, hru, hs1,
         hqpr[i] = hqpr[i] * confac_mod.con_rad
     dt = dt * confac_mod.con_time
     stot = stot / confac_mod.con_mass
+
     return dt, stot

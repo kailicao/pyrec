@@ -1,7 +1,7 @@
-"""Python version of galot06_mod.f (YREC 09c3b9b): the grids of the
+"""Python version of galot06_mod.f (YREC 7be4133): the grids of the
 Alexander et al. 2006 opacity tables, formerly COMMON/GALOT06/.
 
-Translates: galot06_mod.f#GALOT06_MOD (09c3b9b)
+Translates: galot06_mod.f#GALOT06_MOD (7be4133)
 
 Routines that USE GALOT06_MOD import this module and write
 ``galot06_mod.<name>``. Arrays have index 0 unused.
@@ -9,13 +9,13 @@ Routines that USE GALOT06_MOD import this module and write
 
 import numpy as np
 
-# Table dimensions (PRIVATE in the Fortran).
+# Table dimensions (PRIVATE in the Fortran) (Fortran lines 34–37).
 _NUMD = 19
 _NUMT = 85
 _NUMX = 9
 _NUMZ = 16
 
-# log T grid (initializer).
+# log T grid (initializer) (Fortran lines 39–44).
 tgr06 = np.array([0.0] + [
     2.70, 2.75, 2.80, 2.85, 2.90, 2.91, 2.92, 2.93, 2.94, 2.95, 2.96, 2.97,
     2.98, 2.99, 3.00, 3.01, 3.02, 3.03, 3.04, 3.05, 3.06, 3.07, 3.08, 3.09,
@@ -25,13 +25,16 @@ tgr06 = np.array([0.0] + [
     3.46, 3.47, 3.48, 3.49, 3.50, 3.55, 3.60, 3.65, 3.70, 3.75, 3.80, 3.85,
     3.90, 3.95, 4.00, 4.05, 4.10, 4.15, 4.20, 4.25, 4.30, 4.35, 4.40, 4.45,
     4.50])
-# X values of the tables.
+
+# X values of the tables (Fortran line 45).
 xxg06 = np.array([0.0, 0.0, 0.1, 0.2, 0.35, 0.5, 0.7, 0.8, 0.9, 1.0])
-# log R grid.
+
+# log R grid (Fortran lines 46–47).
 r0gr06 = np.array([0.0, -8.0, -7.5, -7.0, -6.5, -6.0, -5.5, -5.0, -4.5,
                    -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5,
                    1.0])
-# Z values of the tables.
+
+# Z values of the tables (Fortran lines 48–49).
 zzg06 = np.array([0.0, 0.0, 0.00001, 0.00003, 0.0001, 0.0003, 0.001, 0.002,
                   0.004, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10])
 

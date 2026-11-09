@@ -1,4 +1,4 @@
-"""Python version of hpoint.f (YREC 09c3b9b): rezoning the model at the
+"""Python version of hpoint.f (YREC 7be4133): rezoning the model at the
 start of each step."""
 
 import math
@@ -6,7 +6,6 @@ import sys
 
 import numpy as np
 
-from pyrec import burn_mod
 from pyrec import comp_mod
 from pyrec import constants_mod
 from pyrec import deuter_mod
@@ -33,13 +32,15 @@ from pyrec.surfopac import surfopac
 
 JSON = dimensions_mod.json
 
-# The Fortran's local arrays. HPOINT has SAVE, so they keep their values
-# between calls; they are module-level here for the same reason (the debug
-# table can print entries of HKO and HFO left from an earlier call).
+# The Fortran's local arrays (Fortran lines 72–79, 128–137). HPOINT has
+# SAVE, so they keep their values between calls; they are module-level here
+# for the same reason (the debug table can print entries of HKO and HFO left
+# from an earlier call).
 omegal = np.zeros(JSON + 1)
 hpmax = np.zeros(5)
-nflag = np.zeros(102, dtype=int)  # NFLAG(100); two extra so that the flags
-                                  # after the gradient tests cannot fall off
+# Suspected bug (see the page): the Fortran can write NFLAG(101), past its
+# 100 elements; the Python's index 101 keeps it in bounds.
+nflag = np.zeros(102, dtype=int)  # NFLAG(100), index 0 unused
 lcz = np.zeros(JSON + 1, dtype=bool)
 ftx = np.zeros(JSON + 1)
 fpx = np.zeros(JSON + 1)
@@ -52,8 +53,19 @@ ytab = np.zeros(JSON + 1)
 chi = np.zeros(JSON + 1)
 y2 = np.zeros(JSON + 1)
 ixflag = np.zeros(JSON + 1, dtype=int)
-# DATA ID: the species of HCOMPM that are interpolated (index 0 unused).
+# DATA ID: the species of HCOMPM that were interpolated (index 0 unused);
+# still declared in the Fortran, unused since the regrid of HCOMPM went.
 ID = np.array([0, 1, 2, 4, 5, 6, 7, 9])
+
+
+def _stop_insertion(what, npts):
+    # FORMAT 104, written to the terminal and ISHORT, then STOP 1: the X or
+    # Z point insertion would run past JSON.
+    msg = (f" HPOINT: {what} POINT INSERTION NEEDS{npts:7d} POINTS; JSON IS"
+           f"{JSON:7d}\n RUN STOPPED")
+    print(msg)
+    iounits_mod.write(iounits_mod.ishort, msg)
+    sys.exit(1)
 
 
 def _fmt_row(i, s, p, t, r, l, x, z, o16):
@@ -62,10 +74,12 @@ def _fmt_row(i, s, p, t, r, l, x, z, o16):
             f"{x:6.3f}{z:5.3f}{o16:5.3f}")
 
 
-def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
-           estore, istore, lreset, jxbeg, model, lshell, jcore, jenv, omega,
-           eta2, r0, hi, hjm, hkerot, sjtot, skerot, fp, ft, hg, qiw, teffl,
-           cmixl):
+def hpoint(m: int, hstot: float, hs: np.ndarray, hs1: np.ndarray, hs2: np.ndarray, ht: np.ndarray, hp: np.ndarray,
+           hr: np.ndarray, lc: np.ndarray, hl: np.ndarray, hd: np.ndarray, hcomp: np.ndarray, ps: np.ndarray,
+           rs: np.ndarray, estore: np.ndarray, istore: int, lreset: bool, jxbeg: int, model: int, lshell: bool,
+           jcore: int, jenv: int, omega: np.ndarray, eta2: np.ndarray, r0: np.ndarray, hi: np.ndarray, hjm: np.ndarray,
+           hkerot: np.ndarray, sjtot: float, skerot: float, fp: np.ndarray, ft: np.ndarray, hg: np.ndarray,
+           qiw: np.ndarray, teffl: float, cmixl: float) -> tuple[int, bool, int, int, float, float]:
     """Rezone the model: keep the jumps between neighbouring points in
     mass, L, P, X and Z below the user's limits (HPTTOL), keep
     discontinuities as fixed points, add or drop outer points at the
@@ -73,7 +87,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     points, recompute the shell masses and, for rotating models, the
     rotation and the start-of-step physics.
 
-    Translates: hpoint.f#HPOINT (09c3b9b)
+    Translates: hpoint.f#HPOINT (7be4133)
 
     Arguments: the model (hs = log m, hp, ht, hr, hl, hd, hcomp, lc, and m
     points), hstot (log M), the envelope fit (ps, rs, estore, istore), the
@@ -84,19 +98,24 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     lreset is output only.
 
     Returns (m, lreset, jcore, jenv, sjtot, skerot).
+
     """
+
+    # Outputs of SPLINTD2, set before its first call.
     y = 0.0
     klo = khi = 0
 
     # Rezone so that the user's maximum jumps between successive points in
-    # P, L, X and Z are not exceeded; flag real discontinuities.
+    # P, L, X and Z are not exceeded; flag real discontinuities. IEND is the
+    # number of species followed (Fortran lines 144–147).
     lreset = False
-    # IEND is the number of species followed
     iend = 11
     if nmlpar_mod.lexcom:
         iend = 15
 
     # Outermost Henyey point colder than the minimum envelope T: drop points
+    # (Fortran lines 149–167).
+    # Question (see the page): the documentation says the code stops.
     if ht[m] < nmlpar_mod.tenv0:
         for i in range(m - 1, 0, -1):  # loop 20
             if ht[i] > nmlpar_mod.tenv0:
@@ -113,8 +132,10 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                    " MAX. STAR T LESS THAN MINIMUM ENVELOPE T.RUN STOPPED")
             iounits_mod.write(iounits_mod.ishort, msg)
             iounits_mod.write(iounits_mod.iowr, msg)
-            sys.exit()
+            sys.exit(1)
+
     # Outermost point hotter than the maximum envelope T: add one point
+    # (Fortran lines 169–186).
     elif ht[m] > nmlpar_mod.tenv1 and istore != 0:
         m = m + 1
         comp_mod.senv = estore[4]
@@ -135,9 +156,10 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                               f"{hp[k]:10.6f}{ht[k]:10.6f}{hr[k]:10.6f}")
         lreset = True
 
-    # Flagged points: the program does not rezone across them
+    # Flagged points, which the program does not rezone across: the edges of
+    # the central and surface convection zones and of the H shell (Fortran
+    # lines 190–204).
     iflag = 1
-    # Edges of the central and surface convection zones
     if jcore > 1:
         nflag[iflag] = jcore
         iflag = iflag + 1
@@ -148,6 +170,9 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     if lshell and jxbeg > 1:
         nflag[iflag] = jxbeg - 1
         iflag = iflag + 1
+
+    # Flags from the gradients in X, Z and log Omega, at most 100 (Fortran
+    # lines 205–228).
     too_many = False
     for i in range(2, m + 1):  # loop 120
         if abs(hcomp[1, i] - hcomp[1, i - 1]) > nmlpar_mod.hpttol[3]:
@@ -173,12 +198,13 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             too_many = True
             break  # GOTO 130
 
+    # The bases of the overshoot region and of the finely zoned region
+    # (Fortran lines 237–293); PMAX1..PMAX5, the largest steps in log P by
+    # region, are computed but read nowhere.
     if not too_many:
-        # PMAX1..PMAX5: maximum steps in log P by region (computed, unused).
-        # Question (see the page): PMAX1-PMAX5, JOS, JFINE are not used.
-        pmax1 = nmlpar_mod.hpttol[11]
-        pmax4 = nmlpar_mod.hpttol[10]
-        pmax5 = nmlpar_mod.hpttol[8]
+        pmax1 = nmlpar_mod.hpttol[11]  # noqa: F841  (unused in the Fortran too)
+        pmax4 = nmlpar_mod.hpttol[10]  # noqa: F841  (unused in the Fortran too)
+        pmax5 = nmlpar_mod.hpttol[8]  # noqa: F841  (unused in the Fortran too)
         if not lc[m]:
             jos = m
             jfine = m
@@ -191,7 +217,8 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                 i = jenv
                 jos = jenv
             else:
-                # Question (see the page): ALPHAE used as a depth in log P.
+                # Suspected bug (see the page): ALPHAE used as a depth in
+                # log P, not in pressure scale heights.
                 jos = jenv - 1
                 while jos >= 1:  # loop 191
                     if hp[jos] - hp[jenv] > nmlpar_mod.alphae:
@@ -203,9 +230,9 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                     np_ = int(delp / nmlpar_mod.hpttol[10])
                     if math.fmod(delp, nmlpar_mod.hpttol[10]) != 0.0:
                         np_ = np_ + 1
-                    pmax3 = delp / float(np_)
+                    pmax3 = delp / float(np_)  # noqa: F841  (unused in the Fortran too)
                 else:
-                    pmax3 = nmlpar_mod.hpttol[10]
+                    pmax3 = nmlpar_mod.hpttol[10]  # noqa: F841  (unused in the Fortran too)
                 if jos > 1:
                     nflag[iflag] = jos
                     iflag = iflag + 1
@@ -234,9 +261,11 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                         iflag = iflag + 1
                 # label 198
 
-    nflag[iflag] = m  # label 130
+    # Label 130: the last flag is the surface; sort the flags in ascending
+    # order (Fortran lines 294–307).
+    nflag[iflag] = m
     if iflag != 1:
-        # Sort the flag points in ascending order (label 140)
+        # label 140
         ldone = False
         while not ldone:
             ldone = True
@@ -244,7 +273,9 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                 if nflag[i + 1] < nflag[i]:
                     nflag[i], nflag[i + 1] = nflag[i + 1], nflag[i]
                     ldone = False
-        # Remove duplicates (label 160). After a removal i still advances,
+
+        # Remove duplicates (label 160) (Fortran lines 309–320).
+        # Suspected bug (see the page): after a removal i still advances,
         # so a third equal flag in a row is kept.
         i = 2
         while True:
@@ -256,29 +287,34 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             i = i + 1
             if not i <= iflag:
                 break
-    # label 180: FORMAT 185 writes 20 flags per record
+
+    # Label 180: FORMAT 185 writes 20 flags per record (Fortran lines
+    # 321–323).
     flags = [nflag[j] for j in range(1, iflag + 1)]
     for k in range(0, max(len(flags), 1), 20):
         iounits_mod.write(iounits_mod.ishort, " FLAG-POINTS"
                           + "".join(f"{n:4d}" for n in flags[k:k + 20]))
 
-    # Refloat the points
+    # Refloat the points: log Omega into OMEGAL, read nowhere (Fortran lines
+    # 325–333).
     if nmlpar_mod.lrot:
         for i in range(1, m + 1):  # loop 190
             if omega[i] > 0.0:
                 omegal[i] = math.log10(omega[i])
             else:
                 omegal[i] = 0.0
+
+    # The first new point, the saved Teff and surface L, the largest L, and
+    # the tolerances HPMAX (Fortran lines 334–356).
     oldmod_mod.hss[1] = hs[1]
     oldmod_mod.hpo[1] = hp[1]
     oldmod_mod.hlo[1] = hl[1]
     hko[1] = hcomp[1, 1]
     hfo[1] = hcomp[3, 1]
     hlmax = hl[m]
-    # Teff saved, and the number of points saved (JVS 04/14, 05/25)
+    # Teff saved (JVS 04/14), and the surface luminosity, HLSURO, for ENTIME
     oldmod_mod.tefflo = teffl
-    # Question (see the page): MO is the old number of points.
-    oldmod_mod.mo = m
+    oldmod_mod.hlsuro = hl[m]
     for i in range(m - 1, 0, -1):
         if hl[i] > hlmax:
             hlmax = hl[i]
@@ -286,11 +322,15 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     hpmax[2] = nmlpar_mod.hpttol[9] * hlmax
     hpmax[3] = nmlpar_mod.hpttol[5]
     hpmax[4] = nmlpar_mod.hpttol[6]
-    iiflg = 1
+
+    # Fortran lines 359–361 (IIFLG and I0 are read nowhere).
+    iiflg = 1  # noqa: F841  (unused in the Fortran too)
     j = 2
-    i0 = 2
+    i0 = 2  # noqa: F841  (unused in the Fortran too)
+
     # CHI: the running total of normalized differences in m, L, P
     # (dCHI = dHS/DM + dHL/DL - dHP/DP, the L term only where L increases)
+    # (Fortran lines 364–388).
     dm = nmlpar_mod.hpttol[2]
     dl = hpmax[2]
     chi[1] = 1.0
@@ -308,11 +348,15 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         else:
             dchi = (hs[j] - hs[j - 1]) / dm - (hp[j] - hp[j - 1]) / dp
         chi[j] = chi[j - 1] + dchi
+
+    # Spline of log m against CHI (Fortran lines 389–394).
     for j in range(1, m + 1):
         xtab[j] = chi[j]
         ytab[j] = hs[j]
-    # Spline of log m against CHI
     splinc(xtab, ytab, y2, m)
+
+    # The new points, evenly in CHI between the flags (Fortran lines
+    # 395–421).
     chiprev = chi[1]
     jprev = 1
     mnew = 1
@@ -334,7 +378,8 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         mnew = mnew + npt
         jprev = mnew
 
-    # Points from the gradient in X: X at the new points, into HKO
+    # Points from the gradient in X: X at the new points, into HKO (Fortran
+    # lines 430–441).
     for j in range(1, m + 1):
         xtab[j] = hs[j]
         ytab[j] = hcomp[1, j]
@@ -345,7 +390,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         hko[i] = y
 
     # Test on the change in X (only where X increases outward); skipped if
-    # HPMAX(3) is zeroed out
+    # HPMAX(3) is zeroed out (Fortran lines 447–483).
     if hpmax[3] > 1.0e-15:
         ixx = 0
         for j in range(mnew, 1, -1):
@@ -354,11 +399,12 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                 ixflag[ixx] = j
         if ixx != 0:
             mm = mnew
-            # Question (see the page): no check that mm stays within JSON.
             for i in range(1, ixx + 1):
                 j = ixflag[i]
                 dx = (hko[j] - hko[j - 1]) / hpmax[3]
                 nn = int(dx)  # the number of new points needed
+                if mm + nn > JSON:
+                    _stop_insertion("X", mm + nn)
                 dss = ((oldmod_mod.hss[j] - oldmod_mod.hss[j - 1])
                        / float(nn + 1))
                 for k in range(mm + nn, j + nn - 1, -1):
@@ -369,7 +415,8 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             mnew = mm
     # label 102
 
-    # Points from the gradient in Z: Z at the new points, into HFO
+    # Points from the gradient in Z: Z at the new points, into HFO (Fortran
+    # lines 487–499).
     for j in range(1, m + 1):
         xtab[j] = hs[j]
         ytab[j] = hcomp[3, j]
@@ -378,8 +425,9 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         x = oldmod_mod.hss[i]
         y, klo, khi = splintd2(xtab, ytab, m, y2, x, y, klo, khi)
         hfo[i] = y
+
     # Test on the change in Z (only where Z decreases outward); skipped if
-    # HPMAX(4) is zeroed out
+    # HPMAX(4) is zeroed out (Fortran lines 504–539).
     if hpmax[4] > 1.0e-15:
         ixx = 0
         for j in range(mnew, 1, -1):
@@ -392,6 +440,8 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                 j = ixflag[i]
                 dz = (hfo[j - 1] - hfo[j]) / hpmax[4]
                 nn = int(dz)  # the number of new points needed
+                if mm + nn > JSON:
+                    _stop_insertion("Z", mm + nn)
                 dss = ((oldmod_mod.hss[j] - oldmod_mod.hss[j - 1])
                        / float(nn + 1))
                 for k in range(mm + nn, j + nn - 1, -1):
@@ -403,6 +453,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     # label 103
 
     # Delete new points that are too close together (HDO as scratch)
+    # (Fortran lines 542–556).
     j = 1
     oldmod_mod.hdo[j] = oldmod_mod.hss[j]
     for jj in range(2, mnew):  # loop 810
@@ -416,7 +467,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         oldmod_mod.hss[j] = oldmod_mod.hdo[j]
 
     # Outer edge of the convective core and inner edge of the convective
-    # envelope on the new points
+    # envelope on the new points (Fortran lines 561–576).
     if jcore > 1:
         j = 2
         while j <= mnew:  # loop 823
@@ -435,6 +486,8 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         jenv = j + 1  # label 826
     else:
         jenv = mnew
+
+    # The convection flags LC on the new points (Fortran lines 577–597).
     if jcore > 1:
         for i in range(1, jcore + 1):
             lc[i] = True
@@ -454,7 +507,8 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
 
     # Oscillatory spline of the old run of each variable (on HS, NTAB = M
     # points) at the new points (HSS, NTOT = MNEW): osplin(xval, yval,
-    # xtab, ytab, ntab, ntot). HPO and HTO serve as scratch.
+    # xtab, ytab, ntab, ntot). HPO and HTO serve as scratch (Fortran lines
+    # 602–603).
     ntab = m
     ntot = mnew
 
@@ -466,34 +520,33 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         for j in range(1, mnew + 1):
             arr[j] = oldmod_mod.hto[j]
 
-    # The entropy terms (loops 904-914) (7/91)
+    # The entropy terms (7/91) (Fortran lines 614–645).
     interpolate(entrop_mod.htt0)
     interpolate(entrop_mod.hpp0)
     interpolate(entrop_mod.hll0)
     interpolate(entrop_mod.hrr0)
 
     # The composition, and HCOMPP, the composition at the start of the step
-    # (needed for composition diffusion in rotating models): loop 850
+    # (needed for composition diffusion in rotating models) (Fortran lines
+    # 648–665).
+    # Question (see the page): is rezoning conservative?
     for i in range(1, iend + 1):
         interpolate(hcomp[i])
         interpolate(oldmod_mod.hcompp[i])
 
-    # HCOMPM, the changes in composition from nuclear burning (loop 849)
-    for i in range(1, 8):
-        interpolate(burn_mod.hcompm[ID[i]])
+    # The deuterium burning rates, always moved onto the new mesh (Fortran
+    # lines 679–685).
+    interpolate(deuter_mod.drate0)
 
-    # The deuterium burning rates, if surface D >= 1e-14 (MHP 05/02)
-    if nmlpar_mod.lexcom and hcomp[12, m] >= 1.0e-14:
-        interpolate(deuter_mod.drate0)
-
-    # P, R, L, T and rho at the new points
+    # P, R, L, T and rho at the new points (Fortran lines 688–692).
     osplin(oldmod_mod.hss, oldmod_mod.hpo, hs, hp, ntab, ntot)
     osplin(oldmod_mod.hss, oldmod_mod.hro, hs, hr, ntab, ntot)
     osplin(oldmod_mod.hss, oldmod_mod.hlo, hs, hl, ntab, ntot)
     osplin(oldmod_mod.hss, oldmod_mod.hto, hs, ht, ntab, ntot)
     osplin(oldmod_mod.hss, oldmod_mod.hdo, hs, hd, ntab, ntot)
 
-    # Rotating models: omega, j/m, fp, ft, r0 and eta2
+    # Rotating models: omega, j/m, fp, ft, r0 and eta2 (Fortran lines
+    # 695–702).
     if nmlpar_mod.lrot:
         osplin(oldmod_mod.hss, oldrot_mod.wold, hs, omega, ntab, ntot)
         osplin(oldmod_mod.hss, oldrot_mod.hjx, hs, hjm, ntab, ntot)
@@ -502,7 +555,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
         osplin(oldmod_mod.hss, oldrot_mod.r0x, hs, r0, ntab, ntot)
         osplin(oldmod_mod.hss, oldrot_mod.eta2x, hs, eta2, ntab, ntot)
 
-    # The point distribution, if requested
+    # The point distribution, if requested (Fortran lines 706–729).
     if nmlpar_mod.ldebug and nmlpar_mod.npoint < 9999:
         if model % nmlpar_mod.npoint == 0:
             idebug = iounits_mod.idebug
@@ -512,8 +565,8 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                               + "NEW POINTS\n"
                               + 2 * "   N     S        P       T       R"
                                     "        L       X    Z   O16 ")
-            # Question (see the page): the "old points" columns X and Z are
-            # HKO and HFO, X and Z at the new points.
+            # Suspected bug (see the page): the "old points" columns X, Z and
+            # O16 hold values at the new points.
             for i in range(1, minmin + 1):
                 iounits_mod.write(idebug, _fmt_row(
                     i, hs[i], hp[i], ht[i], hr[i], hl[i], hko[i], hfo[i],
@@ -537,7 +590,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                         oldmod_mod.hlo[i],
                         hcomp[1, i], hcomp[3, i], hcomp[9, i]))
 
-    # Transfer the new points (loop 1000)
+    # Transfer the new points (Fortran lines 733–750).
     for j in range(1, mnew + 1):
         hs[j] = oldmod_mod.hss[j]
         hp[j] = oldmod_mod.hpo[j]
@@ -553,9 +606,11 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             ft[j] = ftx[j]
             eta2[j] = oldrot_mod.eta2x[j]
             r0[j] = oldrot_mod.r0x[j]
-    # The energy generation at the start of the step (MHP 6/00). Note that HS
-    # already holds the new points here (loop 1000), while SESUM and SEG are on
-    # the old ones.
+
+    # The energy generation at the start of the step (MHP 6/00) (Fortran
+    # lines 752–758).
+    # Suspected bug (see the page): HS already holds the new points here
+    # (loop 1000), while SESUM and SEG are on the old ones.
     if nmlpar_mod.lrot or (nmlpar_mod.lexcom and nmlpar_mod.lovste):
         osplin(oldmod_mod.hss, oldphy_mod.esumo, hs, scrtch_mod.sesum, ntab,
                ntot)
@@ -563,10 +618,13 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             ytab[im] = (scrtch_mod.sesum[im] + scrtch_mod.seg[6, im]
                         + scrtch_mod.seg[7, im])
         osplin(oldmod_mod.hss, oldphy_mod.epso, hs, ytab, ntab, ntot)
+
+    # Fortran lines 759–761.
     iounits_mod.write(iounits_mod.ishort, f" POINTS  OLD{m:5d}   NEW{mnew:5d}")
     m = mnew
 
-    # Masses: HS1 = m at each point, HS2 = the mass of each shell
+    # Masses: HS1 = m at each point, HS2 = the mass of each shell (Fortran
+    # lines 763–773).
     clndp = constants_mod.clndp
     ds3 = math.exp(clndp * hs[1])
     ds2 = -ds3
@@ -580,23 +638,31 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
     hs2[m] = math.exp(constants_mod.cln * hstot) - 0.5 * (ds2 + ds3)
 
     if nmlpar_mod.lrot:
-        # First guess of the moment of inertia
+        # First guess of the moment of inertia (Fortran lines 776–778).
         for i in range(1, m + 1):
             hi[i] = constants_mod.cc23 * hs2[i] * math.exp(
                 constants_mod.cln * 2.0 * hr[i])
-        # Overshoot
+
+        # Overshoot (Fortran lines 780–781).
         nrzone, nzone = ovrot(hcomp, hd, hp, hr, hs, ht, lc, m, lcz, mrzone,
                               mxzone, 0, 0)
-        # The moment of inertia again, on the new points, before the rotation (JNT 2025/09/03).
+
+        # The moment of inertia again, on the new points, before the
+        # rotation (JNT 2025/09/03) (Fortran line 786).
         # Question (see the page): is this extra call still needed?
         momi(eta2, hr, hs, hs2, 1, m, omega, r0, hi, qiw)
-        # Omega from the specific angular momentum HJM
+
+        # Omega from the specific angular momentum HJM (Fortran line 791).
         getrot(hd, hjm, hr, hs, hs2, lcz, m, eta2, hi, omega, qiw, r0)
-        # fp, ft, r0 and eta2 from omega
+
+        # fp, ft, r0 and eta2 from omega (Fortran line 793).
         fpft(hd, hr, hs, m, omega, eta2, fp, ft, hg, r0)
-        # The moment of inertia
+
+        # The moment of inertia (Fortran line 796).
         momi(eta2, hr, hs, hs2, 1, m, omega, r0, hi, qiw)
+
         # The new total angular momentum and rotational kinetic energy
+        # (Fortran lines 798–811).
         sumj = 0.0
         sumke = 0.0
         for i in range(1, m + 1):  # loop 1110
@@ -610,7 +676,9 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
                           f"PREVIOUS {skerot:21.13E} NEW {sumke:21.13E}")
         sjtot = sumj
         skerot = sumke
-        # Store the old model structure for use in diffusion (loop 1130)
+
+        # Store the old model structure for use in diffusion (Fortran lines
+        # 813–823).
         for i in range(1, m + 1):
             oldrot_mod.wold[i] = omega[i]
             oldrot_mod.hgo[i] = hg[i]
@@ -623,9 +691,12 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
 
     # The physics at the new points: for rotation, or for light elements
     # with envelope overshoot (to locate the base of the overshoot region)
+    # (Fortran lines 828–834).
     if nmlpar_mod.lrot or (nmlpar_mod.lexcom and nmlpar_mod.lovste):
         physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl)
-        # Store what diffusion needs at the start of the step (loop 1040)
+
+        # Store what diffusion needs at the start of the step (Fortran lines
+        # 839–856).
         for im in range(1, m + 1):
             oldphy_mod.delro[im] = scrtch_mod.sdel[1, im]
             oldphy_mod.delo[im] = scrtch_mod.sdel[2, im]
@@ -637,9 +708,10 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             oldphy_mod.velo[im] = scrtch_mod.svel[im]
             oldphy_mod.visco[im] = temp_mod.visc[im]
             oldphy_mod.thdifo[im] = temp_mod.thdif[im]
-            oldrot2_mod.ddelm[im] = oldphy_mod.delao[im] - oldphy_mod.delo[im]
             dwmax_mod.qwrmx0[im] = dwmax_mod.qwrmax[im]
-        # The time evolution of the angular velocity (MHP 06/02)
+
+        # The time evolution of the angular velocity (MHP 06/02) (Fortran
+        # lines 859–867).
         cln = constants_mod.cln
         for i in range(2, m + 1):
             dr = math.exp(cln * hr[i]) - math.exp(cln * hr[i - 1])
@@ -650,7 +722,7 @@ def hpoint(m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd, hcomp, ps, rs,
             oldrot2_mod.tho[i] = math.exp(cln * fac) * wmid * dw / dr
             oldrot2_mod.qwrst[i] = dw / dr
 
-    # A new surface opacity table, if needed
+    # A new surface opacity table, if needed (Fortran lines 870–875).
     if abs(comp_mod.xnew - hcomp[1, m]) > 1.0e-8:
         comp_mod.xnew = hcomp[1, m]
         comp_mod.znew = hcomp[3, m]

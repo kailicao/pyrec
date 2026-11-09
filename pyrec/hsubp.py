@@ -1,4 +1,4 @@
-"""Python version of hsubp.f (YREC 09c3b9b): the pressure scale height at
+"""Python version of hsubp.f (YREC 7be4133): the pressure scale height at
 the edge of a convective region, for the overshoot."""
 
 import math
@@ -14,21 +14,26 @@ from pyrec.eqstat import eqstat
 fxion = np.zeros(3 + 1)
 
 
-def hsubp(hcomp, hd, hp, hr, hs, ht, jedge, pscahe):
+def hsubp(hcomp: np.ndarray, hd: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, ht: np.ndarray, jedge: int,
+          pscahe: float) -> float:
     """Return the hydrostatic pressure scale height P r**2 / (rho G m) at
     point jedge, with rho from the equation of state at the point's P,
     T, X, Z (setting the Debye-Hueckel composition first, with
     nmlpar_mod.ldh).
 
-    Translates: hsubp.f#HSUBP (09c3b9b)
+    Translates: hsubp.f#HSUBP (7be4133)
 
     Arguments: hcomp, hd, hp, hr, hs, ht (the model: composition, log
     rho, log P, log r, log m, log T), jedge (the point); pscahe is only
     set.
 
     Returns pscahe, in cm.
+
     """
+
     c = constants_mod
+
+    # The equation of state at the point (Fortran lines 51–70).
     lderiv = False
     latmo = True
     ksaha = 0
@@ -51,9 +56,11 @@ def hsubp(hcomp, hd, hp, hr, hs, ht, jedge, pscahe):
         tl, 0.0, pl, 0.0, dl, 0.0, x, z, 0.0, 0.0, 0.0, fxion, 0.0, 0.0,
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
         lderiv, latmo, ksaha)
+
+    # The pressure scale height (Fortran lines 71–75).
+    # Question (see the page): the EOS density, not hd[jedge].
     sl = hs[jedge]
     rl = hr[jedge]
-    # Question (see the page): the ideal-gas estimate pscap is not used.
-    pscap = rmu * math.exp(c.cln * (tl - c.cgl - sl + rl + rl))
+    pscap = rmu * math.exp(c.cln * (tl - c.cgl - sl + rl + rl))  # noqa: F841  (unused in the Fortran too)
     pscahe = math.exp(c.cln * (pl + 2.0 * rl - dl - c.cgl - sl))
     return pscahe

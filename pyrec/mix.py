@@ -1,11 +1,10 @@
-"""Python version of mix.f (YREC 09c3b9b): the composition over one time
+"""Python version of mix.f (YREC 7be4133): the composition over one time
 step (burning, mixing, semiconvection, settling, deuterium)."""
 
 import math
 
 import numpy as np
 
-from pyrec import burn_mod
 from pyrec import constants_mod
 from pyrec import deuter_mod
 from pyrec import dimensions_mod
@@ -46,37 +45,45 @@ mrzone = np.zeros((14, 3), dtype=int)
 lcc = np.zeros(JSON + 1, dtype=bool)
 
 
-def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
-        ht, itlvl, lc, m, ddage, jcore, jenv, mxzone, mxzon0, teffl, cmixl):
+def mix(delts: float, hcomp: np.ndarray, hd: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray,
+        hs1: np.ndarray, hs2: np.ndarray, hstot: float, ht: np.ndarray, itlvl: int, lc: np.ndarray, m: int,
+        ddage: float, jcore: int, jenv: int, mxzone: np.ndarray, mxzon0: np.ndarray, teffl: float,
+        cmixl: float) -> tuple[float, int, int]:
     """Update the composition hcomp over the step delts (s): find the
     convection zones, compute the burning rates, burn implicitly (KEMCOM)
     or, at itlvl = 1, explicitly (EQBURN), treat semiconvection, mix the
     convection zones, settle (MICRODIFF or GRSETT), clean up the abundances
     and burn deuterium.
 
-    Translates: mix.f#MIX (09c3b9b)
+    Translates: mix.f#MIX (7be4133)
 
     Arguments: the model (hd, hl, hp, hr, hs = log m, hs1 = m, hs2 = shell
     masses, log total mass hstot, ht, convection flags lc, m shells), the
     composition hcomp[k, j], the iteration level itlvl, teffl and the
     mixing length cmixl. Arrays have index 0 unused. Sets in place: hcomp,
-    the zone lists mxzone and mxzon0, burn_mod.hcompm (the rates) and
+    the zone lists mxzone and mxzon0, and
     deuter_mod.drate; may set nmlpar_mod.ldify to False.
 
     Returns (ddage, jcore, jenv): the step in years and the edges of the
     central and surface convection zones.
+
     """
+
     c = constants_mod
     nml = nmlpar_mod
     drate = deuter_mod.drate
-    # NSPEC: the number of species tracked.
+
+    # NSPEC: the number of species tracked (Fortran lines 115–120).
     if nml.lexcom:
         nspec = 15
     else:
         nspec = 11
-    # DDAGE: the step in years.
+
+    # DDAGE: the step in years (Fortran lines 121–122).
     ddage = delts / c.csecyr
-    # Deep mixing: DPENV mixes the star to the mass fraction DPENV.
+
+    # Deep mixing: DPENV mixes the star to the mass fraction DPENV (Fortran
+    # lines 124–168).
     # Question (see the page): from the centre, though the comment says from
     # the surface.
     if nml.dpenv < 1.0 and itlvl > 1:
@@ -93,12 +100,14 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
     else:
         for j in range(1, m + 1):
             lcc[j] = lc[j]
-    # Convection zones with and without overshoot.
+
+    # Convection zones with and without overshoot (Fortran lines 170–171).
     jcore, jenv, nrzone, nzone, nzone0 = convec(
         hcomp, hd, hp, hr, hs, ht, lcc, m, mrzone, mxzone, mxzon0,
         jcore, jenv, 0, 0, 0)
 
-    # Burning rates (HR1 - HR13, HF1, HF2), down to the cutoff TCUT(1).
+    # Burning rates (HR1 - HR13, HF1, HF2), down to the cutoff TCUT(1)
+    # (Fortran lines 173–237).
     if nml.lmdot and nml.dmdt0 > 0.0:
         xh2test = max(hcomp[12, m], nml.compacc[12])
     else:
@@ -133,7 +142,8 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
         drate[ii] = 0.0
 
     # Implicit burning: shell by shell in radiative zones (until the
-    # cutoff), zone by zone in convection zones (which KEMCOM homogenizes).
+    # cutoff), zone by zone in convection zones (which KEMCOM homogenizes)
+    # (Fortran lines 243–273).
     done = False
     for k in range(1, nrzone + 1):  # DO 40
         for j in range(mrzone[k, 1], mrzone[k, 2] + 1):
@@ -151,16 +161,11 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
         iend = mxzone[k, 2]
         kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6,
                hr7, hr8, hr10, hr11, hr12, hf1, hs2, hcomp, ddage)
-    hcompm = burn_mod.hcompm
-    for i in range(1, m + 1):
-        for k, arr in enumerate((hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
-                                 hr9, hr10, hr11, hr12, hr13, hf1, hf2),
-                                start=1):
-            hcompm[k, i] = arr[i]
 
     # ITLVL = 1: explicit H and He burning with equilibrium He3 and CN,
-    # overwriting X (H burning) and Z, C12, O16 (He burning).
-    # Question (see the page): DT in Gyr.
+    # overwriting X (H burning) and Z, C12, O16 (He burning); DT in Gyr,
+    # as the rates are per Gyr (Fortran lines 279–351).
+    # Question (see the page): the equilibrium predictor.
     if itlvl == 1:
         dt = ddage * 1.0e-9
         done = False
@@ -202,13 +207,15 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
                     hcomp[5, i] = xc12
                     hcomp[9, i] = xo16
 
-    # Semiconvection, if applicable.
+    # Semiconvection, if applicable (Fortran lines 353–359).
     if nml.lsemic:
         if itlvl > 1:
             nzone = sconvec(delts, hcomp, hd, hl, hp, hr, hs, ht, m, mxzone,
                             nzone, teffl, cmixl)
+
+    # Mix each convection zone (shells I1..I2) to its mass-weighted mean
+    # (Fortran lines 360–398).
     if nml.lsemic or itlvl == 1:
-        # Mix each convection zone (shells I1..I2) to its mass-weighted mean.
         for j in range(1, nzone + 1):  # DO 100
             i1 = mxzone[j, 1]
             i2 = mxzone[j, 2]
@@ -226,30 +233,37 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
             for jj in range(i1, i2 + 1):
                 for i in range(1, nspec + 1):
                     hcomp[i, jj] = xsum[i]
-    # The mixed regions.
+
+    # The mixed regions (Fortran lines 399–403).
     if nzone >= 1:
         zones = "".join(f"({mxzone[i, 1]:5d},{mxzone[i, 2]:5d}) "
                         for i in range(1, nzone + 1))
         iounits_mod.write(iounits_mod.ishort,
                           " ZONES MIXED IN ORDER--" + zones)  # format 110
 
-    # Microscopic diffusion (Bahcall and Loeb) (MHP 12/89).
+    # Microscopic diffusion (Bahcall and Loeb) (MHP 12/89) (Fortran lines
+    # 405–465).
     if nml.ldify:
         _settle(delts, hcomp, hd, hp, hr, hs, hs1, hstot, ht, lc, m, jenv)
 
-    # Clean up small anomalies (negative abundances ...).
+    # Clean up small anomalies (negative abundances ...) (Fortran lines
+    # 466–475).
     for i in range(1, m + 1):  # DO 180
         for j in range(1, nspec + 1):
             hcomp[j, i] = max(hcomp[j, i], 0.0)
             hcomp[j, i] = min(hcomp[j, i], 1.0)
         hcomp[3, i] = min(hcomp[3, i], 1.0 - hcomp[1, i] - hcomp[4, i])
         hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
-    # Reset JENV, JCORE for deep mixing, with the true flags (MHP 1/95).
+
+    # Reset JENV, JCORE for deep mixing, with the true flags (MHP 1/95)
+    # (Fortran lines 476–480).
     if nml.dpenv < 1.0 and itlvl > 1:
         jcore, jenv, nrzone, nzone, nzone0 = convec(
             hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
             jcore, jenv, nrzone, nzone, nzone0)
-    # Deuterium burning (MHP 5/02).
+
+    # Deuterium burning (MHP 5/02) (Fortran lines 481–505).
+    # Question (see the page): the units of DRATE.
     if nml.lexcom:
         dt = ddage * 1.0e-9
         done = False
@@ -267,25 +281,33 @@ def mix(delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot,
             ibegin = mxzone[k, 1]
             iend = mxzone[k, 2]
             dburn(ibegin, iend, m, hs2, hcomp, dt)
+
     return ddage, jcore, jenv
 
 
-def _settle(delts, hcomp, hd, hp, hr, hs, hs1, hstot, ht, lc, m, jenv):
+def _settle(delts: float, hcomp: np.ndarray, hd: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray,
+            hs1: np.ndarray, hstot: float, ht: np.ndarray, lc: np.ndarray, m: int, jenv: int) -> None:
     # The IF(LDIFY) block, labels 130-170: gravitational settling in
     # NSTEP substeps limited by the helium settling time at the outer
     # boundary. Reads the module-level LCC.
     c = constants_mod
     nml = nmlpar_mod
+
+    # Settling off below XMIN (Fortran lines 413–416).
     # Question (see the page): settling stops for good below XMIN.
     if hcomp[1, 1] < nml.xmin:
         nml.ldify = False
         return  # GOTO 170
+
+    # Fortran lines 417–420.
     stot = math.exp(c.cln * hstot)
     for i in range(1, m + 1):  # DO 130: d ln P/dr = -G m rho / (r^2 P)
         hqpr[i] = -math.exp(c.cln * (hd[i] + c.cgl + hs[i] - 2.0 * hr[i]
                                      - hp[i]))
+
     # The outer boundary: the surface convection zone, or the first point
-    # (inward from JENV) where Y exceeds YMIN.
+    # (inward from JENV) where Y exceeds YMIN (Fortran lines 421–438).
+    # Question (see the page): YMIN as the documentation describes it.
     if not lc[m]:
         # A warning only (DBG 2/92).
         iounits_mod.write(iounits_mod.ishort,
@@ -296,21 +318,22 @@ def _settle(delts, hcomp, hd, hp, hr, hs, hs1, hstot, ht, lc, m, jenv):
             break  # GOTO 150
     else:
         return  # Y < YMIN for the whole star
+
     # FM: the mass fraction above the outer point; TSCALE: the helium
-    # settling time there (Michaud et al. 1984).
+    # settling time there (Michaud et al. 1984) (Fortran lines 440–454).
+    # Question (see the page): the substep bound.
     fm = (stot - hs1[j]) / stot
     tscale = 4.348e21 * c.csecyr * fm / math.exp(c.cln * 1.5 * ht[j])
     dtmax = nml.dt_gs * tscale
-    # Question (see the page): MOD's arguments swapped; NSTEP can be 0.
     nstep = int(delts / dtmax)
-    if math.fmod(dtmax, delts) != 0.0:
+    if math.fmod(delts, dtmax) != 0.0 or nstep == 0:
         nstep = nstep + 1
     dt = delts / float(nstep)
+
+    # The substeps (Fortran lines 455–463).
     # Question (see the page): LCC, not the mixed-zone flags.
     for ns in range(1, nstep + 1):  # DO 160
         if nml.lnewdif:
-            dt, stot = microdiff(
-                dt, hcomp, hqpr, hr, hd, hs1, ht, lcc, m, stot)
+            microdiff(dt, hcomp, hqpr, hr, hd, hs1, ht, lcc, m, stot)
         else:
-            dt, stot = grsett(
-                dt, hcomp, hqpr, hr, hd, hs1, ht, lcc, m, stot)
+            grsett(dt, hcomp, hqpr, hr, hd, hs1, ht, lcc, m, stot)

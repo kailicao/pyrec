@@ -1,4 +1,4 @@
-"""Python version of wrtmod.f (YREC 09c3b9b): extra profiles of one model
+"""Python version of wrtmod.f (YREC 7be4133): extra profiles of one model
 (the sound-speed table, an envelope integrated again for printing, and the
 model for pulsation codes)."""
 
@@ -13,7 +13,6 @@ from pyrec import dimensions_mod
 from pyrec import iounits_mod
 from pyrec import label_mod
 from pyrec import nmlpar_mod
-from pyrec import pualpha_mod
 from pyrec import pulse1_mod
 from pyrec import scrtch_mod
 from pyrec import sound_mod
@@ -22,21 +21,26 @@ from pyrec.envint import envint
 JSON = dimensions_mod.json
 
 # Locals kept between calls (SAVE).
-# Question (see the page): IDM and ID are never assigned, so the pulsation
-# model's shell list is undefined in the Fortran; here it starts empty.
+# Suspected bug (see the page): IDM and ID are never assigned, so the
+# pulsation model's shell list is undefined in the Fortran; here it starts
+# empty.
 id_ = np.zeros(JSON + 1, dtype=int)
 _saved = {'idm': 0,
-          # Question (see the page): LPRT is set only if LSTORE; otherwise
-          # ENVINT gets its saved (or, on the first call, undefined) value.
+          # Suspected bug (see the page): LPRT is set only if LSTORE;
+          # otherwise ENVINT gets its saved (or, on the first call,
+          # undefined) value.
           'lprt': False}
 
 
-def _l1(flag):
+def _l1(flag: bool) -> str:
+    """Fortran's L1."""
+
     return "T" if flag else "F"
 
 
-def _e0(x, w, d):
+def _e0(x: float, w: int, d: int) -> str:
     """Fortran's 0PEw.d: a mantissa in [0.1, 1), e.g. 0.12345678E+01."""
+
     if x == 0.0:
         return f"{'0.' + '0' * d + 'E+00':>{w}}"
     e = math.floor(math.log10(abs(x))) + 1
@@ -49,9 +53,10 @@ def _e0(x, w, d):
     return f"{sign + '0' + s + f'E{e:+03d}':>{w}}"
 
 
-def _records(values, per_line, w, d):
+def _records(values: list, per_line: tuple, w: int, d: int) -> str:
     """Values in 0PEw.d, per_line[k] of them on record k (FORMATs 5052,
     6052, 6053); the last record stops when the values run out."""
+
     lines = []
     k = 0
     for count in per_line:
@@ -63,21 +68,24 @@ def _records(values, per_line, w, d):
     return "\n".join(lines)
 
 
-def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
-           ft, hs, dage, cmixl, xmsol):
+def wrtmod(m: int, jenv: int, hcomp: np.ndarray, hs1: np.ndarray, hd: np.ndarray, hl: np.ndarray, hp: np.ndarray,
+           hr: np.ndarray, ht: np.ndarray, model: int, bl: float, teffl: float, fp: np.ndarray, ft: np.ndarray,
+           hs: np.ndarray, dage: float, cmixl: float, xmsol: float) -> None:
     """Write extra profiles of one model: with LSOUND, a sound-speed and
     structure table (units IMODPT and ISOUND); with LSTATM, LSTENV or
     LPULSE, an envelope integrated again by ENVINT for printing; with
     LPULSE, a model for pulsation codes on IOPMOD (version IPVER).
 
-    Translates: wrtmod.f#WRTMOD (09c3b9b)
+    Translates: wrtmod.f#WRTMOD (7be4133)
 
     Arguments: the number of shells m, the envelope's base jenv, the model
     (hcomp, hs1, hd, hl, hp, hr, ht, fp, ft, hs, all logarithmic as in the
     model arrays), the model number, log L bl, log Teff teffl, the age
     dage, the mixing length cmixl, and xmsol, the star's mass in solar
     masses as main.f snapshots it. Nothing is returned.
+
     """
+
     n = nmlpar_mod
     c = constants_mod
     cln = c.cln
@@ -87,15 +95,21 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
     pqdt = pulse1_mod.pqdt
     sdel = scrtch_mod.sdel
 
-    # Question (see the page): debugging prints at every call.
+    # Suspected bug (see the page): debugging prints at every call
+    # (Fortran line 127).
     print(' wrtmod LSOUND 1: ', _l1(sound_mod.lsound))
 
+    # The sound-speed and structure table (Fortran lines 129–175).
     if sound_mod.lsound:
         print(' wrtmod LSOUND 2: ', _l1(sound_mod.lsound))
-        # The sound-speed profile, on ISOUND (opened in PARMIN) (CFD 10/09).
-        # Question (see the page): the header is written at every call.
+
+        # The sound-speed profile's header, on ISOUND (opened in PARMIN)
+        # (CFD 10/09) (Fortran line 138). Question (see the page): the
+        # header is written at every call.
         io.write(io.isound, " Shell#     R/Rsun       M/Msun       Cs"
                             "               Rho")  # FORMAT 9124
+
+        # One line per shell on IMODPT and ISOUND (Fortran lines 142–156).
         for i in range(1, m + 1):
             fr = math.exp(cln * hr[i]) / c.crsun
             fm = math.exp(cln * hs[i]) / c.cmsun
@@ -113,7 +127,7 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
                      f" {i:6d} {fr:12.8f}{fm:12.8f}{sv:16.8E}{hd[i]:16.8E}"
                      f"{ht[i]:16.8E}")
 
-            # Derivatives of dP/dr, drho/dr.
+            # Derivatives of dP/dr, drho/dr (Fortran lines 158–173).
             if i < m:
                 rmid = 0.5 * (math.exp(cln * hr[i]) + math.exp(cln * hr[i + 1]))
                 dr = math.exp(cln * hr[i + 1]) - math.exp(cln * hr[i])
@@ -125,7 +139,7 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
                 qdr1 = math.exp(cln * (hd[i] - hp[i])) * pqdp[i] * qpr1
                 qpr2 = math.exp(cln * (c.cgl + hs[i + 1] + hd[i + 1]
                                        - 2.0 * hr[i + 1]))
-                # Question (see the page): QPR1 where QPR2 is expected.
+                # Suspected bug (see the page): QPR1 where QPR2 is expected.
                 qdr2 = math.exp(cln * (hd[i + 1] - hp[i + 1])) * pqdp[i + 1] \
                     * qpr1
                 qqpr = (qpr1 - qpr2) / divp
@@ -135,8 +149,10 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
                          f"{qqpr:16.8E}{qqdr:16.8E}")
 
     # Integrate an envelope from the surface to the converged model,
-    # printing the results (ENVINT prints them).
+    # printing the results (ENVINT prints them) (Fortran lines 181–243).
     if n.lstatm or n.lstenv or n.lpulse:
+
+        # Flags and counters (Fortran lines 185–189).
         lsbc0 = False
         if n.lstore:
             _saved['lprt'] = True
@@ -144,8 +160,9 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
         katm = 0
         kenv = 0
         ksaha = 0
+
         # Save the integration step parameters and enforce the spacing
-        # requested for printout.
+        # requested for printout (Fortran lines 192–203).
         abeg0 = n.atmbeg
         amin0 = n.atmmin
         amax0 = n.atmmax
@@ -158,6 +175,8 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
         n.envbeg = n.envstp
         n.envmin = n.envstp
         n.envmax = n.envstp
+
+        # The surface quantities for ENVINT (Fortran lines 204–215).
         b = math.exp(cln * bl)
         rl = 0.5 * (bl + c.clsunl - 4.0 * teffl - c.c4pil - c.csigl)
         gl = c.cgl + comp_mod.stotal - rl - rl
@@ -169,6 +188,8 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
         hstot = comp_mod.stotal
         plim = hp[m]
         lpulpt = n.lpulse
+
+        # The Debye-Hueckel composition (Fortran lines 216–223).
         if n.ldh:
             debhu_mod.xxdh = hcomp[1, m]
             debhu_mod.yydh = hcomp[2, m] + hcomp[4, m]
@@ -177,12 +198,16 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
             debhu_mod.zdh[2] = hcomp[7, m] + hcomp[8, m]
             debhu_mod.zdh[3] = hcomp[9, m] + hcomp[10, m] + hcomp[11, m]
         idum = 0
-        # For a spotted star, the ambient temperature (G. Somers 10/14).
+
+        # For a spotted star, the ambient temperature (G. Somers 10/14)
+        # (Fortran lines 225–232).
         if jenv == m and n.spotf != 0.0 and n.spotx != 1.0:
             ateffl = teffl - 0.25 * math.log10(
                 n.spotf * n.spotx**4.0 + 1.0 - n.spotf)
         else:
             ateffl = teffl
+
+        # The envelope, integrated and printed (Fortran lines 233–235).
         dum1 = np.zeros(5)
         dum2 = np.zeros(4)
         dum3 = np.zeros(4)
@@ -191,6 +216,8 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
             b, fpl, ftl, gl, hstot, ixx, lprt, lsbc0, plim, rl, ateffl, x,
             z, dum1, idum, katm, kenv, ksaha, dum2, dum3, dum4, lpulpt,
             cmixl)
+
+        # The integration steps restored (Fortran lines 237–242).
         n.atmbeg = abeg0
         n.atmmin = amin0
         n.atmmax = amax0
@@ -198,9 +225,11 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
         n.envmin = emin0
         n.envmax = emax0
 
+    # Fortran line 249.
     fsi = math.exp(-cln * comp_mod.stotal)
     idm = _saved['idm']
-    # The pulsation model's header.
+
+    # The pulsation model's header (Fortran lines 251–264).
     if n.lpulse:
         rsurfl = 0.5 * (bl - c.c4pil - c.csigl - 4.0 * teffl + c.clsunl)
         tempr = rsurfl - c.crsunl
@@ -215,10 +244,10 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
                  f" ZAMS (X,Z)={label_mod.xenv0:18.10f}"
                  f"{label_mod.zenv0:18.10f}")
 
-    # The pulsation model, shell by shell, on the list ID(1..IDM).
+    # The pulsation model, shell by shell, on the list ID(1..IDM) (Fortran
+    # lines 265–305).
     p = pulse1_mod
     s = scrtch_mod
-    v = pualpha_mod
     for j in range(1, idm + 1):  # loop 220
         i = id_[j]
         fs = fsi * hs1[i]
@@ -243,12 +272,13 @@ def wrtmod(m, jenv, hcomp, hs1, hd, hl, hp, hr, ht, model, bl, teffl, fp,
                     hcomp[3, i]]
             io.write(io.iopmod, _records(vals, (5, 5, 5, 5), 23, 16))
         elif n.ipver == 3:
-            # With the mixing-length variables (DBG 7/95).
-            vals = [hr[i], fs, hl[i], ht[i], hd[i], v.valfmlt[i],
+            # The mixing-length columns (DBG 7/95), always zero, written
+            # as literal zeros to keep the layout.
+            vals = [hr[i], fs, hl[i], ht[i], hd[i], 0.0,
                     hp[i], s.sesum[i], s.so[i], p.pqdp[i], p.pqed[i],
-                    v.vphmlt[i],
+                    0.0,
                     p.pqet[i], p.pqod[i], p.pqot[i], s.sdel[2, i],
-                    s.sdel[3, i], v.vcmxmlt[i],
+                    s.sdel[3, i], 0.0,
                     p.pqcp[i], p.prmu[i], p.pqdt[i], hcomp[1, i],
                     hcomp[3, i]]
             io.write(io.iopmod, _records(vals, (6, 6, 6, 5), 23, 16))

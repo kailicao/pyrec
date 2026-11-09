@@ -1,4 +1,4 @@
-"""Python version of alfilein.f (YREC 09c3b9b): reads a table of Allard
+"""Python version of alfilein.f (YREC 7be4133): reads a table of Allard
 model atmospheres (the 1999 NextGen format or the newer "Allard" format)
 into ALATM01_MOD, then has ALTABINIT check it."""
 
@@ -16,7 +16,6 @@ NGA = 25
 
 # SAVE: locals kept between calls.
 teffs = np.zeros(NTA + 1)
-latmtptau100 = False  # Question (see the page): never set in the Fortran.
 
 
 class _ReadError(Exception):
@@ -28,6 +27,7 @@ def _fields(line, specs):
     A blank field reads as 0; a field without a decimal point or exponent
     gets the format's implied decimals, as in Fortran; D exponents read as
     E. A field that cannot be read raises _ReadError."""
+
     out, pos = [], 0
     for width, decimals in specs:
         text = line[pos:pos + width].strip().upper().replace('D', 'E')
@@ -47,11 +47,14 @@ def _fields(line, specs):
 
 def _read(unit):
     """One record; None at end of file (END=)."""
+
     return iounits_mod.read(unit)
 
 
 def _error_exit():
     """label 9999: the error exit."""
+
+    # Fortran lines 354–368.
     msg = " **************** PROGRAM ALFilein TERMINATED @ 9999 "
     print("")
     print("")
@@ -64,19 +67,23 @@ def _error_exit():
     w(iounits_mod.ishort, msg + "*************")
     w(iounits_mod.ishort, "")
     w(iounits_mod.ishort, "")
-    raise SystemExit(9999)
+    raise SystemExit(3)    # STOP 3, the input-error code
 
 
 def _differs(feh, alpha):
     """The passes' test for a record to skip: [Fe/H] off by more than 1e-5,
     or alpha off at all."""
+
     n = nmlpar_mod
-    # Question (see the page): two tolerances for [Fe/H] and alpha.
+    # Fortran lines 209–210 (and 226–227, 296–297). Suspected bug (see the
+    # page): the second pass tests [Fe/H] again with 1e-6.
     return abs(feh - n.alatm_feh) > 1e-5 or abs(alpha - n.alatm_alpha) > 0.0
 
 
 def _read_old(ioatma):
     """The old 1999 NextGen format (label 100): fixed sizes, log P only."""
+
+    # Fortran lines 146–180.
     a = alatm01_mod
     ishort = iounits_mod.ishort
     a.loldnextgen = True
@@ -84,7 +91,7 @@ def _read_old(ioatma):
                               " (Old NEXTGEN)")
     # Ensure that PL, TL at tau = 100 are not requested: they are not in
     # the old NextGen files.
-    if latmtptau100:  # Question (see the page): the misspelled flag.
+    if nmlpar_mod.laltptau100:
         text = (" ALFileIN: Invalid old Allard input file for requested"
                 " PT,TL at Tau=100")
         print("")
@@ -98,7 +105,7 @@ def _read_old(ioatma):
     a.gls[1:a.ngl + 1] = _fields(_read(ioatma), [(7, 2)] * 5)
     _read(ioatma)
     # FORMAT 907, (10(1P5E16.8,/),1P4E16.8,/): the 54 temperatures, as
-    # given (Question (see the page): log Teff or Teff?).
+    # given (already log Teff in the files).
     values = []
     for _ in range(10):
         values += _fields(_read(ioatma), [(16, 8)] * 5)
@@ -116,9 +123,10 @@ def _first_pass(ioatma):
     Teff, log g, [Fe/H] and alpha of the records with the requested [Fe/H]
     and alpha, up to the end of the file. Raises _ReadError on a bad
     record."""
+
     a = alatm01_mod
     spec915 = [(6, 0), (6, 2), (6, 2), (6, 2)]  # FORMAT 915, (F6.0,3F6.2)
-    # label 299: up to the first acceptable record.
+    # label 299: up to the first acceptable record (Fortran lines 204–220).
     while True:
         rec = _read(ioatma)
         if rec is None:
@@ -134,7 +142,8 @@ def _first_pass(ioatma):
     a.gls[a.ngl] = gl
     a.fehs[a.nfeh] = feh
     a.alphas[a.nalpha] = alpha
-    # label 300: the rest of the file.
+
+    # label 300: the rest of the file (Fortran lines 222–264).
     while True:
         rec = _read(ioatma)
         if rec is None:
@@ -150,11 +159,12 @@ def _first_pass(ioatma):
         if not any(abs(gl - a.gls[i]) < 1e-6 for i in range(1, a.ngl + 1)):
             a.ngl += 1
             a.gls[a.ngl] = gl
-        # label 312. Question (see the page): the loop runs to nGL, not nFeH.
+        # label 312. Suspected bug (see the page): the loop runs to nGL, not
+        # nFeH.
         if not any(abs(feh - a.fehs[i]) < 1e-6 for i in range(1, a.ngl + 1)):
             a.nfeh += 1
             a.fehs[a.nfeh] = feh
-        # label 314. Question (see the page): to nGL, not nALPHA.
+        # label 314. Suspected bug (see the page): to nGL, not nALPHA.
         if not any(abs(alpha - a.alphas[i]) < 1e-6
                    for i in range(1, a.ngl + 1)):
             a.nalpha += 1
@@ -166,12 +176,16 @@ def _second_pass(ioatma, nhdr):
     """Pass 2 of the new format (labels 410 to 440): place each accepted
     record's log P at Teff, log P and log T at tau = 100 at its indices.
     Raises _ReadError on a bad record."""
+
     a = alatm01_mod
     n = nmlpar_mod
+
+    # Rewind and skip the header (Fortran lines 283–289).
     iounits_mod.rewind(ioatma)
     for _ in range(nhdr):
         _read(ioatma)
-    # FORMAT 920, (F6.0,3F6.2,1P4D16.8).
+
+    # FORMAT 920, (F6.0,3F6.2,1P4D16.8) (Fortran lines 291–340).
     spec920 = [(6, 0), (6, 2), (6, 2), (6, 2), (16, 8), (16, 8), (16, 8)]
     while True:  # label 410
         rec = _read(ioatma)
@@ -197,7 +211,8 @@ def _second_pass(ioatma, nhdr):
             print(" ALFilein: Impossible failure #2")
             print(f" GL of  {gl} not in GL table.")
             _error_exit()
-        # label 430: wrong [Fe/H] or alpha, bypass the record.
+        # label 430: wrong [Fe/H] or alpha, bypass the record. Suspected bug
+        # (see the page): 1e-6 here, 1e-5 in the test above.
         if abs(feh - n.alatm_feh) >= 1e-6:
             continue
         if abs(alpha - n.alatm_alpha) >= 1e-6:
@@ -210,21 +225,23 @@ def _second_pass(ioatma, nhdr):
         # label 440
 
 
-def alfilein(fallard):
+def alfilein(fallard: str) -> None:
     """Read the Allard atmosphere file FALLARD (old or new format) on unit
     IOATMA, keep the records with the requested [Fe/H] and alpha
     (NMLPAR_MOD), fill ALATM01_MOD and call ALTABINIT. Entries absent from
     the file keep -999. Stops the run on any error.
 
-    Translates: alfilein.f#ALFILEIN (09c3b9b)
+    Translates: alfilein.f#ALFILEIN (7be4133)
 
     Argument: the file name fallard. Nothing is returned.
+
     """
+
     a = alatm01_mod
     ioatma = iounits_mod.ioatma
     ishort = iounits_mod.ishort
 
-    # Every entry starts invalid (-999).
+    # Every entry starts invalid (-999) (Fortran lines 110–119).
     for i in range(1, NTA + 1):
         a.teffls[i] = -999.0
         for j in range(1, NGA + 1):
@@ -233,6 +250,7 @@ def alfilein(fallard):
             a.p100ls[i, j] = -999.0
             a.t100ls[i, j] = -999.0
 
+    # Open the file (Fortran lines 120–129).
     try:
         iounits_mod.open(ioatma, fallard, status='OLD')
     except OSError:
@@ -243,13 +261,13 @@ def alfilein(fallard):
         _error_exit()
 
     # label 900: the first record decides the format (FORMAT 901, (a),
-    # into a CHARACTER*35).
+    # into a CHARACTER*35) (Fortran lines 131–143).
     inrec = (_read(ioatma) or '')[:35].ljust(35)
     iounits_mod.rewind(ioatma)
     if inrec[3:7] == '3.50':
         _read_old(ioatma)  # old NextGen file type
     elif inrec[3:9] == 'ALLARD':
-        # label 200: the new Allard file type.
+        # label 200: the new Allard file type (Fortran lines 184–200).
         a.loldnextgen = False
         # FORMAT 911, (i2,X,a): the number of header records to skip.
         rec = _read(ioatma)
@@ -264,6 +282,8 @@ def alfilein(fallard):
         a.nteff = 0
         a.nfeh = 0
         a.nalpha = 0
+
+        # Pass 1 (Fortran lines 202–271).
         try:
             _first_pass(ioatma)
         except _ReadError:
@@ -272,11 +292,14 @@ def alfilein(fallard):
             print(" AtTabInit Pass 1 File Error ")
             print("")
             _error_exit()
-        # label 400: sort the values found.
+
+        # label 400: sort the values found (Fortran lines 273–281).
         sort_shell(a.nteff, teffs)
         sort_shell(a.ngl, a.gls)
         sort_shell(a.nfeh, a.fehs)
         sort_shell(a.nalpha, a.alphas)
+
+        # Pass 2 (Fortran lines 283–346).
         try:
             _second_pass(ioatma, nhdr)
         except _ReadError:
@@ -291,19 +314,22 @@ def alfilein(fallard):
             show(f" First record was '{inrec}'")
         _error_exit()
 
-    # label 500
+    # label 500 (Fortran lines 348–352).
     altabinit()
 
 
-def sort_shell(nn, a):
+def sort_shell(nn: int, a: np.ndarray) -> None:
     """Shell's sort (Numerical Recipes), ascending, in place, on a[1..nn],
     with the increments 1, 4, 13, 40, ...
 
-    Translates: alfilein.f#SORT_SHELL (09c3b9b)
+    Translates: alfilein.f#SORT_SHELL (7be4133)
 
     Arguments: the count nn and the array a (changed in place). Nothing is
     returned.
+
     """
+
+    # Fortran lines 388–407.
     if nn == 1:
         return
     n = nn

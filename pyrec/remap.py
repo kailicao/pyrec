@@ -1,4 +1,4 @@
-"""Python version of remap.f (YREC a8a5950): translates the newer,
+"""Python version of remap.f (YREC 7be4133): translates the newer,
 "more intuitively named" namelist parameters into the arrays the rest of
 the code uses."""
 
@@ -6,7 +6,8 @@ from pyrec import cross_mod
 from pyrec import nmlbypass_mod
 from pyrec import nmlpar_mod
 
-# DATA: the reference S-factors that RATES and ENGEB assume (keV b).
+# DATA: the reference S-factors that RATES and ENGEB assume (keV b)
+# (Fortran lines 69–77).
 S0_1_1_REF = 4.07e-22
 S0_3_3_REF = 5.15e3
 S0_3_4_REF = 5.4e-1
@@ -20,9 +21,10 @@ S0_1_BE7P_REF = 0.0243
 S0_HEP_REF = 8.0e-20
 S0_1_15_C12ALP_REF = 6.75e4
 S0_1_15_O16_REF = 6.4e1
+
 # DATA: Adelberger et al. 1998 (Solar Fusion I) values (keV b), each the
 # normalization of its own reaction's derivative factors below; the others
-# are commented out in the Fortran (KC 2025-05-31).
+# are commented out in the Fortran (KC 2025-05-31) (Fortran lines 78–96).
 S0_1_1_A98 = 4.00e-22
 S0_3_3_A98 = 5.4e3
 S0_3_4_A98 = 5.3e-1
@@ -31,7 +33,8 @@ S0_1_13_A98 = 7.6
 S0_1_14_A98 = 3.5
 S0_1_16_A98 = 9.4
 S0_1_BE7P_A98 = 0.019
-# First derivatives (b).
+
+# First derivatives (b) (Fortran lines 97–101).
 QS0E_1_1_A98 = 4.48e-24
 QS0E_3_3_A98 = -4.1
 QS0E_3_4_A98 = -3.0e-4
@@ -40,7 +43,8 @@ QS0E_1_13_A98 = -7.8e-3
 QS0E_1_14_A98 = -1.28e-2
 QS0E_1_16_A98 = -2.4e-2
 QS0E_1_BE7P_A98 = -1.33e-5
-# Second derivatives.
+
+# Second derivatives (Fortran lines 103–106).
 QQS0EE_1_12_A98 = 8.3e-5
 QQS0EE_1_13_A98 = 7.3e-4
 QQS0EE_1_16_A98 = 5.7e-5
@@ -49,31 +53,38 @@ QQS0EE_1_BE7P_A98 = 7.22e-8
 
 def _ratio(s0, s0p, ref_deriv, ref_s0):
     """(S'/S0) / (S'/S0)_A98, or 0 when S0 <= 0 (MHP 4/25)."""
+
     if s0 > 0.0:
         return (s0p / s0) / (ref_deriv / ref_s0)
     return 0.0
 
 
-def remap():
+def remap() -> None:
     """With LNEWNUC, set SSTANDARD, the N15+p branching factors FC12, FO16
     and the derivative factors QS0E, QQS0EE from the individual
     cross sections; with LNEWVARS, copy the new tolerance names into
     HPTTOL, ATIME, LPTIME, DTWIND and DTDIF.
 
-    Translates: remap.f#REMAP (a8a5950)
+    Translates: remap.f#REMAP (7be4133)
 
     No arguments; nothing is returned. Reads nmlbypass_mod, sets
     cross_mod and nmlpar_mod.
+
     """
+
     nb = nmlbypass_mod
     nml = nmlpar_mod
     cr = cross_mod
 
+    # Defaults: no change to the rates (Fortran lines 117–124).
     for i in range(1, 9):
         cr.qs0e[i] = 1.0
         cr.qqs0ee[i] = 1.0
     cr.fc12 = 1.0
     cr.fo16 = 1.0
+
+    # With LNEWNUC, SSTANDARD from the individual S-factors (Fortran lines
+    # 128–156).
     if nb.lnewnuc:
         for i in range(1, 18):
             nml.sstandard[i] = 1.0
@@ -89,10 +100,13 @@ def remap():
         nml.sstandard[15] = nb.s0_1_be7e / S0_1_BE7E_REF
         nml.sstandard[16] = nb.s0_1_be7p / S0_1_BE7P_REF
         nml.sstandard[17] = nb.s0_hep / S0_HEP_REF
-        # The branching of N15+p.
+
+        # The branching of N15+p (Fortran lines 157–159).
         cr.fc12 = nb.s0_1_15_c12alp / S0_1_15_C12ALP_REF
         cr.fo16 = nb.s0_1_15_o16 / S0_1_15_O16_REF
-        # First-derivative factors (multiply Q2 and Q3 in ENGEB and RATES).
+
+        # First-derivative factors (multiply Q2 and Q3 in ENGEB and RATES)
+        # (Fortran lines 160–205).
         cr.qs0e[1] = _ratio(nb.s0_1_1, nb.s0p_1_1, QS0E_1_1_A98, S0_1_1_A98)
         cr.qs0e[2] = _ratio(nb.s0_3_3, nb.s0p_3_3, QS0E_3_3_A98, S0_3_3_A98)
         cr.qs0e[3] = _ratio(nb.s0_3_4, nb.s0p_3_4, QS0E_3_4_A98, S0_3_4_A98)
@@ -106,8 +120,9 @@ def remap():
                             S0_1_16_A98)
         cr.qs0e[8] = _ratio(nb.s0_1_be7p, nb.s0p_1_be7p, QS0E_1_BE7P_A98,
                             S0_1_BE7P_A98)
+
         # Second-derivative factors (multiply Q4 and Q5); 1-3 and 6 were
-        # zeroed out.
+        # zeroed out (Fortran lines 206–232).
         cr.qqs0ee[4] = _ratio(nb.s0_1_12, nb.s0pp_1_12, QQS0EE_1_12_A98,
                               S0_1_12_A98)
         cr.qqs0ee[5] = _ratio(nb.s0_1_13, nb.s0pp_1_13, QQS0EE_1_13_A98,
@@ -117,7 +132,8 @@ def remap():
         cr.qqs0ee[8] = _ratio(nb.s0_1_be7p, nb.s0pp_1_be7p,
                               QQS0EE_1_BE7P_A98, S0_1_BE7P_A98)
 
-    # Overwrite the HPTTOL and ATIME vectors with the newer names.
+    # Overwrite the HPTTOL and ATIME vectors with the newer names (Fortran
+    # lines 233–295).
     if nb.lnewvars:
         nml.hpttol[1] = nb.tol_dm_min           # min log mass spacing
         nml.hpttol[2] = nb.tol_dm_max           # max log mass spacing

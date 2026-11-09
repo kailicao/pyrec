@@ -1,4 +1,4 @@
-"""Python version of seculr.f (YREC development, 09c3b9b)."""
+"""Python version of seculr.f (YREC development, 7be4133)."""
 
 import math
 from types import SimpleNamespace
@@ -52,12 +52,12 @@ _s = SimpleNamespace(
 )
 
 
-def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
-           hjmsav, lcz, m, omega,
-           hjm, eta2, qiw, r0, hcomp, imin, imax,
-           bl, hstot, smass, teffl, lredo, iredo,
-           hicz, hsbot, hstop, omegas, lczsur,
-           cod2, hv, lok, hcomps):
+def seculr(dt: float, hd: np.ndarray, hg: np.ndarray, hi: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray,
+           hs: np.ndarray, hs1: np.ndarray, hs2: np.ndarray, ht: np.ndarray, hjmsav: np.ndarray, lcz: np.ndarray,
+           m: int, omega: np.ndarray, hjm: np.ndarray, eta2: np.ndarray, qiw: np.ndarray, r0: np.ndarray,
+           hcomp: np.ndarray, imin: int, imax: int, bl: float, hstot: float, smass: float, teffl: float, lredo: bool,
+           iredo: int, hicz: float, hsbot: float, hstop: float, omegas: float, lczsur: bool, cod2: np.ndarray,
+           hv: np.ndarray, lok: bool, hcomps: np.ndarray) -> tuple[float, bool, int, float, float, bool]:
     """Secular transport of angular momentum and composition, one step.
 
     Transfers angular momentum (and the associated transport of
@@ -66,7 +66,7 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
     up, iterates and checks the diffusion of Omega and of the abundances,
     with the wind applied to the surface convection zone.
 
-    Translates: seculr.f#SECULR (09c3b9b)
+    Translates: seculr.f#SECULR (7be4133)
 
     Parameters
     ----------
@@ -92,7 +92,8 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
     bl, hstot, smass, teffl : float
         log L/Lsun, log total mass, mass in solar units, log Teff (wind).
     lredo, iredo, hicz, omegas, lok : bool, int, float, float, bool
-        Input values are kept where the routine does not set them.
+        Input values are kept where the routine does not set them (lredo
+        is cleared on entry).
     hsbot, hstop : float
         Masses at the bottom and top of the surface convection zone.
     lczsur : bool
@@ -117,50 +118,76 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
         Surface angular velocity.
     lok : bool
         Converged.
+
     """
+
     c = constants_mod
     nml = nmlpar_mod
     s = _s
     qwlnr, hru, faci, vfc = s.qwlnr, s.hru, s.faci, s.vfc
     wsav, hjmp = s.wsav, s.hjmp
 
-    # Printing of the composition changes is switched off (G Somers 11/14).
+    # Printing of the composition changes is switched off (G Somers 11/14)
+    # (Fortran line 153).
     lprt = False
-    # Disk locking (MHP 9/94).
+
+    # LREDO describes this call only (the stable-model exit returns before
+    # CHECKJ or CHECKC can set it) (Fortran line 159).
+    lredo = False
+
+    # Disk locking (MHP 9/94) (Fortran lines 162–163).
     lock = False
     if nml.ldisk and disk_mod.sage <= nml.tdisk:
         lock = True
-    # The first and last shells are treated as convective for diffusion.
+
+    # The first and last shells are treated as convective for diffusion
+    # (Fortran lines 166–167).
     lcz1 = lcz[1]
     lczm = lcz[m]
-    # Set up factors used to compute diffusion velocities.
+
+    # Set up factors used to compute diffusion velocities (Fortran lines
+    # 170–171).
     setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, s.qwrmax, faci)
     cltot = c.clsun * hl[m]
-    # Angular velocity gradients, centered logarithmic derivative (label 10).
+
+    # Angular velocity gradients, centered logarithmic derivative (label 10)
+    # (Fortran lines 173–183).
+    # Question (see the page): RM is the arithmetic mean of the radii.
     for i in range(imin, imax + 1):
         rlnc = math.log10(intvar_mod.rm[i])
         dr1 = 1.0 / c.cln / (hr[i] - rlnc) + 1.0 / c.cln / (rlnc - hr[i - 1])
         qwlnr[i] = 0.25 * (omega[i] - omega[i - 1]) * dr1
     getqua(hd, hg, hru, omega, m)
     vfc[1:m + 1] = 0.0
-    # Stability of the model and circulation velocities.
+
+    # Stability of the model and circulation velocities (Fortran lines
+    # 187–192).
     it = 1
     ldo = vcirc(hr, hru, imin, imax, it, lcz, m, omega, False, qwlnr,
                 s.qwrmax, hv, cltot, dt, hp, faci)
     if nml.lvfc:
         getfc(hd, hru, hv, imin, imax, omega, vfc)
-    # Store the initial angular momentum distribution (label 20).
+
+    # Store the initial angular momentum distribution (label 20) (Fortran
+    # lines 194–197).
     hjmp[1:m + 1] = hjmsav[1:m + 1]
     wsav[1:m + 1] = omega[1:m + 1]
-    # Initial surface angular velocity, for the angular momentum loss.
+
+    # Initial surface angular velocity, for the angular momentum loss
+    # (Fortran lines 201–202).
     wbeg = oldrot2_mod.wmst[m]
     lok = False
 
+    # The iterations (Fortran lines 209–452).
     converged = False
     for it in range(1, nml.itdif2 + 1):  # label 100
         omegas = omega[m]
+
+        # From the second iteration: new velocities, j and species 1-4
+        # reset, convection zones remixed (Fortran lines 211–257).
         if it > 1:
             # New Omega: average of the initial and the latest values.
+            # Question (see the page): the aim of the averaging.
             for i in range(1, m + 1):
                 omega[i] = 0.5 * (omega[i] + wsav[i])
             # New angular velocity gradients (label 30).
@@ -180,11 +207,11 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
                 for j in range(1, 5):
                     hcomp[j, i] = hcomps[j, i]
             # Remix convection zones to their proper depth (MHP 10/91).
-            # Question (see the page): LIMIX is set but no longer used.
-            limix = False  # noqa: F841
+            limix = False  # noqa: F841  (unused in the Fortran too)
             mixcz(hcomp, hs2, lcz, m)
 
-        # Wind loss for an isolated surface convection zone.
+        # Wind loss for an isolated surface convection zone, or from the
+        # whole star (Fortran lines 260–287).
         if lczsur and hv[imax] == 0.0 and not lock:
             hicz = 0.0
             for i in range(imax, m + 1):  # label 55
@@ -205,25 +232,27 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
             solid(hd, hjm, hr, hs, hs2, jstart, jend, eta2, hi, omega,
                   qiw, r0, m)
 
-        # No instability: done (label 9999).
+        # No instability: done (label 9999) (Fortran line 289).
         if not ldo:
             return dt, lredo, iredo, hicz, omegas, lok
 
-        # Treat the central and surface zones as convective.
+        # Treat the central and surface zones as convective, and find the
+        # diffusion coefficients for all unstable regions (Fortran lines
+        # 292–297).
         lcz[1] = True
         lcz[m] = True
-        # Diffusion coefficients for all unstable regions.
         codiff(hru, m, s.rmid, s.cod, cod2, vfc)
 
         # Each unstable region is solved separately. IBEG is the zone
-        # below the first non-zero v, IEND the zone above the last.
+        # below the first non-zero v, IEND the zone above the last (Fortran
+        # lines 302–337).
         s.ldum = False
         s.istart = imin
         while True:  # label 60
             ltest = False
             if nml.lcodm and nml.codm > 0.0:
-                # Treat the entire domain as unstable (MHP 8/13).
-                # Question (see the page): not gated on solid-body models.
+                # Treat the entire domain as unstable (MHP 8/13); not gated
+                # on solid-body models (KNOWN_ISSUES.md, issue 1).
                 ltest = True
                 s.ibeg = imin - 1
                 s.iend = imax
@@ -253,21 +282,24 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
             if not ltest:
                 break  # to label 90
 
-            # Equal spacing in CHI for the region.
+            # Equal spacing in CHI for the region (Fortran lines 345–347).
+            # Question (see the page): the equation's coordinate.
             s.dr, s.ldum2 = rotgrid(
                 s.cod, cod2, hd, hi, hjmsav, hl, hp, hr, hru, hs, hs1, hs2,
                 hstot, s.ibeg, s.iend, lcz, m, wsav, s.dr, s.ecod,
                 s.ecod2, s.ei, s.ej, s.em, s.ew, s.ldum2)
-            # Two convection zones separated by one radiative zone: skip.
+            # Two convection zones separated by one radiative zone: skip
+            # (Fortran lines 355–361).
             if s.ldum2:
                 if s.istart <= imax:
                     continue  # to label 60
                 break  # to label 90
 
             # Skip the angular momentum evolution for solid-body models
-            # (IMPJMOD = 1 as LSOLID) (MHP 3/09).
+            # (IMPJMOD = 1 as LSOLID) (MHP 3/09) (Fortran lines 364–418).
             if not nml.lsolid and nml.impjmod != 1:
-                # Surface convection zone in the region: wind terms.
+                # Surface convection zone in the region: wind terms (Fortran
+                # lines 367–388).
                 if lczsur and s.iend == imax:
                     if lock:
                         s.wind1 = 0.0
@@ -288,6 +320,8 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
                     s.lfix = False
                     s.wind1 = 0.0
                     s.wind2 = 0.0
+
+                # Solve for Omega (Fortran lines 389–404).
                 s.lokad = False
                 if not nml.ldifad:
                     # Diffusion equation for Omega at the end of the step,
@@ -300,32 +334,36 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
                     dt, s.wind2, s.sumdj, s.lokad = dadcoeft(
                         s.dr, dt, s.ei, s.ew, egrid_mod.ntot, s.wind1,
                         s.wind2, s.dj, s.ecod2, s.sumdj, s.lfix, s.lokad)
-                # Back to the original grid.
+
+                # Back to the original grid (Fortran line 408).
                 eq2mod(s.dj, s.ej, hs2, s.ibeg, s.iend, lcz, m, s.sumdj, hjm)
 
             # Composition diffusion of species 1-4 until the final
-            # iteration. Question (see the page): the Fortran comment
-            # names only H, He3 and He4.
+            # iteration (the Fortran comment names only H, He3 and He4)
+            # (Fortran lines 419–424).
             jbeg = 1
             jend = 4
             s.ibeg, s.iend = ndifcom(
                 dt, cod2, s.ecod2, s.em, hd, hl, hp, hr, hs, hs1, hs2,
                 hstot, hv, s.ibeg, s.iend, imax, imin, lcz, lok, m,
                 hcomp, jbeg, jend)
-            # Next region, if any.
+
+            # Next region, if any (Fortran line 430).
             if s.istart <= imax:
                 continue  # to label 60
             break
 
         # label 90: check the solution, update Omega, decide whether
-        # another iteration is needed.
+        # another iteration is needed (Fortran lines 433–440).
         lcz[1] = lcz1
         lcz[m] = lczm
         dt, iredo, lok, lredo, s.idm = checkj(
             hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz,
             m, dt, eta2, hi, hjm, iredo, lok, lredo, omega, qiw, r0,
             wsav, s.id, s.idm, s.lokad)
-        # Check composition diffusion; recompute mean molecular weight.
+
+        # Check composition diffusion; recompute mean molecular weight; the
+        # exits (Fortran lines 444–450).
         if not lredo:
             dt, iredo, lok, lredo = checkc(hcomp, it, lprt, m, dt,
                                            iredo, lok, lredo)
@@ -336,11 +374,15 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
             break  # to label 200
         if lredo:
             return dt, lredo, iredo, hicz, omegas, lok  # label 9999
+
+    # Fortran line 452.
     if not converged:
         # Question (see the page): non-convergence counts as success.
         lok = True
 
-    # label 200: composition diffusion of the remaining species.
+    # label 200: composition diffusion of the remaining species; NDIFCOM
+    # finds every unstable region itself, since lok is True (Fortran lines
+    # 455–482).
     lcz[1] = True
     lcz[m] = True
     jbeg = 5
@@ -356,7 +398,8 @@ def seculr(dt, hd, hg, hi, hl, hp, hr, hs, hs1, hs2, ht,
     lcz[m] = lczm
 
     # Output of the composition changes to unit IMODPT (iounits_mod.imodpt;
-    # standard output stands in for it). Never runs: lprt is False.
+    # standard output stands in for it). Never runs: lprt is False (Fortran
+    # lines 484–501).
     if lprt:
         print('COMPOSITION CHANGE FROM ROTATIONAL MIXING')
         print('    H        HE3       C12       C13       N14       LI7'

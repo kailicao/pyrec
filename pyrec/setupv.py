@@ -1,4 +1,4 @@
-"""Python version of setupv.f (YREC 09c3b9b): the structural factors at
+"""Python version of setupv.f (YREC 7be4133): the structural factors at
 the shell interfaces that the rotational-mixing criteria and circulation
 velocities need, computed once per rotational-mixing step."""
 
@@ -24,9 +24,11 @@ cpmi = np.zeros(dimensions_mod.json + 1)   # c_P at the interfaces
 opm = np.zeros(dimensions_mod.json + 1)    # opacity at the interfaces (unused)
 
 
-def _lagrange(hru, rm, i, j, faci):
+def _lagrange(hru: np.ndarray, rm: np.ndarray, i: int, j: int, faci: np.ndarray) -> None:
     """Fill faci[1..4, i], the 4-point Lagrange weights at rm[i] over the
-    shells j .. j+3 (the Fortran repeats this block three times)."""
+    shells j .. j+3 (the Fortran repeats this block three times: lines
+    122–139, 172–189 and 222–239)."""
+
     a43 = hru[j + 3] - hru[j + 2]
     a42 = hru[j + 3] - hru[j + 1]
     a41 = hru[j + 3] - hru[j]
@@ -47,17 +49,21 @@ def _lagrange(hru, rm, i, j, faci):
     faci[4, i] = (xa1*xa2*xa3)/d4
 
 
-def _interp(y, faci, i, j):
+def _interp(y: np.ndarray, faci: np.ndarray, i: int, j: int) -> float:
     """y interpolated to interface i from shells j .. j+3, summed in the
     Fortran's order."""
+
     return (y[j]*faci[1, i] + y[j + 1]*faci[2, i]
             + y[j + 2]*faci[3, i] + y[j + 3]*faci[4, i])
 
 
-def _interface_values(i, j, hd, hg, hl, hp, hs1, ht, faci):
+def _interface_values(i: int, j: int, hd: np.ndarray, hg: np.ndarray, hl: np.ndarray, hp: np.ndarray,
+                      hs1: np.ndarray, ht: np.ndarray, faci: np.ndarray) -> None:
     """The physical variables at interface i, from shells j .. j+3 (the
     Fortran repeats this block three times: first, last and inner
-    interfaces). P, T and rho are interpolated in the log."""
+    interfaces, lines 141–166, 191–216 and 247–282). P, T and rho are
+    interpolated in the log."""
+
     c = constants_mod
     iv = intvar_mod
     md = mdphy_mod
@@ -76,13 +82,14 @@ def _interface_values(i, j, hd, hg, hl, hp, hs1, ht, faci):
     cpmi[i] = _interp(md.cpm, faci, i, j)            # specific heat
 
 
-def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
+def setupv(hd: np.ndarray, hg: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs1: np.ndarray,
+           ht: np.ndarray, imin: int, imax: int, m: int, hru: np.ndarray, qwrmax: np.ndarray, faci: np.ndarray) -> None:
     """Prepare, for the interfaces imin..imax (interface i lies between
     shells i-1 and i), the factors of the stability criteria and
     circulation velocities that do not change during a diffusion time
     step; VCIRC multiplies them by the current Omega gradients.
 
-    Translates: setupv.f#SETUPV (09c3b9b)
+    Translates: setupv.f#SETUPV (7be4133)
 
     Arguments: the model's log rho (hd), gravity (hg), L in solar units
     (hl), log P (hp), log r (hr), enclosed mass in g (hs1), log T (ht),
@@ -95,7 +102,9 @@ def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
     difad3_mod and egridder_mod.
 
     Returns nothing.
+
     """
+
     c = constants_mod
     iv = intvar_mod
     md = mdphy_mod
@@ -106,14 +115,18 @@ def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
     rd = rotder_mod
     eg = egridder_mod
 
-    # Unlogged radii of the model points (label 5).
+    # Unlogged radii of the model points (label 5) (Fortran lines 109–111).
     for i in range(1, m + 1):
         hru[i] = math.exp(c.cln*hr[i])
-    # Radii of the midpoints of the interfaces (label 10).
+
+    # Radii of the midpoints of the interfaces (label 10) (Fortran lines
+    # 113–115).
     for i in range(2, m + 1):
         iv.rm[i] = 0.5*(hru[i] + hru[i - 1])
+
     # 4-point Lagrange interpolation: the first interface uses the first 4
-    # points, the last the last 4, and interface i uses i-2, i-1, i, i+1.
+    # points, the last the last 4, and interface i uses i-2, i-1, i, i+1
+    # (Fortran lines 121–219).
     if imin < 3:
         _lagrange(hru, iv.rm, 2, 1, faci)
         i0 = 3
@@ -126,17 +139,25 @@ def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
         _interface_values(m, m - 3, hd, hg, hl, hp, hs1, ht, faci)
     else:
         i1 = imax
-    # Interpolation factors for all other interfaces (label 20).
+
+    # Interpolation factors for all other interfaces (label 20) (Fortran
+    # lines 221–240).
     for i in range(i0, i1 + 1):
         _lagrange(hru, iv.rm, i, i - 2, faci)
+
+    # Physical variables at the interfaces (label 30) (Fortran lines
+    # 241–283).
     cg = math.exp(c.cln*c.cgl)
-    cg2 = cg**2   # unused, as in the Fortran
-    # Physical variables at the interfaces (label 30).
+    cg2 = cg**2  # noqa: F841  (unused in the Fortran too)
     for i in range(i0, i1 + 1):
         _interface_values(i, i - 2, hd, hg, hl, hp, hs1, ht, faci)
-    # The actual del is min(del_rad, del_ad) (label 35).
+
+    # The actual del is min(del_rad, del_ad) (label 35) (Fortran lines
+    # 284–286).
     for i in range(imin, imax + 1):
         iv.delmi[i] = min(iv.delmi[i], iv.delami[i])
+
+    # Clear the factors (Fortran lines 287–303).
     for i in range(1, m + 1):
         tk.fes1[i] = 0.0
         tk.fes2[i] = 0.0
@@ -152,15 +173,20 @@ def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
         o2.thm[i] = 0.0
         vf.fact7[i] = 0.0
         vf.fact8[i] = 0.0
-    # The d theta/dt term of Zahn and Maeder 1998: r^4 / (sqrt(m) G).
+
+    # The d theta/dt term of Zahn and Maeder 1998: r_i^2 r_(i-1)^2 /
+    # (G sqrt(m_i m_(i-1))), about r^2/g (Fortran lines 304–309).
     for i in range(2, m + 1):
         fac = (2.0*(hr[i] + hr[i - 1])
                - 0.5*(math.log10(hs1[i]) + math.log10(hs1[i - 1])) - c.cgl)
         o2.thm[i] = math.exp(c.cln*fac)
 
-    # Structural quantities for the velocities at all interfaces (label 40).
+    # Structural quantities for the velocities at all interfaces (label 40)
+    # (Fortran lines 312–405).
     cpigi = 4.0/c.c4pi/cg
     for i in range(imin, imax + 1):
+        # The mu gradient and the floors of del_ad - del (Fortran lines
+        # 314–335).
         if not nmlpar_mod.ldifad:
             delmu = ((math.log10(md.amum[i]) - math.log10(md.amum[i - 1]))
                      / (hp[i] - hp[i - 1]))
@@ -176,6 +202,8 @@ def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
             dmin = 1.0e-3
         ddel = max(iv.delami[i] - iv.delmi[i], dmin)
         o2.ddelm[i] = max(iv.delami[i] - iv.delmi[i] + delmu, dmin)
+
+        # Scale heights and the Zahn-type factors (Fortran lines 337–355).
         o2.festime[i] = iv.pm[i]/(iv.hgm[i]*ddel*iv.dm[i])
         hpsc = iv.pm[i]*iv.rm[i]**2/iv.dm[i]/iv.hs3[i]/cg
         htsc = hpsc/iv.delmi[i]
@@ -194,32 +222,41 @@ def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
         da.fv2a[i] = em*cpigi*3.0*htsc/iv.dm[i]
         da.fv2b[i] = -em*cpigi*iv.rm[i]/iv.dm[i]
         tk.fgsfj[i] = abs(fac*em*htsc)*iv.rm[i]
+
         # Eddington circulation: v_ES = fact1*fact2*Omega**2 (Endal and
-        # Sofia, paper II).
+        # Sofia, paper II) (Fortran lines 361–367).
         # Question (see the page): the floor 1e-3 caps 1/(del_ad - del)
         # at 1e3, not the comment's 1e6.
         vf.fact1[i] = 1.0/iv.qdtmi[i]/max(iv.delami[i] - iv.delmi[i], 1.0e-3)
         fac = iv.delami[i]/iv.hgm[i]
         vf.fact2[i] = fac*eta*(iv.epsilm[i] - em)
         tk.fact6[i] = -fac*em/c.c4pi/cg/iv.dm[i]/iv.rm[i]
-        # GSF: fact3 is the temperature scale height times the radius.
+
+        # GSF: fact3 is the temperature scale height times the radius
+        # (Fortran line 374).
         vf.fact3[i] = abs(htsc*iv.rm[i])
-        # Fictitious mu currents (Kippenhahn, IAU 66).
+
+        # Fictitious mu currents (Kippenhahn, IAU 66) (Fortran lines
+        # 387–388).
         vf.fact4[i] = (iv.rm[i]**2/iv.hs3[i]/cg/iv.dm[i]
                        * (iv.pm[i] - c.ca3*iv.tm[i]**4)/math.sqrt(iv.hgm[i]))
-        # Dynamical shear: stable when the Richardson number exceeds 1/4.
+
+        # Dynamical shear: stable when the Richardson number exceeds 1/4
+        # (Fortran lines 392–393).
         qwrmax[i] = (math.sqrt(iv.dm[i]/iv.pm[i]
                                * max(iv.delami[i] - iv.delmi[i], 1.0e-3))
                      * 2.0*iv.hgm[i])
-        # Secular shear inhibited by mu gradients.
+
+        # Secular shear inhibited by mu gradients (Fortran lines 401–402).
         vf.fact5[i] = (iv.dm[i]*iv.hgm[i]**2/iv.pm[i]/c.cln
                        / (hp[i] - hp[i - 1])
                        * (c.ca3*iv.tm[i]**4/iv.pm[i] - 1.0)
                        / (1.0 + 3.0*c.ca3*iv.tm[i]**4/iv.pm[i]))
 
-    # Terms of order d Omega/dr from Zahn and Maeder 1998.
+    # Terms of order d Omega/dr from Zahn and Maeder 1998; imin >= 2, so
+    # shell imin-1 exists (Fortran lines 407–465). qqqcod is read by no
+    # routine: unused? (see the page).
     if nmlpar_mod.ldifad:
-        # Question (see the page): reads shell imin-1, index 0 if imin = 1.
         htm = (math.exp(c.cln*(hp[imin - 1] + 2.0*hr[imin - 1]
                                - hd[imin - 1]))
                / hs1[imin - 1]/cg/md.delrm[imin - 1])
@@ -230,26 +267,26 @@ def setupv(hd, hg, hl, hp, hr, hs1, ht, imin, imax, m, hru, qwrmax, faci):
             f1 = iv.pm[i]/(iv.hgm[i]*o2.ddelm[i]*cpmi[i]*iv.dm[i]*iv.tm[i])
             f2 = iv.alm[i]*iv.rm[i]/iv.hs3[i]/3.0
             f3 = 0.75*iv.hs3[i]/(c.cpi*iv.dm[i]*iv.rm[i]**3)
-            # Question (see the page): v0, qc1r, qqc1rr, qqchitr, htp2 and
-            # qhtr feed only commented-out formulas.
-            v0 = -f1*f2*f3
+            # v0, qc1r, qqc1rr, qqchitr, htp2 and qhtr feed only
+            # commented-out formulas: unused? (see the page).
+            v0 = -f1*f2*f3  # noqa: F841  (unused in the Fortran too)
             ff = iv.rm[i]**3/iv.hs3[i]
             c1 = c.cc23*iv.rm[i]**4/cg/iv.hs3[i]
             eg.qqcod[i] = c1
-            qc1r = 4.0*c.cc23*ff/cg*(1.0 - c.cpi*iv.dm[i]*ff)
+            qc1r = 4.0*c.cc23*ff/cg*(1.0 - c.cpi*iv.dm[i]*ff)  # noqa: F841  (unused in the Fortran too)
             dr = 10.0**hr[i] - 10.0**hr[i - 1]
             qdr = (10.0**hd[i] - 10.0**hd[i - 1])/dr
-            qqc1rr = (8.0*ff/cg/iv.rm[i]
+            qqc1rr = (8.0*ff/cg/iv.rm[i]  # noqa: F841  (unused in the Fortran too)
                       * (1.0 - c.cc13*c.cpi*ff*(1.0e1*iv.dm[i] - iv.rm[i]*qdr)
                          + c.cc13*8.0*(c.cpi*iv.dm[i]*ff)**2))
             # d ln chi / d ln T = 3 - d ln kappa / d ln T
             qchit = 3.0 - 0.5*(rd.sqot[i] + rd.sqot[i - 1])
-            qqchitr = (rd.sqot[i - 1] - rd.sqot[i])/dr
+            qqchitr = (rd.sqot[i - 1] - rd.sqot[i])/dr  # noqa: F841  (unused in the Fortran too)
             htp = (math.exp(c.cln*(hp[i] + 2.0*hr[i] - hd[i]))
                    / hs1[i]/cg/md.delm[i])
             eg.qqqcod[i] = htp
-            htp2 = dr/c.cln/(ht[i - 1] - ht[i])
-            qhtr = (abs(htp) - abs(htm))/dr
+            htp2 = dr/c.cln/(ht[i - 1] - ht[i])  # noqa: F841  (unused in the Fortran too)
+            qhtr = (abs(htp) - abs(htm))/dr  # noqa: F841  (unused in the Fortran too)
             htm = htp
             qetm = 0.5*(rd.sqet[i] + rd.sqet[i - 1])
             fnu = 0.5*(rd.fracnuc[i] + rd.fracnuc[i - 1])

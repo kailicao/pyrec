@@ -1,6 +1,6 @@
-"""Python version of temp_mod.f (YREC 09c3b9b): physics at each shell for rotational mixing, formerly COMMON/TEMP/.
+"""Python version of temp_mod.f (YREC 7be4133): physics at each shell for rotational mixing, formerly COMMON/TEMP/.
 
-Translates: temp_mod.f#TEMP_MOD (09c3b9b)
+Translates: temp_mod.f#TEMP_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE TEMP_MOD import this module and write ``temp_mod.<name>``.
@@ -13,6 +13,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–32.
 cp = np.zeros(_JSON + 1)      # c_P (physic)
 hamu = np.zeros(_JSON + 1)    # mean molecular weight, fully ionized (physic)
 sqdt = np.zeros(_JSON + 1)    # dln rho / dln T (physic)

@@ -1,21 +1,25 @@
-"""Python version of simeqc.f (YREC 09c3b9b): a small linear system solved
+"""Python version of simeqc.f (YREC 7be4133): a small linear system solved
 in place by Gaussian elimination with partial pivoting."""
 
 from pyrec import iounits_mod
+import numpy as np
 
 
-def simeqc(a, m, n):
+def simeqc(a: np.ndarray, m: int, n: int) -> None:
     """Solve n linear equations whose matrix and m - n right-hand sides are
     stored together by columns in a[1..56] (n rows, m columns); the
     solutions overwrite the right-hand-side columns. A zero pivot stops the
     run.
 
-    Translates: simeqc.f#SIMEQC (09c3b9b)
+    Translates: simeqc.f#SIMEQC (7be4133)
 
     Arguments: a[1..56], changed in place; m, the number of columns; n, the
     number of equations. None is returned.
+
     """
-    # Forward elimination, one column j at a time.
+
+    # Forward elimination, one column j at a time (Fortran lines 17–55):
+    # the pivot (Fortran lines 21–33).
     jj = -n
     for j in range(1, n + 1):
         jy = j + 1
@@ -30,10 +34,12 @@ def simeqc(a, m, n):
             imax = i
         # Question (see the page): an exact-zero test only.
         if abs(biga) == 0.0:
-            # Question (see the page): the message goes to unit 5.
+            # Suspected bug (see the page): the message goes to unit 5.
             iounits_mod.write(5, " STOPPED AT 1010")  # label 1010
             raise SystemExit(29)
-        # Swap the pivot row in and divide it by the pivot (label 1012).
+
+        # Swap the pivot row in and divide it by the pivot (label 1012,
+        # Fortran lines 34–44).
         ia = j + n * (j - 2)
         it = imax - j
         for k in range(j, m + 1):
@@ -45,7 +51,8 @@ def simeqc(a, m, n):
             a[ia] = a[ia] / biga
         if j == n:
             break
-        # Eliminate the column below the pivot.
+
+        # Eliminate the column below the pivot (Fortran lines 45–54).
         ia = n * (j - 1)
         for ix in range(jy, n + 1):
             ib = ia + ix
@@ -55,7 +62,7 @@ def simeqc(a, m, n):
                 id_ = ic + it
                 a[ic] = a[ic] - a[ib] * a[id_]
 
-    # Back substitution (label 70).
+    # Back substitution (label 70, Fortran lines 56–76).
     ny = n - 1
     it = n * n
     for j in range(1, ny + 1):

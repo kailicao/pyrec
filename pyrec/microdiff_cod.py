@@ -1,4 +1,4 @@
-"""Python version of microdiff_cod.f (YREC 09c3b9b): settling coefficients
+"""Python version of microdiff_cod.f (YREC 7be4133): settling coefficients
 of one species on the equally spaced diffusion grid."""
 
 import math
@@ -15,7 +15,8 @@ NSPEC = 4  # DATA NSPEC/4/: H, He, the species, electrons
 
 # The Fortran's local arrays. MICRODIFF_COD has SAVE, so they keep their
 # values between calls: HYDCON, filled on the hydrogen call, and the
-# FACS ... ADS of points skipped on a later call (question 3 of the page).
+# FACS ... ADS of points skipped on a later call (a suspected bug, see
+# the page).
 atomwt = np.zeros(NSPEC + 1)
 zspec = np.zeros(NSPEC + 1)
 xfrac = np.zeros(NSPEC + 1)
@@ -32,13 +33,14 @@ ads = np.zeros(JSON + 1)
 hydcon = np.zeros(JSON + 1)
 
 
-def microdiff_cod(npt, espec, er, eden, etem, ehqpr, edelr,
-                  ecod1, ecod2, edxdr, thea, thez, j):
+def microdiff_cod(npt: int, espec: np.ndarray, er: np.ndarray, eden: np.ndarray, etem: np.ndarray, ehqpr: np.ndarray,
+                  edelr: np.ndarray, ecod1: np.ndarray, ecod2: np.ndarray, edxdr: np.ndarray, thea: float, thez: float,
+                  j: int) -> None:
     """Compute the settling coefficients of species column j at each of the
     npt points of the equally spaced grid (Thoul et al. 1994 coefficients
     from THDIFF), for MICRODIFF_RUN.
 
-    Translates: microdiff_cod.f#MICRODIFF_COD (09c3b9b)
+    Translates: microdiff_cod.f#MICRODIFF_COD (7be4133)
 
     Arguments: npt points with radius er (Rsun), density eden, temperature
     etem (K), dlnP/dr ehqpr and the gradient edelr; espec[k, i], the mass
@@ -49,9 +51,12 @@ def microdiff_cod(npt, espec, er, eden, etem, ehqpr, edelr,
     Sets in place: ecod1, ecod2 (the coefficients) and, on the hydrogen call
     (j = 1), edxdr, the hydrogen concentration gradient read by later calls.
     Returns nothing.
+
     """
+
     nml = nmlpar_mod
-    # Set up the atomic weight and charge matrices.
+
+    # Set up the atomic weight and charge matrices (Fortran lines 64–72).
     atomwt[1] = 1.008
     atomwt[2] = 4.004
     atomwt[3] = thea
@@ -60,90 +65,111 @@ def microdiff_cod(npt, espec, er, eden, etem, ehqpr, edelr,
     zspec[2] = 2.0
     zspec[3] = thez
     zspec[4] = -1.0
-    # Set LN_LAMBDA, CON_RAD and CON_TEMP.
+
+    # Set LN_LAMBDA, CON_RAD and CON_TEMP (Fortran lines 73–76).
     ln_lambda = 2.2
-    con_rad = 1.0 / 6.9598e10  # set but not used
+    con_rad = 1.0 / 6.9598e10  # noqa: F841  (unused in the Fortran too)
     con_temp = 1.0e-7
-    # Calculate diffusion coefficients for each layer.
+
+    # Calculate diffusion coefficients for each layer (Fortran lines 77–168).
     for i in range(1, npt + 1):  # DO 5
+        # Make sure XFRAC = 0.0 isn't used for diffusion coefficients
+        # (Fortran lines 79–85).
         xfrac[1] = espec[1, i]
         xfrac[2] = espec[2, i]
         xfrac[3] = espec[3, i]
-        # Make sure XFRAC = 0.0 isn't used for diffusion coefficients.
         for k in (1, 2, 3):
             if xfrac[k] < 1.0e-24:
                 xfrac[k] = 1.0e-24
-        # Concentrations from mass fractions.
+
+        # Concentrations from mass fractions; the hydrogen concentration is
+        # saved when X is diffused (Fortran lines 86–96).
         zxa = 0.0
         for ii in range(1, NSPEC):
             zxa = zxa + zspec[ii] * xfrac[ii] / atomwt[ii]
         for ii in range(1, NSPEC):
             concen[ii] = xfrac[ii] / (atomwt[ii] * zxa)
         concen[NSPEC] = 1.0
-        # Save the hydrogen concentration when X is diffused.
+        # Suspected bug (see the page): with LDIFY off, the hydrogen
+        # gradient is never computed.
         if j == 1:
             hydcon[i] = concen[1]
+
         # Skip the Thoul routine where the species is absent here and at the
-        # next point (the first depleted shell is kept, so that AD is right).
-        # Question (see the page): only ADS is reset; FACS ... AHS keep old
-        # values.
+        # next point; the first depleted shell is kept, so that AD is right
+        # (Fortran lines 97–105).
+        # Suspected bug (see the page): only ADS is reset; FACS ... AHS keep
+        # old values.
         if espec[j, i] == 0.0 and i != npt:
             if espec[j, i + 1] == 0.0:
                 ads[i] = 0.0
                 continue  # GOTO 5
+
+        # Electron density NE from the mass density (Fortran lines 106–114).
         rho = eden[i]
         t = etem[i]
-        # Electron density NE from the mass density.
         ac = 0.0
         for ii in range(1, NSPEC + 1):
             ac = ac + atomwt[ii] * concen[ii]
         ne = rho / (1.6726e-24 * ac)
-        # Inter-ionic distance AO.
+
+        # Inter-ionic distance AO (Fortran lines 115–120).
         ni = 0.0
         for ii in range(1, NSPEC):
             ni = ni + concen[ii] * ne
         ao = (0.23873 / ni)**constants_mod.cc13
-        # Debye length LAMBDAD.
+
+        # Debye length LAMBDAD, and LAMBDA for the Coulomb logarithm
+        # (Fortran lines 121–128).
         cz = 0.0
         for ii in range(1, NSPEC + 1):
             cz = cz + concen[ii] * zspec[ii]**2
         lambdad = 6.9010 * math.sqrt(t / (ne * cz))
-        lam = max(lambdad, ao)  # LAMBDA, used in the Coulomb logarithm
-        # Coulomb logarithms.
+        lam = max(lambdad, ao)  # LAMBDA
+
+        # Coulomb logarithms (Fortran lines 129–136).
         for ii in range(1, NSPEC + 1):
             for jj in range(1, NSPEC + 1):
                 xij = 2.3939e3 * t * lam / abs(zspec[ii] * zspec[jj])
                 tcl[ii, jj] = 0.81245 * math.log(1.0 + 0.18769 * xij**1.2)
-        # The diffusion coefficients.
+
+        # The diffusion coefficients (Fortran lines 137–140).
         thdiff(NSPEC, atomwt, zspec, xfrac, tcl, tap, tat, tac)
+
+        # The factor FAC, scaled by FGRY and FGRZ, JvS 01/26 (Fortran lines
+        # 141–154).
+        # Question (see the page): FGRZ also scales the light elements (j = 3).
         hru_i = er[i]
         htu_i = t * con_temp
-        # The FGRY and FGRZ factors scale the settling of helium and metals
-        # (JvS 01/26).
-        # Question (see the page): FGRZ also scales the light elements (j = 3).
         fac = hru_i**2 * htu_i**2.5 / ln_lambda
         if j == 1:
             fac = nml.fgry * hru_i**2 * htu_i**2.5 / ln_lambda
         if j == 3:
             fac = nml.fgrz * hru_i**2 * htu_i**2.5 / ln_lambda
+
         # The first diffusion terms for hydrogen, the third for the others;
-        # stored so that the hydrogen gradient can be finished first.
+        # stored so that the hydrogen gradient can be finished first
+        # (Fortran lines 155–167).
         facs[i] = fac
         aps[i] = -tap[j]
         ats[i] = -tat[j] * edelr[i]
         ahs[i] = -tac[j, 1]
         ads[i] = -tac[j, j]
+
     # The velocity is Ap dlnP/dR + At dlnT/dR + Ax dlnX/dR + Ad dlnD/dR
-    # (Thoul et al. 1994); for hydrogen the third term is the fourth.
+    # (Thoul et al. 1994); for hydrogen the third term is the fourth
+    # (Fortran lines 169–215).
     for i in range(1, npt + 1):  # DO 10
         fac = facs[i]
         ap = aps[i]
         at = ats[i]
         ah = ahs[i]
         ad = ads[i]
+
+        # The hydrogen gradient: computed on the hydrogen call, zero at the
+        # ends, then zeroed locally to remove the second self-diffusion
+        # term; read back on the other calls (Fortran lines 175–212).
         if j == 1:
-            # Hydrogen call: the gradient of ln c_H, zero at the ends, then
-            # zeroed locally to remove the second self-diffusion term.
             if i == 1:
                 dlncdr = 0.0
             elif i == npt:
@@ -159,8 +185,10 @@ def microdiff_cod(npt, espec, er, eden, etem, ehqpr, edelr,
             edxdr[i] = dlncdr
             dlncdr = 0.0
         else:
-            # Question (see the page): EDXDR is stale if hydrogen is not
-            # diffused.
+            # Suspected bug (see the page): EDXDR is never set if hydrogen is
+            # not diffused.
             dlncdr = edxdr[i]
+
+        # The coefficients (Fortran lines 213–214).
         ecod1[i] = fac * (ehqpr[i] * (ap + at) + dlncdr * ah) * espec[j, i]
         ecod2[i] = fac * ad

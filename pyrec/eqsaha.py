@@ -1,4 +1,4 @@
-"""Python version of eqsaha.f (YREC development, 09c3b9b): the Saha
+"""Python version of eqsaha.f (YREC development, 7be4133): the Saha
 equation of state for partially ionized gas."""
 
 import math
@@ -9,13 +9,15 @@ from pyrec import constants_mod
 from pyrec import iounits_mod
 
 # DATA: ionization temperatures chi/k (K) of the 11 species, in the order
-# Na, Al, Mg, Fe, Si, C, H, O, N, Ar, Ne (index 0 unused), and of He, He+.
+# Na, Al, Mg, Fe, Si, C, H, O, N, Ar, Ne (index 0 unused), and of He, He+
+# (Fortran lines 47–54).
 SAHAT = np.array([0.0, 59630., 69450., 88710., 91330., 94570., 130630.,
                   157800., 158000., 168630., 183080., 250200.])
 SAHET0 = 285270.
 SAHET1 = 631370.
 # DATA SAHAU: the constant u_i of each Saha equation (13 values: the 11
 # species, then He and He+), in double precision.
+# Question (see the page): the source of the constants u_i.
 SAHAU = np.array([0.0, -.01, -.47, .60, .49, .08, .11, .0, -.04, .64, .99,
                   1.03, .6, .0])
 NZ = 11
@@ -31,14 +33,16 @@ sahex1 = 0.0
 sahex2 = 0.0
 
 
-def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
-           amu, emu, lderiv, latmo, qdt, qdp, qcp, dela, qdtt, qdtp, qat,
-           qap, qcpt, qcpp, ksaha):
+def eqsaha(fx: np.ndarray, tl: float, t: float, pl: float, p: float, dl: float, d: float, beta: float, betai: float,
+           beta14: float, fxion: np.ndarray, rmu: float, amu: float, emu: float, lderiv: bool, latmo: bool, qdt: float,
+           qdp: float, qcp: float, dela: float, qdtt: float, qdtp: float, qat: float, qap: float, qcpt: float,
+           qcpp: float, ksaha: int) -> tuple[float, float, float, float, float, float, float, float, float, float,
+           float, float, float, float, int]:
     """Solve the Saha equations for hydrogen, helium (two stages) and ten
     metals by Newton iteration on the electrons per atom, and return the
     density, the ionization fractions and the thermodynamic derivatives.
 
-    Translates: eqsaha.f#EQSAHA (09c3b9b)
+    Translates: eqsaha.f#EQSAHA (7be4133)
 
     Arguments: fx, the number fractions of the 12 species (index 0
     unused); tl, t, pl, p (log T, T, log P, P); beta and its relatives
@@ -50,7 +54,9 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
     Returns (dl, d, rmu, emu, qdt, qdp, qcp, dela, qdtt, qdtp, qat, qap,
     qcpt, qcpp, ksaha). With latmo, qdt ... qcpp are returned as passed in;
     without lderiv, qdtt ... qcpp are.
+
     """
+
     global e, sahex1, sahex2
     c = constants_mod
     sahatt = np.zeros(NZ + 1)
@@ -59,10 +65,12 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
     fxs = np.zeros(NZ + 1)
     fxt = np.zeros(NZ + 1)
 
+    # Fortran lines 58–60.
     fxhe = fx[12]
     emax = 1.0 + fxhe
     ti = 1.0 / t
-    # The Saha K's, in the order of increasing ionization temperature. The
+
+    # The Saha K's (Fortran lines 63–77), in the order of increasing ionization temperature. The
     # first species with an exponent below -STOL ends the list: it and all
     # later ones count as neutral. Above +STOL, the species is fully
     # ionized (K = 1e16) and left out of the derivative sums (nz1).
@@ -82,7 +90,8 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
         i = NZ + 1
     nz0 = i - 1                                    # label 12
     nz1 = min(NZ, nz1)
-    # Helium: neutral (lnohe), or no He++ (lnohe2).
+
+    # Helium: neutral (lnohe), or no He++ (lnohe2) (Fortran lines 78–92).
     lnohe = True
     lnohe2 = True
     sahek0 = sahek1 = 0.0
@@ -105,7 +114,7 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
                 sahek1 = betai * math.exp(sahek1)
 
     # Newton iterations for e, sahex1, sahex2 (the 3x3 system reduced by
-    # hand).
+    # hand; Fortran lines 94–192).
     cr12 = cr13 = cr23 = 0.0
     c11 = c12 = c13 = c22 = c23 = 0.0
     r1 = r2 = 0.0
@@ -198,7 +207,7 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
                           f" -----SAHA FAILURE (TL,PL)={tl:10.6f}{pl:10.6f}"
                           f"  (E,DE)={e:20.12f}{delte:20.12f}")  # format 99
 
-    # label 29: the system has been solved for e.
+    # label 29: the system has been solved for e (Fortran lines 194–202).
     emu = e * amu
     rmu = c.cgas * (emu + amu)
     d = beta * p / (rmu * t)
@@ -212,8 +221,9 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
         return (dl, d, rmu, emu, qdt, qdp, qcp, dela, qdtt, qdtp, qat, qap,
                 qcpt, qcpp, ksaha)                 # go to 60
 
-    # First derivatives: d ln E / d ln T (sqet) and d ln P (sqep).
-    rmub = rmu * betai                             # set, never used
+    # First derivatives: d ln E / d ln T (sqet) and d ln P (sqep)
+    # (Fortran lines 204–235).
+    rmub = rmu * betai  # noqa: F841  (unused in the Fortran too)
     r3t = 0.0
     r3p = 0.0
     if nz0 > 0:
@@ -244,7 +254,8 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
     sqep = r3p / c33
     qdt = -1.0 - beta14 - ep1 * sqet
     qdp = betai - ep1 * sqep
-    # Internal energy temperature derivative (qut).
+
+    # Internal energy temperature derivative (qut; Fortran lines 237–260).
     usum = 0.0
     sx0qt = sx0qp = sx1qt = sx1qp = sx2qt = sx2qp = 0.0
     if not lnohe:
@@ -267,7 +278,9 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
     ramu = c.cgas * amu
     qut = ramu * ((1.0 + e) * (betaut + 3.0 * betai * beta14)
                   + betaut * sqet + usum * ti)
-    # Specific heat (qcp) and adiabatic gradient (dela).
+
+    # Specific heat (qcp) and adiabatic gradient (dela; Fortran lines
+    # 262–267).
     pdt = p / (d * t)
     pdtq = pdt * qdt
     qcp = qut - pdtq
@@ -277,7 +290,8 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
         return (dl, d, rmu, emu, qdt, qdp, qcp, dela, qdtt, qdtp, qat, qap,
                 qcpt, qcpp, ksaha)                 # go to 60
 
-    # Derivatives of qdt, qcp and dela.
+    # Derivatives of qdt, qcp and dela: the second derivatives of E
+    # (Fortran lines 269–311).
     beta16 = 4.0 * betai * beta14
     r3t = 0.0
     r3p = 0.0
@@ -321,6 +335,8 @@ def eqsaha(fx, tl, t, pl, p, dl, d, beta, betai, beta14, fxion, rmu,
         r3t = r3t + cr23 * r2t
     sqett = r3t / c33                              # label 44
     sqetp = r3p / c33
+
+    # Fortran lines 312–343.
     qdtt = -beta16 + (ep1 * sqet)**2 - ep1 * sqett
     qdtp = betai * beta14 + ep12 * sqet * sqep - ep1 * sqetp
     if nz0 > 0:

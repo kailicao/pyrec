@@ -1,7 +1,7 @@
-"""Python version of oldrot2_mod.f (YREC 09c3b9b): the d(theta)/dt terms of
+"""Python version of oldrot2_mod.f (YREC 7be4133): the d(theta)/dt terms of
 the Maeder-Zahn treatment of angular momentum, formerly COMMON/OLDROT2/.
 
-Translates: oldrot2_mod.f#OLDROT2_MOD (09c3b9b)
+Translates: oldrot2_mod.f#OLDROT2_MOD (7be4133)
 
 Routines that USE OLDROT2_MOD import this module and write
 ``oldrot2_mod.<name>``. Index i is the interface between shells i-1 and i.
@@ -13,6 +13,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–36.
 tho = np.zeros(_JSON + 1)       # theta of the old model (hpoint)
 thn = np.zeros(_JSON + 1)       # d theta / dt term (vcirc)
 thm = np.zeros(_JSON + 1)       # r^4 / (sqrt(m) G) (setupv)

@@ -1,14 +1,16 @@
-"""Python version of lubksb.f (YREC development, 09c3b9b)."""
+"""Python version of lubksb.f (YREC development, 7be4133)."""
+
+import numpy as np
 
 
-def lubksb(a, n, np_, indx, b):
+def lubksb(a: np.ndarray, n: int, np_: int, indx: np.ndarray, b: np.ndarray) -> None:
     """Solve A x = b from the LU decomposition made by LUDCMP.
 
     *Numerical Recipes*' LUBKSB: forward substitution with L (unscrambling
     the row permutation ``indx`` and skipping the leading zeros of b), then
     back-substitution with U. The solution overwrites ``b``.
 
-    Translates: lubksb.f#LUBKSB (09c3b9b)
+    Translates: lubksb.f#LUBKSB (7be4133)
 
     Parameters
     ----------
@@ -23,9 +25,12 @@ def lubksb(a, n, np_, indx, b):
         The row permutation from LUDCMP.
     b : ndarray, shape (n + 1,)
         In: the right-hand side. Out, in place: the solution.
+
     """
+
+    # Forward substitution with L (loop 12, Fortran lines 23–38).
     ii = 0
-    for i in range(1, n + 1):  # loop 12
+    for i in range(1, n + 1):
         ll = indx[i]
         sum_ = b[ll]
         b[ll] = b[i]
@@ -35,7 +40,9 @@ def lubksb(a, n, np_, indx, b):
         elif sum_ != 0.0:
             ii = i
         b[i] = sum_
-    for i in range(n, 0, -1):  # loop 14
+
+    # Back substitution with U (loop 14, Fortran lines 39–48).
+    for i in range(n, 0, -1):
         sum_ = b[i]
         if i < n:
             for j in range(i + 1, n + 1):  # loop 13

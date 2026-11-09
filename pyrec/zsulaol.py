@@ -1,4 +1,4 @@
-"""Python version of zsulaol.f (YREC 09c3b9b): splines of the pure-Z LAOL89
+"""Python version of zsulaol.f (YREC 7be4133): splines of the pure-Z LAOL89
 opacity table in density."""
 
 import math
@@ -15,23 +15,29 @@ tr = np.zeros(105)
 tdor = np.zeros(105)
 
 
-def zsulaol():
+def zsulaol() -> None:
     """Convert the pure-Z table's temperatures to log10 T in place, and
     for each temperature fit a natural cubic spline of log kappa against
     log rho through the nonzero entries, if there are at least four
     (otherwise numrsz is 0 and gtpurz skips that temperature).
 
-    Translates: zsulaol.f#ZSULAOL (09c3b9b)
+    Translates: zsulaol.f#ZSULAOL (7be4133)
 
     No arguments; reads zlaol_mod (from rdzlaol), sets zslaol_mod. None is
     returned.
+
     """
+
     z = zlaol_mod
     zs = zslaol_mod
-    # Question (see the page): the logarithm is taken in place.
+
+    # The temperatures to log10 T, in place (Fortran lines 23–25).
     for it in range(1, z.numtz + 1):
         z.zot[it] = math.log10(z.zot[it])
+
+    # For each temperature, a spline in density (Fortran lines 26–49).
     for it in range(1, z.numtz + 1):
+        # The nonzero entries, in logs (Fortran lines 27–37).
         nums = 0
         for ir in range(1, z.numrhoz + 1):
             zs.zslaoll[ir, it] = 0.0
@@ -41,6 +47,8 @@ def zsulaol():
                 nums = nums + 1
                 top[nums] = math.log10(z.zolaol[ir, it])
                 tr[nums] = math.log10(z.zorho[ir])
+
+        # A natural spline through them, if there are at least four (Fortran lines 38–48).
         if nums >= 4:
             zs.numrsz[it] = nums
             cspline(tr, top, nums, 1.0e30, 1.0e30, tdor)

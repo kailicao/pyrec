@@ -1,4 +1,4 @@
-"""Python version of tauintnew.f (YREC 09c3b9b): the convective overturn
+"""Python version of tauintnew.f (YREC 7be4133): the convective overturn
 time by G. Somers' method (3/17)."""
 
 import math
@@ -10,25 +10,25 @@ from pyrec import ovrtrn_mod
 from pyrec.kspline import kspline
 from pyrec.ksplint import ksplint
 
-# TAUINTNEW has SAVE. Of its locals only JCORE can be read before it is set
-# in a call, so it alone is kept between calls here.
-jcore = 0
+# TAUINTNEW has SAVE, but since 7be4133 every local is set in each call
+# before it is read (JCORE = 0 at the start), so none is kept here.
 
 
-def _psca(hp, hd, hg, k):
+def _psca(hp: np.ndarray, hd: np.ndarray, hg: np.ndarray, k: int) -> float:
     # The pressure scale height P/(rho g) at shell k.
     cln = constants_mod.cln
     return math.exp(cln * (hp[k] - hd[k])) / hg[k]
 
 
-def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
+def tauintnew(hs1: np.ndarray, lcz: np.ndarray, hr: np.ndarray, hp: np.ndarray, hd: np.ndarray, hg: np.ndarray, m: int,
+              mint: int, svel: np.ndarray, del1: np.ndarray, del2: np.ndarray, rbcz: float) -> float:
     """Compute the convective overturn time TAUCZ (in ovrtrn_mod) and the
     radius of the base of the convection zone: find the zone from the
     centre up and from the surface down; for a single zone, H_P/v one
     pressure scale height above its base; otherwise the lowest cell's width
     over the velocity at its middle.
 
-    Translates: tauintnew.f#TAUINTNEW (09c3b9b)
+    Translates: tauintnew.f#TAUINTNEW (7be4133)
 
     Arguments: the profile of m points (mint of them interior shells), index
     0 unused: hs1 (mass, g), lcz (convective or not), hr, hp, hd (log r, P,
@@ -37,8 +37,9 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
 
     Returns rbcz, the base's radius in solar radii (0 for a radiative
     envelope).
+
     """
-    global jcore
+
     cln = constants_mod.cln
     xdel = np.zeros(5)
     xrad = np.zeros(5)
@@ -49,11 +50,12 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
 
     lallcz = False
     ibeg = 1
+    jcore = 0  # no core to start with (MHP 10/30/26)
     while True:  # label 50
-        # Find the top of the main internal convection zone.
-        # Question (see the page): jcore keeps its value from an earlier pass
-        # or call when the search starts in a radiative shell.
-        # Question (see the page): nothing stops ibeg from passing m.
+        # Find the top of the main internal convection zone (Fortran lines
+        # 74–99).
+        # Question (see the page): jcore keeps its value from an earlier
+        # pass when a restart begins in a radiative shell.
         lradzone = not lcz[ibeg]
         found = False
         for i in range(ibeg, m + 1):  # loop 60
@@ -81,7 +83,8 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                 jcore = 1
                 to_100 = False
         else:
-            # label 70: find the base of the uppermost convection zone.
+            # label 70: find the base of the uppermost convection zone
+            # (Fortran lines 100–106).
             # LCZ(J+1) traps the case where the last points are already
             # radiative (JvS 02/2026).
             j = 0  # the Fortran's J after the loop runs out
@@ -92,31 +95,36 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
             to_100 = False
 
         if not to_100:
-            # label 90
+            # label 90 (Fortran lines 107–109).
             imax = i
             jmax = j + 1
             ijmax = jmax - imax
+
             # Skip convective shells just above the convective core.
-            # The check on imax and jcore (KC 2025-05-30).
-            # Question (see the page): for a fully convective star with a
-            # stitched envelope, this restarts the search for ever.
+            # The check on imax and jcore (KC 2025-05-30) (Fortran lines
+            # 115–120).
+            # Question (see the page): a fully convective star.
             if imax > 0 and jcore > 0:
                 if m != mint and hp[jcore] - hp[imax] < 1:
                     ibeg = imax + 1
                     continue  # GOTO 50
-            # At least 3 shells thick, or search again from above.
-            # Question (see the page): lcz[imax + 2] can be beyond m.
+
+            # At least 3 shells thick, or search again from above (Fortran
+            # lines 124–131).
             if not (lcz[imax] and lcz[imax + 1] and lcz[imax + 2]):
                 if not lcz[imax + 1]:
                     ibeg = imax + 1
                 else:
                     ibeg = imax + 2
                 continue  # GOTO 50
-            # Interior model only: use jmax.
+
+            # Interior model only: use jmax (Fortran lines 133–136).
             if ijmax != 0 and m == mint:
                 imax = jmax
                 ijmax = 0
-            # Masses at the top and bottom of the zone (unused below).
+
+            # Masses at the top and bottom of the zone, only for LCZSUR,
+            # which is true for any zone (Fortran lines 139–150).
             hstop = hs1[m]
             if jmax > 1:
                 hsbot = 0.5 * (hs1[jmax] + hs1[jmax - 1])
@@ -125,10 +133,10 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
             lczsur = (hstop - hsbot) / constants_mod.cmsun > 0.0
 
         # label 100: taucz from the top down; 0 for a radiative envelope.
+        # The base's radius (Fortran lines 155–168).
         if lczsur:
             if lallcz:
-                # Question (see the page): exp(cln * 1) is 10 cm, not 1 cm.
-                rbcz = 1.0
+                rbcz = 1.0  # exp(cln * 1) below: 10 cm
             else:
                 # The base where del1 - del2 changes sign, linear in log r.
                 dd2 = del1[imax - 1] - del2[imax - 1]
@@ -136,6 +144,8 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                 fx = dd2 / (dd2 - dd1)
                 rbcz = hr[imax - 1] + fx * (hr[imax] - hr[imax - 1])
             rbcz = math.exp(cln * rbcz)
+
+            # One zone: H_P / v where r - r_b = H_P (Fortran lines 171–230).
             to_110 = ijmax != 0  # several cells: the averaging method
             if not to_110:
                 psca2 = _psca(hp, hd, hg, imax)
@@ -147,15 +157,15 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                     cvel = svel[imax]
                     psca = psca2
                     ovrtrn_mod.taucz = psca / cvel
-                    # Possible bug (see the page): with the ENDIF where it now
-                    # is, this branch falls through to label 110, which
+                    # Suspected bug (see the page): with the ENDIF where it
+                    # now is, this branch falls through to label 110, which
                     # overwrites taucz (the ENDIF moved, KC 2025-05-31).
                     to_110 = True
                 else:
                     to_110 = True
                     for k in range(imax + 1, m):
-                        psca1 = psca2
-                        rtest1 = rtest2
+                        psca1 = psca2  # noqa: F841  (unused in the Fortran too)
+                        rtest1 = rtest2  # noqa: F841  (unused in the Fortran too)
                         psca2 = _psca(hp, hd, hg, k)
                         rtest2 = math.exp(cln * hr[k]) - rbcz
                         valtest = rtest2 - psca2
@@ -164,7 +174,8 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                             kk = k
                             if k == imax + 1:
                                 kk = k + 1
-                            # Question (see the page): kk + 1 can reach m + 1.
+                            # Keep the stencil inside 1..m (MHP 10/30/26).
+                            kk = max(3, min(kk, m - 1))
                             for n in range(1, 5):
                                 kn = kk - 3 + n
                                 xdel[n] = (math.exp(cln * hr[kn]) - rbcz
@@ -180,15 +191,15 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                             for n in range(1, 5):
                                 yrad[n] = hr[kk - 3 + n]
                             kspline(xdel, yrad, yspl)
-                            # Question (see the page): envrcl is not used.
-                            envrcl = ksplint(xdel, yrad, yspl, 0.0, 0.0)
+                            envrcl = ksplint(xdel, yrad, yspl, 0.0, 0.0)  # noqa: F841  (unused in the Fortran too)
                             ovrtrn_mod.taucz = psca / cvel
                             to_110 = False
                             break  # to label 140
+
             if to_110:
                 # label 110: r_b + H_P is outside the star, or several cells
                 # lie in the radiative envelope; use the lowest cell's
-                # middle. First find its upper edge.
+                # middle. First find its upper edge (Fortran lines 231–272).
                 k = m  # the Fortran's K after the loop runs out
                 for kk2 in range(imax, m):
                     if not lcz[kk2]:
@@ -212,18 +223,23 @@ def tauintnew(hs1, lcz, hr, hp, hd, hg, m, mint, svel, del1, del2, rbcz):
                 kk = k
                 if k == imax + 1:
                     kk = k + 1
+                kk = max(3, min(kk, m - 1))  # MHP 10/30/26
                 for n in range(1, 5):
                     xrad[n] = math.exp(cln * hr[kk - 3 + n])
                     yvel[n] = svel[kk - 3 + n]
                 kspline(xrad, yvel, yspl)
                 cvel = ksplint(xrad, yvel, yspl, rtest, 0.0)
                 ovrtrn_mod.taucz = delr / cvel
-            # label 140: the base's radius in solar units.
+
+            # label 140: the base's radius in solar units (Fortran line 277).
             rbcz = rbcz / constants_mod.crsun
         else:
             ovrtrn_mod.taucz = 0.0
             rbcz = 0.0
-        # A taucz found deep in the interior: search again above.
+
+        # A taucz found deep in the interior: search again above (Fortran
+        # lines 284–287).
+        # Question (see the page): restarts without a limit.
         if ovrtrn_mod.taucz > 1.0e20:
             ibeg = imax + 1
             continue  # GOTO 50

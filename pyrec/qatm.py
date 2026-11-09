@@ -1,4 +1,4 @@
-"""Python version of qatm.f (YREC 09c3b9b): the right-hand side of the
+"""Python version of qatm.f (YREC 7be4133): the right-hand side of the
 atmosphere integration, d log P / d log tau."""
 
 import math
@@ -20,14 +20,15 @@ from pyrec.hra import hra
 tl = 0.0
 
 
-def qatm(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
-         rl, teffl, x, z, katm, ksaha):
+def qatm(x0: float, y: np.ndarray, dydx: np.ndarray, b: float, fpl: float, ftl: float, gl: float, latmo: bool,
+         lderiv: bool, locond: bool, lsave: bool, rl: float, teffl: float, x: float, z: float, katm: int,
+         ksaha: int) -> tuple[int, int]:
     """Derivative of log P with respect to log tau in the atmosphere, from
     a T-tau relation (Eddington, Krishna Swamy or the Harvard reference
     atmosphere, by KTTAU) and hydrostatic equilibrium dP/dtau = g/kappa.
     Also stores the point for output in atmprt_mod and pulse2_mod.
 
-    Translates: qatm.f#QATM (09c3b9b)
+    Translates: qatm.f#QATM (7be4133)
 
     Arguments: x0 = log tau; y (array of 3, index 0 unused), y[1] = log P;
     the surface gravity gl, distortion factor fpl, teffl, x, z; lsave
@@ -37,11 +38,14 @@ def qatm(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
 
     Returns (katm, ksaha): the atmosphere-call counter, incremented, and
     the counter of Saha calls, from eqstat.
+
     """
+
     global tl
     fxion = np.zeros(4)   # index 0 unused
 
-    # Statement functions: Eddington, and Krishna Swamy (1966, ApJ 145, 176).
+    # Statement functions: Eddington, and Krishna Swamy (1966, ApJ 145, 176)
+    # (Fortran lines 65–71).
     def ttaul0(yy):
         return teffl - 0.031235 + 0.25 * math.log10(yy + constants_mod.cc23)
 
@@ -50,6 +54,8 @@ def qatm(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
             yy + 1.39 - 0.815 * math.exp(-2.54 * yy)
             - 0.025 * math.exp(-30.0 * yy))
 
+    # T from the T-tau relation (Fortran lines 73–83). For KTTAU 3-5 TL
+    # would keep its last value, but envint does not call qatm with them.
     g = math.exp(constants_mod.cln * gl) * fpl
     atmprt_mod.taul = x0
     tau = math.exp(constants_mod.cln * atmprt_mod.taul)
@@ -59,7 +65,8 @@ def qatm(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
         tl = ttaul1(tau)
     elif nmlpar_mod.kttau == 2:
         tl = teffl + hra(tau) - atmos_mod.hras
-    # Question (see the page): for KTTAU 3-5 TL keeps its last value.
+
+    # Density and opacity, then d log P / d log tau (Fortran lines 84–94).
     pl = y[1]
     (t, p, dl, d, beta, beta1, beta14, rmu, amu, emu, eta, qdt, qdp, qcp,
      dela, qdtt, qdtp, qat, qap, qcpt, qcpp, ksaha) = eqstat(
@@ -71,6 +78,8 @@ def qatm(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
     katm = katm + 1
     atmprt_mod.ap = pl
     atmprt_mod.at = tl
+
+    # Store the point for output (Fortran lines 95–119).
     if lsave or pulse1_mod.lpumod:
         atmprt_mod.ad = dl
         atmprt_mod.ao = o
@@ -96,4 +105,5 @@ def qatm(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
         q.qqcp = qcp
         q.qrmu = rmu
         q.qemu = emu
+
     return katm, ksaha

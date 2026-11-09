@@ -1,9 +1,10 @@
-"""Python version of getopal95.f (YREC development, 09c3b9b): the driver for
+"""Python version of getopal95.f (YREC development, 7be4133): the driver for
 the OPAL 1995 opacity tables."""
 
 import numpy as np
 
 from pyrec import acdpth_mod
+from pyrec import iounits_mod
 from pyrec import llot95_mod
 from pyrec import llot95a_mod
 from pyrec import llot95e_mod
@@ -20,7 +21,7 @@ NUMX = 10
 NUMZ = 13
 
 # GETOPAL95 has SAVE: its locals keep their values between calls. Only
-# LSHIFT is read before it is set (Question 2); the work arrays A, B, C are
+# LSHIFT is read before it is set (a suspected bug, see the page); the work arrays A, B, C are
 # kept here as well, as in the Fortran.
 a = np.zeros(5)
 b = np.zeros(5)
@@ -36,9 +37,13 @@ def _x_stencil(k, x, zz):
     with ZZ = ZTAB, labels 70 and 80) and for each Z node of the 4D path
     (labels 75 and 85). It is one helper here; the statements are those of
     the Fortran.
+
     """
+
     jx = op95interp_mod.jx
     xxg = llot95a_mod.xxg
+
+    # Stencil in X (Fortran lines 263–281, 366–384).
     if x > xxg[jx[k, 1] + 2]:
         for i in range(jx[k, 1] + 3, NUMX):         # I = JX(K,1)+3, NUMX-1
             if x < xxg[i]:
@@ -53,7 +58,8 @@ def _x_stencil(k, x, zz):
                 break
         else:
             jx[k, 1] = 1
-    # Check for absent tables at high X.
+
+    # Check for absent tables at high X (Fortran lines 283–309, 386–412).
     if zz >= 0.04 and x >= 0.8:
         if zz < 0.1:
             # No table 9 (X = 0.95).
@@ -71,7 +77,8 @@ def _x_stencil(k, x, zz):
         jxx = jx[k, 1] - 1
         for i in range(1, 5):
             jx[k, i] = jxx + i
-    # X interpolation factors.
+
+    # X interpolation factors (Fortran lines 311–322, 414–425).
     for i in range(1, 5):
         a[i] = xxg[jx[k, i]]
     if jx[k, 4] == NUMX:
@@ -81,14 +88,15 @@ def _x_stencil(k, x, zz):
         op95interp_mod.bx[k, j] = b[j]
 
 
-def getopal95(dl, tl, x, z, o, ol, qod, qot):
+def getopal95(dl: float, tl: float, x: float, z: float, o: float, ol: float, qod: float, qot: float) -> tuple[float,
+              float, float, float]:
     """Opacity from the OPAL 1995 tables, given rho, T, X and Z.
 
     Finds the interpolation stencils and weights in T, R = rho/T6**3, X and
     Z, handles the tables' empty high-density corner, and calls the 2D, 3D
     or 4D interpolator.
 
-    Translates: getopal95.f#GETOPAL95 (09c3b9b)
+    Translates: getopal95.f#GETOPAL95 (7be4133)
 
     Parameters
     ----------
@@ -104,7 +112,9 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
     o, ol, qod, qot
         The opacity, its log10, and dlog(kappa)/dlog(rho) and
         dlog(kappa)/dlog(T), as from the interpolators.
+
     """
+
     global lshift, lchk
     im = op95interp_mod
     tgr = llot95a_mod.tgr
@@ -115,15 +125,20 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
     jd = im.jd
     jx = im.jx
 
-    # log R = log rho - 3 (log T - 6).
+    # log R = log rho - 3 (log T - 6), and the check of T (Fortran lines 88–96).
     im.rho_t63l = dl - 3.0 * (tl - 6.0)
     if tl < tgr[1] or tl > tgr[NUMT]:
-        print(f" LOG T OF{tl:11.6f}OUT OF OPAL 95 TABLE RANGE")   # format 5
-        raise SystemExit
-    # Extrapolation below the first density of the table?
+        text = f" LOG T OF{tl:11.6f}OUT OF OPAL 95 TABLE RANGE"   # format 5
+        print(text)
+        iounits_mod.write(iounits_mod.ishort, text)
+        raise SystemExit(1)    # STOP 1, the run-time error code
+
+    # Extrapolation below the first density of the table? (Fortran lines 99–103.)
     im.lextl = im.rho_t63l < r0gr[1]
 
-    # Stencil in T, starting from the last one.
+    # Stencil in T, starting from the last one (Fortran lines 113–131).
+    # Suspected bug (see the page): with the OP tables of the recent
+    # mixtures, the stencil reaches empty rows from log T = 7.9 up.
     if tl >= tgr[im.jt + 2]:
         for i in range(im.jt + 3, NUMT):
             if tl < tgr[i]:
@@ -139,6 +154,8 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
         else:
             im.jt = 1
     jt = im.jt
+
+    # T interpolation factors (Fortran lines 133–141).
     for i in range(1, 5):
         a[i] = tgr[jt + i - 1]
     interp(a, b, c, tl)
@@ -146,7 +163,7 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
         im.bt[i] = b[i]
         im.btt[i] = c[i]
 
-    # Stencil in R (for the first temperature).
+    # Stencil in R (for the first temperature) (Fortran lines 143–161).
     if im.rho_t63l >= r0gr[jd[1] + 2]:
         for i in range(jd[1] + 3, NUMD):
             if im.rho_t63l < r0gr[i]:
@@ -162,17 +179,16 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
         else:
             jd[1] = 1
 
-    # The empty corner. At low X and low T the check is postponed (and
-    # never made): GOTO 60 skips the reset of LSHIFT and LEXTH.
+    # The empty corner (Fortran lines 167–211). At low X and low T the check is
+    # postponed (and never made): GOTO 60 skips the reset of LSHIFT and LEXTH.
     if x < 0.2 and jt <= 5:
-        # Question (see the page): LSHIFT and LEXTH keep their values from
-        # the last call on this path; LCHK is never used.
+        # Suspected bug (see the page): LSHIFT and LEXTH keep their values
+        # from the last call on this path; LCHK is never used.
         lchk = True
     else:
         lchk = False
         lshift = False
         im.lexth = False
-        # Question (see the page): JX(1,1) is the X stencil of the last call.
         if cappa[jx[1, 1], jt + 3, jd[1] + 3] >= 9.9:
             lshift = True
             for k in range(1, 5):
@@ -188,9 +204,8 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
                 itt = jt + i - 1
                 if cappa[ixx, itt, idd + 3] > 9.9:
                     for j in range(idd + 2, 0, -1):
-                        # Question (see the page): CAPPA2 here, CAPPA above.
+                        # Suspected bug (see the page): CAPPA2 here, CAPPA above.
                         if cappa2[ixx, itt, j] <= 9.9:
-                            # Question (see the page): can be zero or less.
                             jd[i] = j - 3
                             idd = j - 3
                             break                       # label 50
@@ -198,7 +213,7 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
                     jd[i] = idd
     # label 60
 
-    # Weights in R for each of the four temperatures.
+    # Weights in R for each of the four temperatures (Fortran lines 214–250).
     if not lshift:
         for i in range(1, 5):
             a[i] = r0gr[jd[1] + i - 1]
@@ -228,7 +243,8 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
                 im.bd[j, i] = b[i]
                 im.bdd[j, i] = c[i]
 
-    # 2D, 3D or 4D? The 4D path is forced for acoustic-depth output (JVS 04/11).
+    # 2D, 3D or 4D? The 4D path is forced for acoustic-depth output (JVS 04/11)
+    # (Fortran lines 254–326).
     if not (acdpth_mod.ladon and acdpth_mod.lacout):
         ztab = llot95_mod.ztab
         if abs(z - ztab) / max(ztab, 1.0e-6) <= 1.0e-4:
@@ -241,7 +257,7 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
             o, ol, qod, qot = op953d(o, ol, qod, qot)
             return o, ol, qod, qot
 
-    # label 153: 4D in Z, X, T, rho. Nearest tables in Z.
+    # label 153: 4D in Z, X, T, rho. Nearest tables in Z (Fortran lines 330–361).
     if z > zzg[im.jz + 2]:
         for i in range(im.jz + 3, NUMZ):  # up to NUMZ, a typo fixed (mhp 7/12)
             if z < zzg[i]:
@@ -262,7 +278,9 @@ def getopal95(dl, tl, x, z, o, ol, qod, qot):
     intrp2(a, b, z)
     for i in range(1, 5):
         im.bz[i] = b[i]
-    # Nearest tables in X at each value of Z.
+
+    # Nearest tables in X at each value of Z, then the 4D interpolation
+    # (Fortran lines 363–427).
     for k in range(1, 5):
         _x_stencil(k, x, zzg[im.jz + k - 1])
     o, ol, qod, qot = op954d(o, ol, qod, qot)

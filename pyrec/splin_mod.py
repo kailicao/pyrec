@@ -1,6 +1,6 @@
-"""Python version of splin_mod.f (YREC 09c3b9b): work arrays for interpolation with osplin, formerly COMMON/SPLIN/.
+"""Python version of splin_mod.f (YREC 7be4133): work arrays for interpolation with osplin, formerly COMMON/SPLIN/.
 
-Translates: splin_mod.f#SPLIN_MOD (09c3b9b)
+Translates: splin_mod.f#SPLIN_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE SPLIN_MOD import this module and write ``splin_mod.<name>``.

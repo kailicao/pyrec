@@ -1,4 +1,4 @@
-"""Python version of eqrelv.f (YREC 09c3b9b): the equation of state for
+"""Python version of eqrelv.f (YREC 7be4133): the equation of state for
 fully ionized gas with partially degenerate, possibly relativistic
 electrons."""
 
@@ -13,13 +13,15 @@ from pyrec import iounits_mod
 from pyrec import nmlpar_mod
 
 
-def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
-           dela, qdtt, qdtp, qat, qap, qcpt, qcpp):
+def eqrelv(tl: float, t: float, pl: float, p: float, dl: float, d: float, beta: float, amu: float, emu: float,
+           eta: float, qdt: float, qdp: float, qcp: float, dela: float, qdtt: float, qdtp: float, qat: float,
+           qap: float, qcpt: float, qcpp: float) -> tuple[float, float, float, float, float, float, float, float, float,
+           float, float, float, float]:
     """Find the density at which ions, electrons (from the Fermi table) and
     radiation, plus an optional Debye-Hueckel term, give the pressure p,
     then the thermodynamic derivatives the structure equations need.
 
-    Translates: eqrelv.f#EQRELV (09c3b9b)
+    Translates: eqrelv.f#EQRELV (7be4133)
 
     Arguments: tl, t (log10 T and T); pl, p (log10 P and P); dl, the
     starting guess of log10 rho; d; beta (P_gas/P); amu, emu (ions and
@@ -31,7 +33,9 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
     d ln T and / d ln P, c_P, nabla_ad, and their logarithmic derivatives.
     If the iteration does not converge, a message is written and the
     arguments come back as they were passed (eta possibly set).
+
     """
+
     c = constants_mod
     dval = ccr_mod.dval
     etat8 = ccr_mod.etat8
@@ -45,6 +49,7 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
     ff = np.zeros((5 + 1, 3 + 1))
     ffe = np.zeros(5 + 1)
 
+    # Fortran lines 89–97.
     pinv = 1.0 / p
     beta1 = 1.0 - beta
     tl8 = tl
@@ -54,7 +59,9 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
     ramut = ramu * t
     emul = math.log10(emu)
     emul8 = emul
-    # Newton interpolation in log T: three columns from jt1.
+
+    # Newton interpolation in log T: three columns from jt1 (Fortran lines
+    # 101–110).
     # Question (see the page): forced into the table, extrapolating silently.
     jt1 = int(5.0 * (tl - 5.0))
     jt1 = max(1, min(jt1, 18))
@@ -66,6 +73,8 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
     dml = dl + emul
     nden = 1
     id1p = -100
+
+    # Debye-Hueckel composition terms (Fortran lines 112–119).
     if ldh:
         almix = 0.0
         for ii in range(1, 19):
@@ -74,8 +83,10 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
                   + 0.5 * (debhu_mod.zzdh + almix))
         cmfdh1 = debhu_mod.xxdh + debhu_mod.yydh + 0.5 * almix
 
-    # Newton iteration on log rho for the pressure balance.
+    # Newton iteration on log rho for the pressure balance (Fortran lines
+    # 120–220).
     while True:  # label 10
+        # The three table rows around x (Fortran lines 123–148).
         xx = dml - 1.50 * tl8
         pr6 = 20.0 * (xx - dval[1]) + 1.0
         kk = int(pr6)
@@ -97,7 +108,8 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
                 df2[1, nn] = dtable[1, id_, jt3] - dtable[1, id_, jt2] - df1[1, nn]
                 ff[1, nn] = dtable[1, id_, jt1] + ttud * df1[1, nn] + ttcu * df2[1, nn]
             dpel2 = 2.0 * (ff[1, 1] * cden1 + ff[1, 2] * cden2 + ff[1, 3] * cden3)
-        # label 30: Lagrange interpolation in x.
+
+        # label 30: Lagrange interpolation in x (Fortran lines 149–171).
         dx1 = xx - dval[id1]
         dx2 = xx - dval[id2]
         dx3 = xx - dval[id3]
@@ -119,6 +131,9 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
                 t1 = cmfdh0 * math.sqrt(cmfdh1)
                 slope = (t1 - t0) / (etadh1 - etadh0)
                 cmfdh = t0 + (eta - etadh0) * slope
+
+        # The total pressure and its derivatives in log rho (Fortran lines
+        # 173–196).
         pel = cl1 * ff[1, 1] + cl2 * ff[1, 2] + cl3 * ff[1, 3]
         dpel1 = dcl1 * ff[1, 1] + dcl2 * ff[1, 2] + dcl3 * ff[1, 3]
         dl8 = dml - emul8
@@ -139,7 +154,9 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
         pr9 = c.cln * ((pa + pe * (dpel1**2 + dpel2 / c.cln)) / (pt * pr7) - pr7)
         if ldh:
             pr9 = pr9 + 2.25 * pdhp / pr7
-        # Second-order correction 0.5*pr9*pr8**2, formed through logs.
+
+        # Second-order correction 0.5*pr9*pr8**2, formed through logs
+        # (Fortran lines 199–220).
         factor = abs(pr8)
         if factor < 1e-15:
             factor = 1e-15
@@ -170,7 +187,9 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
 
     dl = dl8
     d = d8
-    # The other table columns: log U_e, and the derivatives.
+
+    # The other table columns: log U_e, and the derivatives (Fortran lines
+    # 221–231).
     for kk in range(2, 6):  # label 60
         for nn in range(1, 4):  # label 50
             id_ = id1 + nn - 1
@@ -179,7 +198,7 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
             ff[kk, nn] = dtable[kk, id_, jt1] + ttud * df1[kk, nn] + ttcu * df2[kk, nn]
         ffe[kk] = cl1 * ff[kk, 1] + cl2 * ff[kk, 2] + cl3 * ff[kk, 3]
 
-    # Pressure derivatives.
+    # Pressure derivatives (Fortran lines 233–262).
     peq = math.exp(c.cln * ffe[3])
     qped = ffe[4]
     qqpedd = (dcl1 * ff[4, 1] + dcl2 * ff[4, 2] + dcl3 * ff[4, 3]) * c.clni
@@ -206,7 +225,7 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
     if ldh:
         qqpdd = qqpdd + (-1.5 * qpd + 2.25) * pdhp
 
-    # Density derivatives, by inversion.
+    # Density derivatives, by inversion (Fortran lines 264–269).
     qdp = 1.0 / qpd
     qdt = -qpt * qdp
     pr1 = qdp**2
@@ -214,7 +233,7 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
     qdtp = -qpt * qdpp - qqpdt * pr1
     qdtt = -qpt * qdtp - qdp * (qqptt + qdt * qqpdt)
 
-    # Internal energy and its derivatives.
+    # Internal energy and its derivatives (Fortran lines 271–309).
     ue = math.exp(c.cln * (ffe[2] + emul))
     ueq = math.exp(c.cln * (ffe[5] + emul))
     pr1 = df1[5, 1] + ttdcu * df2[5, 1]
@@ -249,7 +268,7 @@ def eqrelv(tl, t, pl, p, dl, d, beta, amu, emu, eta, qdt, qdp, qcp,
     if ldh:
         qqudt = qqudt + (0.5 * qudt - 0.25) * udhu
 
-    # c_P, nabla_ad and their derivatives.
+    # c_P, nabla_ad and their derivatives (Fortran lines 311–328).
     pr1 = -pdt * qdt
     pr2 = u / t
     pr3 = -(1.0 + qdt) + qdtt / qdt

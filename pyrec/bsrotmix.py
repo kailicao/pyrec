@@ -1,4 +1,4 @@
-"""Python version of bsrotmix.f (YREC 09c3b9b): extrapolation of burn-mix
+"""Python version of bsrotmix.f (YREC 7be4133): extrapolation of burn-mix
 sequences to zero substep."""
 
 import math
@@ -24,10 +24,13 @@ _lhe3 = np.zeros(_JSON + 1, dtype=bool)
 _saved = {'nmax': 0, 'lcncheck': False}
 
 
-def _transform(target, hcomp, i):
+def _transform(target: np.ndarray, hcomp: np.ndarray, i: int) -> None:
     """Fill the CNO variables 5, 6, 7, 9 of target[:, i]: C13/C12, N14/C12,
     O16/N14 and C12/12 + C13/13 + N14/14 + O16/16 (written out three times
-    in the Fortran)."""
+    in the Fortran: lines 100–116, 168–180).
+
+    """
+
     x12 = hcomp[5, i]
     x13 = hcomp[6, i]
     x14 = hcomp[7, i]
@@ -38,13 +41,14 @@ def _transform(target, hcomp, i):
     target[9, i] = x12 / 12.0 + x13 / 13.0 + x14 / 14.0 + x16 / 16.0
 
 
-def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
+def bsrotmix(delts: float, hcomp: np.ndarray, iest: int, m: int, jbeg: int, nspec: int, nseq: np.ndarray,
+             lconv: bool) -> bool:
     """Polynomial (Richardson) extrapolation to zero substep of the
     abundances from successive burn-mix sequences, with He3 in logarithm
     and CNO as ratios plus a total; sets lconv when the largest relative
     correction is below 1e-3.
 
-    Translates: bsrotmix.f#BSROTMIX (09c3b9b)
+    Translates: bsrotmix.f#BSROTMIX (7be4133)
 
     Arguments: the time step delts; the abundances hcomp[species, shell]
     after sequence iest (changed in place to the extrapolated abundances
@@ -53,11 +57,13 @@ def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
 
     Returns lconv: True once converged; otherwise the value passed in
     (False after the first sequence).
+
     """
+
     hcompi, hcompa, hcompe, d, x = _hcompi, _hcompa, _hcompe, _d, _x
     jj, ldo, lcno, lhe3 = _jj, _ldo, _lcno, _lhe3
 
-    # Determine which species require calculation.
+    # Determine which species require calculation (Fortran lines 30–78).
     if iest == 1:
         for j in range(jbeg, nspec + 1):
             ldo[j] = False
@@ -86,25 +92,29 @@ def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
                 jj[icount] = i
                 icount = icount + 1
         _saved['nmax'] = icount - 1
-        # Question (see the page): the run stops without a message.
+        # Suspected bug (see the page): the run stops without a message.
         if _saved['nmax'] < 1:
             raise SystemExit(999)
     nmax = _saved['nmax']
     lcncheck = _saved['lcncheck']
 
+
     # Store current results in the composition (hcompa) and the error
-    # (hcompe; the Fortran comment says DCOMPA).
+    # (hcompe; the Fortran comment says DCOMPA) (Fortran lines 81–87).
     for j1 in range(1, nmax + 1):
         j = jj[j1]
         for i in range(1, m + 1):
             hcompa[j, i] = hcomp[j, i]
             hcompe[j, i] = hcomp[j, i]
-    # Extrapolate in the log of He3 rather than the abundance.
+
+    # Extrapolate in the log of He3 rather than the abundance (Fortran lines 89–96).
     if ldo[4]:
         for i in range(1, m + 1):
             if lhe3[i]:
                 hcompa[4, i] = math.log(hcomp[4, i])
                 hcompe[4, i] = hcompa[4, i]
+
+    # The CNO ratios and total (Fortran lines 97–119).
     if lcncheck:
         for i in range(1, m + 1):
             if lcno[i]:
@@ -112,9 +122,11 @@ def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
                 for k in (5, 6, 7, 9):
                     hcompe[k, i] = hcompa[k, i]
 
+    # The squared substep (Fortran line 122).
     x[iest] = (delts / float(nseq[iest]))**2
+
     if iest == 1:
-        # Current results are the initial extrapolation; exit.
+        # Current results are the initial extrapolation; exit (Fortran lines 123–147).
         for j1 in range(1, nmax + 1):
             j = jj[j1]
             for i in range(1, m + 1):
@@ -130,7 +142,7 @@ def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
                         hcompi[iest, k, i] = hcompa[k, i]
         lconv = False
     else:
-        # Polynomial extrapolation (Neville's scheme, as in PZEXTR).
+        # This sequence's values, transformed as above (Fortran lines 151–183).
         xest = x[iest]
         for j1 in range(1, nmax + 1):
             j = jj[j1]
@@ -144,6 +156,8 @@ def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
             for i in range(1, m + 1):
                 if lcno[i]:
                     _transform(d, hcomp, i)
+
+        # Polynomial extrapolation (Neville's scheme, as in PZEXTR) (Fortran lines 184–205).
         for k1 in range(1, iest):
             delta = 1.0 / (x[iest - k1] - xest)
             f1 = xest * delta
@@ -162,15 +176,15 @@ def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
             for i in range(1, m + 1):
                 hcompi[iest, j, i] = hcompe[j, i]
 
-        # Now check if the error is within tolerance.
+        # Now check if the error is within tolerance (Fortran lines 207–226).
         errmax = 1.0e-30
         imax = 1
         jmax = 1
         for j1 in range(1, nmax + 1):
             j = jj[j1]
             for i in range(1, m + 1):
-                # Question (see the page): ln X3 < 0 and the ratios are
-                # tested on their own size.
+                # Suspected bug (see the page): ln X3 < 0, so He3 never
+                # enters the test.
                 if hcompa[j, i] > 1.0e-12:
                     q = hcompe[j, i] / hcompa[j, i]
                     if abs(q) > errmax:
@@ -183,8 +197,9 @@ def bsrotmix(delts, hcomp, iest, m, jbeg, nspec, nseq, lconv):
         # Question (see the page): the tolerance 1e-3 is hard-coded.
         if errmax < 1.0e-3:
             lconv = True
+
         if lconv:
-            # Convert back to absolute abundances.
+            # Convert back to absolute abundances (Fortran lines 227–268).
             if ldo[4]:
                 for i in range(1, m + 1):
                     if lhe3[i]:

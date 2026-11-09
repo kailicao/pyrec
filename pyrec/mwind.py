@@ -1,6 +1,7 @@
-"""Python version of mwind.f (YREC development, 09c3b9b)."""
+"""Python version of mwind.f (YREC development, 7be4133)."""
 
 import math
+import numpy as np
 
 from pyrec import constants_mod
 from pyrec import nmlpar_mod
@@ -8,14 +9,13 @@ from pyrec import ovrtrn_mod
 from pyrec.amcalc import amcalc
 from pyrec.wind import wind
 
-# Fortran SAVEs its locals. TCZ is set only when LROSSBY is true, but read
-# whenever LBSCALE is true, so its value can carry over from an earlier
-# call; Fortran leaves its first value undefined (0.0 here).
+# Fortran SAVEs its locals. TCZ is set only when LROSSBY is true, and is
+# read only then.
 _tcz = 0.0
 
 
-def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
-          smass, teffl, hicz, hjm):
+def mwind(bl: float, delts: float, hsbot: float, hstop: float, jstart: int, jend: int, ljdot: bool, omegas: float,
+          smass: float, teffl: float, hicz: float, hjm: np.ndarray) -> None:
     """Remove angular momentum from the surface convection zone by a wind.
 
     Uses the magnetized-wind law of Matt et al. (2012) with their
@@ -24,7 +24,7 @@ def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
     if LMWIND is false. The loss of specific angular momentum is
     subtracted from every shell of the zone.
 
-    Translates: mwind.f#MWIND (09c3b9b)
+    Translates: mwind.f#MWIND (7be4133)
 
     Parameters
     ----------
@@ -37,7 +37,7 @@ def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
     jstart, jend : int
         First and last shells of the zone.
     ljdot : bool
-        Passed on to WIND only.
+        The wind switch: no angular momentum is removed when it is false.
     omegas : float
         Surface angular velocity at the start of the step.
     smass : float
@@ -54,19 +54,27 @@ def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
     -----
     Sets ``nmlpar_mod.wnew`` (the new surface angular velocity), as the
     Fortran does through the module.
+
     """
+
     global _tcz
     c = constants_mod
     nml = nmlpar_mod
 
     # If desired, remove angular momentum using a Weber-Davis wind model;
-    # otherwise use the old law.
+    # otherwise use the old law (Fortran lines 76–81).
     if not nml.lmwind:
         wind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
              smass, teffl, hicz, hjm)
         return  # label 9999
 
-    # Rossby scaling, if desired; tau_cz interpolated within the step.
+    # Honour the wind switch, as WIND does (Fortran line 85).
+    if not ljdot:
+        return  # label 9999
+
+    # Rossby scaling, if desired; tau_cz interpolated within the step
+    # (Fortran lines 88–103).
+    # Question (see the page): tcz may be 0.
     if nml.lrossby:
         _tcz = (ovrtrn_mod.taucz0
                 + ovrtrn_mod.fracstep * (ovrtrn_mod.taucz - ovrtrn_mod.taucz0))
@@ -80,20 +88,23 @@ def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
         wnow = omegas
         wsat = nml.wmax
 
-    # The structure factor of the Matt et al. (2012) law.
+    # The structure factor of the Matt et al. (2012) law (Fortran line
+    # 120).
     structfactor = amcalc(smass, bl, teffl, 0.0)
 
     # Centrifugal reduction term (Matt et al. 2012, ApJ 754, L26),
-    # relative to the Sun. C_2 = 0.0506.
+    # relative to the Sun. C_2 = 0.0506 (Fortran lines 137–141).
     fsun = (0.5 * nml.pmmsolw ** 2 * c.crsun ** 3
             / math.exp(c.cln * c.cgl) / c.cmsun)
-    # Radius.
+    # Radius:
     rl = 0.5 * (bl + c.clsunl - c.c4pil - c.csigl - 4.0 * teffl)
     fcorr = (0.5 * omegas ** 2 * math.exp(c.cln * (3.0 * rl - c.cgl))
              / smass / c.cmsun)
     fcen = ((c.c_2 ** 2 + fsun) / (c.c_2 ** 2 + fcorr)) ** nml.excen
+
     # First guess of the change in Omega; if it exceeds Omega, use
-    # several smaller steps so that Omega stays positive.
+    # several smaller steps so that Omega stays positive (Fortran lines
+    # 142–153).
     dwtest = ((delts / hicz) * nml.constfactor * structfactor * omegas
               * min(wnow, wsat) ** (nml.exw - 1.0) * fcen)
     if dwtest > omegas:
@@ -103,19 +114,16 @@ def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
         nstep = 1
         dt = delts
 
+    # Iterative solution in each substep: first guess uses the starting
+    # Omega; then the average of the starting and the previous ending
+    # Omega (Fortran lines 156–200).
     ws = omegas
     for n in range(1, nstep + 1):  # label 100
-        # Question (see the page): the comment here on PARMIN and ALFA
-        # describes the old law.
-        # Iterative solution: first guess uses the starting Omega; then
-        # the average of the starting and the previous ending Omega.
         k = 0
         w = ws
         wnew0 = ws
         while True:  # label 5
-            # Question (see the page): _tcz is undefined here when
-            # LBSCALE is true but LROSSBY is false.
-            if nml.lbscale:
+            if nml.lrossby and nml.lbscale:
                 wnow = w * _tcz / nml.pmmsoltau
             else:
                 wnow = w
@@ -123,7 +131,7 @@ def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
             fcorr = (0.5 * w ** 2 * math.exp(c.cln * (3.0 * rl - c.cgl))
                      / smass / c.cmsun)
             fcen = ((c.c_2 ** 2 + fsun) / (c.c_2 ** 2 + fcorr)) ** nml.excen
-            # Question (see the page): WNEW is the namelist input in
+            # Suspected bug (see the page): WNEW is the namelist input in
             # nmlpar_mod, overwritten here.
             nml.wnew = (ws - (dt / hicz) * nml.constfactor * structfactor
                         * w * min(wnow, wsat) ** (nml.exw - 1.0) * fcen)
@@ -139,7 +147,8 @@ def mwind(bl, delts, hsbot, hstop, jstart, jend, ljdot, omegas,
         ws = nml.wnew
 
     # DM is the total mass in the convection zone; subtract the change in
-    # angular momentum per unit mass from every shell of the zone.
+    # angular momentum per unit mass from every shell of the zone (Fortran
+    # lines 205–215).
     dm = hstop - hsbot
     fjdom = (omegas - nml.wnew) * hicz / dm
     for ii in range(jstart, jend + 1):  # label 10

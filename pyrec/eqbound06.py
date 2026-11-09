@@ -1,4 +1,4 @@
-"""Python version of eqbound06.f (YREC 09c3b9b): whether (T, rho) lies in
+"""Python version of eqbound06.f (YREC 7be4133): whether (T, rho) lies in
 the OPAL 2006 equation-of-state table, and the blending weight near its
 edges."""
 
@@ -12,18 +12,20 @@ NR = 169
 NT = 197
 
 
-def eqbound06(t, dl, fac, ltab, lramp):
+def eqbound06(t: float, dl: float, fac: float, ltab: bool, lramp: bool) -> tuple[float, bool, bool]:
     """Test whether (T, log rho) lies inside the OPAL 2006 table, following
     its irregular edge (nta, nra), and give the weight fac = f_rho * f_T for
     blending OPAL with the Yale/SCV equation of state near the edges.
 
-    Translates: eqbound06.f#EQBOUND06 (09c3b9b)
+    Translates: eqbound06.f#EQBOUND06 (7be4133)
 
     Arguments: t (K), dl (log10 rho); fac, ltab, lramp (set only).
 
     Returns (fac, ltab, lramp): the weight (0 out of table), whether the
     point is in the table, and whether ramping is on (True out of table).
+
     """
+
     rho = aeos06_mod.rho
     t6a = aeos06_mod.t6a
     nta = eos06misc_mod.nta
@@ -32,17 +34,21 @@ def eqbound06(t, dl, fac, ltab, lramp):
     d = 10.0**dl
 
     while True:  # one pass; break goes to the out-of-table exit, label 9999
+
+        # Out of the table's rectangle (Fortran lines 38–46).
         if d < rho[1] or d >= rho[NR]:
             break  # out of table in density
         if t6 > t6a[1] or t6 <= t6a[NT]:
             break  # out of table in temperature
 
+        # Initialize (Fortran lines 48–53).
         drampf = 1.0
         trampf = 1.0
         ltab = True
         lramp = False
 
-        # Ramps at the easy borders, linear in T6 and rho.
+        # Ramps at the easy borders, linear in T6 and rho (Fortran lines
+        # 55–63).
         # Question (see the page): linear, where the older OPAL tables
         # ramped in log rho.
         if t6 > t6a[2]:
@@ -52,7 +58,8 @@ def eqbound06(t, dl, fac, ltab, lramp):
             drampf = (d - rho[1]) / (rho[2] - rho[1])
             lramp = True
 
-        # Find k, l by a linear search from ESAC06's last indices.
+        # Find k, l by a linear search from ESAC06's last indices (Fortran
+        # lines 65–89).
         # Question (see the page): k3, l2 are left by ESAC06's last call.
         k = eos06misc_mod.k3
         while t6 <= t6a[k]:  # label 10
@@ -65,7 +72,7 @@ def eqbound06(t, dl, fac, ltab, lramp):
         while d <= rho[l - 1]:  # label 40
             l = l - 1
 
-        # The irregular edge.
+        # The irregular edge (Fortran lines 91–117).
         if l > nra[k]:
             break  # out of table in density
         if l == nra[k]:
@@ -75,14 +82,13 @@ def eqbound06(t, dl, fac, ltab, lramp):
             break  # out of table in temperature
         if k == nta[l]:
             lramp = True
-            # Question (see the page): replaces, not combines, the
-            # high-temperature ramp above.
             trampf = (t6 - t6a[k]) / (t6a[k - 1] - t6a[k])
 
+        # The weight (Fortran lines 119–120).
         fac = drampf * trampf
         return fac, ltab, lramp
 
-    # label 9999: out of table
+    # label 9999: out of table (Fortran lines 122–128).
     ltab = False
     lramp = True
     fac = 0.0

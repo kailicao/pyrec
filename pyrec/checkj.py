@@ -1,4 +1,4 @@
-"""Python version of checkj.f (YREC 09c3b9b): checks one iteration of
+"""Python version of checkj.f (YREC 7be4133): checks one iteration of
 angular-momentum transport."""
 
 import numpy as np
@@ -17,20 +17,22 @@ from pyrec.solid import solid
 
 # Locals kept between calls (SAVE): the largest change of j over each
 # iteration, and where it occurred.
-# Question (see the page): indexed by IT, so ITDIF2 > 16 overflows them.
-delji = np.zeros(17)
-imaxi = np.zeros(17, dtype=int)
+# Allocatable in the Fortran, sized MAX(ITDIF2, IT, 1) (index 0 unused).
+delji = None
+imaxi = None
 
 
-def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
-           eta2, hi, hjm, iredo, lok, lredo, omega, qiw, r0, wsav, id_,
-           idm, lokad):
+def checkj(hd: np.ndarray, hjmp: np.ndarray, hjmsav: np.ndarray, hr: np.ndarray, hs: np.ndarray, hs2: np.ndarray,
+           hv: np.ndarray, imin: int, imax: int, it: int, lcz: np.ndarray, m: int, dt: float, eta2: np.ndarray,
+           hi: np.ndarray, hjm: np.ndarray, iredo: int, lok: bool, lredo: bool, omega: np.ndarray, qiw: np.ndarray,
+           r0: np.ndarray, wsav: np.ndarray, id_: np.ndarray, idm: int,
+           lokad: bool) -> tuple[float, int, bool, bool, int]:
     """Check one iteration of angular-momentum diffusion: stop on j <= 0,
     test convergence against nmlpar_mod.djok, get Omega (and the moment
     of inertia) from j with getrot, and remove reversals of the Omega
     gradient by local solid-body rotation (solid).
 
-    Translates: checkj.f#CHECKJ (09c3b9b)
+    Translates: checkj.f#CHECKJ (7be4133)
 
     Arguments: the model hd, hr, hs, hs2 (logs, and the shell masses), hv
     (the diffusion velocities), lcz (convective for angular momentum);
@@ -45,10 +47,20 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
     Returns (dt, iredo, lok, lredo, idm): the step (halved in a branch
     that never runs), the count of cuts, converged or not, a cut needed,
     and the number of printed shells (set only in the switched-off print).
+
     """
+
+    global delji, imaxi
     n = nmlpar_mod
 
-    # Check for negative j.
+    # One history slot per iteration; SECULR runs it = 1..itdif2 (Fortran
+    # lines 131–138).
+    nhist = max(n.itdif2, it, 1)
+    if delji is None or delji.size - 1 < nhist:
+        delji = np.zeros(nhist + 1)
+        imaxi = np.zeros(nhist + 1, dtype=int)
+
+    # Check for negative j (Fortran lines 139–170).
     lok = False
     lredo = False
     if lokad:
@@ -58,7 +70,7 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
         if hjm[i] <= 0.0:
             iredo = iredo + 1
             # Question (see the page): IREDO.GT.0, not .GT.3, so the
-            # time-step cut below never runs.
+            # time-step cut below never runs (unused?).
             if iredo > 0:
                 msg = (" " + ">" * 39 + "<" * 39 + "\n"
                        + "     ERROR IN SR CHECKJ\n"
@@ -67,7 +79,7 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
                        + "RUN STOPPED")
                 print(msg)
                 iounits_mod.write(iounits_mod.ishort, msg)
-                raise SystemExit(msg)
+                raise SystemExit(1)    # STOP 1, the run-time error code
             else:
                 lredo = True
                 dt = 0.5 * dt
@@ -79,7 +91,7 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
                 return dt, iredo, lok, lredo, idm  # GOTO 240
 
     # Convergence: the largest fractional change of j over the iteration,
-    # and where it occurs; hjmp becomes hjm.
+    # and where it occurs; hjmp becomes hjm (Fortran lines 171–189).
     delji[it] = (hjm[1] - hjmp[1]) / hjmp[1]
     hjmp[1] = hjm[1]
     imaxi[it] = 1
@@ -94,7 +106,8 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
 
     # Omega from the new j. The error in the diffusion is of order DJOK,
     # so the tolerances of the moment-of-inertia iteration are relaxed
-    # except at the last iteration, and restored after.
+    # except at the last iteration, and restored after (Fortran lines
+    # 190–203).
     toler0 = errmom_mod.toleri
     acc = n.acfpft
     if it < n.itdif2 and not lok:
@@ -105,13 +118,13 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
     n.acfpft = acc
 
     # Reversals of the Omega gradient, from the surface inward: enforce
-    # solid-body rotation in the offending pair of shells.
+    # solid-body rotation in the offending pair of shells (Fortran lines
+    # 204–223).
     wold = oldrot_mod.wold
     i = m
     ibot = m
     while True:  # label 20
-        # Question (see the page): a threshold of 1.0, not 1.0d-15.
-        if omega[i] - omega[i - 1] > 1.0:
+        if omega[i] - omega[i - 1] > 1.0e-15:
             if wold[i] - wold[i - 1] > 1.0e-15:
                 # The previous gradient was positive too: leave it.
                 i = ibot - 1
@@ -121,7 +134,8 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
                 # else GOTO 130
             else:
                 # ITOP, the uppermost unstable shell, and IBOT, the
-                # lowest, each widened over an adjacent convection zone.
+                # lowest, each widened over an adjacent convection zone;
+                # then SOLID (Fortran lines 224–245).
                 itop = i
                 if lcz[itop] and itop < m:
                     j = itop + 1
@@ -136,7 +150,9 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
                     ibot = j + 1  # label 60
                 solid(hd, hjm, hr, hs, hs2, ibot, itop, eta2, hi, omega,
                       qiw, r0, m)
-                # Widen the range while its boundaries show new reversals.
+
+                # Widen the range while its boundaries show new reversals
+                # (Fortran lines 246–286).
                 while True:  # label 70
                     lredo = False
                     if ibot > 1:
@@ -164,16 +180,19 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
                               omega, qiw, r0, m)
                         continue  # GOTO 70
                     break
+
+                # Fortran lines 287–289.
                 if it == n.itdif2 or lok:
                     print(f"     OMEGA GRADIENT REVERSAL BETWEEN ZONES "
                           f"{ibot:5d} AND {itop:5d} ITERATION {it:5d}")
-        # label 130: the next shell.
+
+        # label 130: the next shell (Fortran lines 291–295).
         i = ibot - 1
         ibot = i
         if i <= 1:
             break
 
-    # Output at the end of the diffusion step.
+    # Output at the end of the diffusion step (Fortran lines 296–318).
     if it == n.itdif2 or lok:
         # The largest fractional change of j over the time step.
         delj = 0.0
@@ -191,27 +210,34 @@ def checkj(hd, hjmp, hjmsav, hr, hs, hs2, hv, imin, imax, it, lcz, m, dt,
                     line += "\n"
                 line += f" {delji[j]:11.3E}{imaxi[j]:4d}"
             print(line)
+
         # The detailed output to IMODPT is switched off (IF(.TRUE.)GOTO
-        # 240); kept here as in the Fortran (G. Somers 11/14).
-        # Question (see the page): can it be removed?
+        # 240); kept here as in the Fortran (G. Somers 11/14); unused?
+        # (Fortran lines 319–330).
         if False:
             idm = _detailed_print(hjm, hjmsav, hv, imin, imax, m, omega,
                                   wsav, id_, idm)
-    # label 240
+
+    # label 240 (Fortran line 402).
     return dt, iredo, lok, lredo, idm
 
 
-def _detailed_print(hjm, hjmsav, hv, imin, imax, m, omega, wsav, id_,
-                    idm):
+def _detailed_print(hjm: np.ndarray, hjmsav: np.ndarray, hv: np.ndarray, imin: int, imax: int, m: int,
+                    omega: np.ndarray, wsav: np.ndarray, id_: np.ndarray, idm: int) -> int:
     """The switched-off detailed print of CHECKJ (after IF(.TRUE.)GOTO
     240): Omega, j and the diffusion velocities at every NPRTPT-th shell.
-    Returns idm."""
+    Returns idm.
+
+    """
+
     n = nmlpar_mod
     t2 = temp2_mod
     imodpt = iounits_mod.imodpt
     nprtpt = n.nprtpt
     if nprtpt > m:
         return idm
+
+    # Omega and j at the chosen shells (Fortran lines 331–356).
     iounits_mod.write(imodpt, " SHELL   OMEGA     DEL OMEGA      J/M"
                               "       DEL J/M")
     # The first point is always printed.
@@ -232,6 +258,8 @@ def _detailed_print(hjm, hjmsav, hv, imin, imax, m, omega, wsav, id_,
         iounits_mod.write(imodpt, f" {k:5d}{omega[k]:12.3E}"
                           f"{omega[k] - wsav[k]:12.3E}{hjm[k]:12.3E}"
                           f"{hjm[k] - hjmsav[k]:12.3E}")
+
+    # The diffusion velocities (Fortran lines 357–366).
     iounits_mod.write(imodpt, " SHELL    VES0         VES       VGSF0"
                               "        VGSF         VSS         RAT"
                               "        VTOT       LENGTH        VMU")
@@ -241,11 +269,13 @@ def _detailed_print(hjm, hjmsav, hv, imin, imax, m, omega, wsav, id_,
                 quadd_mod.rat[k], hv[k], t2.hle[k], t2.vmu[k])
         iounits_mod.write(imodpt, f" {k:5d}"
                           + "".join(f"{v:12.3E}" for v in vals))
+
+    # With LDIFAD, the even grid's coefficients (Fortran lines 367–400).
     if n.ldifad:
         eg = egrid_mod
         ntot = eg.ntot
 
-        def row7(i):
+        def row7(i: int) -> str:
             vals = (eg.chi[i], t2.ves[i], difad2_mod.vesa[i],
                     difad2_mod.vesd[i], eg.echi[i], difad_mod.ecod3[i],
                     difad_mod.ecod4[i])

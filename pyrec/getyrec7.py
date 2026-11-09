@@ -1,7 +1,8 @@
-"""Python version of getyrec7.f (YREC 09c3b9b): read a stellar model in
+"""Python version of getyrec7.f (YREC 7be4133): read a stellar model in
 the older YREC7 text format."""
 
 from pyrec import constants_mod
+import numpy as np
 from pyrec import dimensions_mod
 from pyrec import iounits_mod
 
@@ -14,6 +15,7 @@ def _fields(line, spec):
     last `decimals` digits taken as decimals. (The 1P scale factor of the
     FORMATs only matters for fields without an exponent, and is not
     applied.)"""
+
     out, pos = [], 0
     for item in spec:
         kind, w = item[0], item[1]
@@ -48,6 +50,7 @@ def _fields(line, spec):
 def _read_values(unit, n, spec):
     """Read n values with a FORMAT that is reused for further records
     (Fortran's format reversion); None at the end of the file."""
+
     values = []
     while len(values) < n:
         line = iounits_mod.read(unit)
@@ -57,18 +60,23 @@ def _read_values(unit, n, spec):
     return values[:n]
 
 
-def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
-             hs, hstot, ht, iread, ishort, jcore, jenv, lc, lexcom, lrot, m,
-             model, omega, ps, rs, smass, teffl, tlumx, tril, trit, ts, atm,
-             eos, hik, ldify, ldifz, ldisk, linstb, ljdot0, alok, lovstc,
-             lovste, lovstm, lpurez, lsemic, compmix, pdisk, tdisk, wmax):
+def getyrec7(bl: float, cfenv: np.ndarray, cmixl: float, dage: float, ddage: float, ftri: float, hcomp: np.ndarray,
+             hd: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, hstot: float,
+             ht: np.ndarray, iread: int, ishort: int, jcore: int, jenv: int, lc: np.ndarray, lexcom: bool, lrot: bool,
+             m: int, model: int, omega: np.ndarray, ps: np.ndarray, rs: np.ndarray, smass: float, teffl: float,
+             tlumx: np.ndarray, tril: np.ndarray, trit: np.ndarray, ts: np.ndarray, atm: str, eos: str, hik: str,
+             ldify: bool, ldifz: bool, ldisk: bool, linstb: bool, ljdot0: bool, alok: str, lovstc: bool, lovste: bool,
+             lovstm: bool, lpurez: bool, lsemic: bool, compmix: str, pdisk: float, tdisk: float,
+             wmax: float) -> tuple[float, float, float, float, float, float, int, int, bool, bool, int, int, float,
+             float, str, str, str, bool, bool, bool, bool, bool, str, bool, bool, bool, bool, bool, str, float, float,
+             float]:
     """Read a YREC7-format model from unit iread (rewound before and
     after): the header, the luminosities, the envelope triangle, the
     shells with X and Z in units of 1e-6, the other species stored only
     between the convective core and envelope, and Omega (as -log Omega)
     with rotation. The Model2-only items get defaults.
 
-    Translates: getyrec7.f#GETYREC7 (09c3b9b)
+    Translates: getyrec7.f#GETYREC7 (7be4133)
 
     Arguments: iread (the unit), ishort (for the error messages); every
     other scalar is only set.
@@ -79,14 +87,18 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
     lrot, m, model, smass, teffl, atm, eos, hik, ldify, ldifz, ldisk,
     linstb, ljdot0, alok, lovstc, lovste, lovstm, lpurez, lsemic,
     compmix, pdisk, tdisk, wmax).
+
     """
+
+    # Zero the composition and Omega, in case they are used though the
+    # file lacks them (Fortran lines 50–60).
     json = dimensions_mod.json
     for i in range(1, json + 1):
         omega[i] = 0.0
         for j in range(1, 15 + 1):
             hcomp[j, i] = 0.0
 
-    # The Model2-only items, which this format lacks.
+    # The Model2-only items, which this format lacks (Fortran lines 62–89).
     atm = "  ? "
     eos = "    ? "
     hik = "  ? "
@@ -102,28 +114,29 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
     lovstm = False
     lpurez = False
     lsemic = False
-    # Question (see the page): defaults that change the physics.
     pdisk = 7.2722e-6
     tdisk = 0.0
     wmax = 3e-4
 
+    # Fortran line 95.
     iounits_mod.rewind(iread)
 
-    # Header (FORMAT 10).
+    # Header (FORMAT 10) (Fortran lines 97–100).
     (atemp, model, m, smass, teffl, bl, hstot, dage, ddage) = _fields(
         iounits_mod.read(iread),
         [('a', 4), ('x', 1), ('i', 5), ('i', 5)] + [('f', 8, 5)] * 3
         + [('x', 1), ('f', 14, 10), ('f', 13, 9), ('f', 13, 0)])
 
-    # Flags (FORMAT 30).
-    # Question (see the page): 5X skips one column more than PUTYREC7
-    # writes.
+    # Flags (FORMAT 30) (Fortran lines 102–105).
+    # Suspected bug (see the page): 5X skips one column more than PUTYREC7
+    # writes; kept bug for bug.
     lrot, lexcom, jcore, jenv, cmixl = _fields(
         iounits_mod.read(iread),
         [('l', 1), ('x', 1), ('l', 1), ('x', 1), ('x', 5), ('i', 4),
          ('i', 4), ('f', 7, 3)])
 
-    # Luminosities by source (FORMAT 40); in erg/s if any exceeds 1e20.
+    # Luminosities by source (FORMAT 40); in erg/s if any exceeds 1e20
+    # (Fortran lines 107–119).
     tlumx[1:8] = _fields(iounits_mod.read(iread),
                          [('x', 10)] + [('f', 10, 3)] * 7)
     cccmax = max(tlumx[1], tlumx[2], tlumx[3], tlumx[4], tlumx[5],
@@ -132,7 +145,7 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
         for j in range(1, 7 + 1):
             tlumx[j] = tlumx[j] / constants_mod.clsun
 
-    # The envelope triangle (FORMAT 70).
+    # The envelope triangle (FORMAT 70) (Fortran lines 121–130).
     ftri = 1.0
     for i in range(1, 3 + 1):  # label 80
         vals = _fields(iounits_mod.read(iread),
@@ -144,7 +157,8 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
         if io < 0:
             ftri = -1.0
 
-    # The shells (FORMAT 100), X and Z in units of 1e-6.
+    # The shells (FORMAT 100), X and Z in units of 1e-6 (Fortran lines
+    # 132–150).
     spec100 = ([('f', 13, 10), ('f', 10, 7), ('f', 14, 7), ('f', 10, 7),
                 ('f', 10, 7), ('f', 10, 7), ('l', 1), ('i', 6), ('i', 6)])
     for i in range(1, m + 1):  # label 110
@@ -156,11 +170,12 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
             iounits_mod.write(ishort, ' ERROR IN SUBROUTINE GETY7')
             iounits_mod.write(ishort, f' GLITCH IN SHELL{i:3d}, SHELL MASS '
                               'LESS THAN ZERO OR GREATER THAN STAR MASS')
-            raise SystemExit
+            raise SystemExit(3)
         hcomp[1, i] = 1.0e-6 * float(ix)
         hcomp[3, i] = 1.0e-6 * float(iz)
 
-    # Species 4-11, stored from jcore to jenv only (FORMAT 200).
+    # Species 4-11, stored from jcore to jenv only (FORMAT 200) (Fortran
+    # lines 152–183).
     spec200 = [('f', 9, 3), ('x', 1)] * 8
     if jenv <= jcore:
         hcomp[4:12, jcore] = _fields(iounits_mod.read(iread), spec200)
@@ -181,7 +196,8 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
     for i in range(1, m + 1):  # label 260
         hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
 
-    # The light elements (species 12-15), two shells per record.
+    # The light elements (species 12-15), two shells per record (Fortran
+    # lines 185–223).
     if lexcom:
         spec300 = [('f', 9, 3), ('x', 1)] * 4
         if jenv == 1:
@@ -210,7 +226,9 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
                     for i in range(12, 15 + 1):  # label 340
                         hcomp[i, j] = hcomp[i, jenv]
 
-    # Rotation (FORMAT 500): -log Omega, 58.9 or more for Omega = 0.
+    # Rotation (FORMAT 500): -log Omega, 58.9 or more for Omega = 0
+    # (Fortran lines 225–238); missing records go to the bypass (lines
+    # 245–260).
     if lrot:
         omegal = _read_values(iread, m, [('f', 10, 7)] * 8)
         if omegal is None:  # END=9999
@@ -231,6 +249,7 @@ def getyrec7(bl, cfenv, cmixl, dage, ddage, ftri, hcomp, hd, hl, hp, hr,
             else:
                 omega[i] = 0.0
 
+    # Keep iread open, rewound (Fortran lines 240–243).
     iounits_mod.rewind(iread)
     return (bl, cmixl, dage, ddage, ftri, hstot, jcore, jenv, lexcom, lrot,
             m, model, smass, teffl, atm, eos, hik, ldify, ldifz, ldisk,

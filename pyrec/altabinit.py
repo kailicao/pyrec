@@ -1,4 +1,4 @@
-"""Python version of altabinit.f (YREC 09c3b9b): checks the Allard
+"""Python version of altabinit.f (YREC 7be4133): checks the Allard
 atmosphere table just read by ALFILEIN and derives the limits ALSURFP
 needs."""
 
@@ -9,17 +9,19 @@ from pyrec import iounits_mod
 from pyrec.alprint import alprint
 
 
-def altabinit():
+def altabinit() -> None:
     """Set the table's range in log Teff (ALATM05_MOD: its own ends;
     ALATM02_MOD: one row's width beyond them), each row's first and last
     valid column in log g and its allowed range of log g, and the extremes
     GLXmin, GLXmax; then check the table, and stop the run (after ALPRINT)
     if it is bad.
 
-    Translates: altabinit.f#ALTABINIT (09c3b9b)
+    Translates: altabinit.f#ALTABINIT (7be4133)
 
     No arguments; nothing is returned.
+
     """
+
     a1 = alatm01_mod
     a2 = alatm02_mod
     a5 = alatm05_mod
@@ -28,15 +30,16 @@ def altabinit():
     nteff = a1.nteff
     ngl = a1.ngl
 
+    # The range in log Teff (Fortran lines 58–64).
     a5.al_tefflmin = a1.teffls[1]
     a5.al_tefflmax = a1.teffls[nteff]
     a2.tefflmin = a1.teffls[1] - (a1.teffls[2] - a1.teffls[1])
     a2.tefflmax = a1.teffls[nteff] + (a1.teffls[nteff] - a1.teffls[nteff - 1])
 
-    # The first and last valid entries (above -998) of each row. Possible
-    # bug (see the page): a row with none keeps its earlier
-    # values (0 at first), and the loop below then reads GLs out of bounds
-    # (here gls[0] and, through index -1, the array's last element).
+    # The first and last valid entries (above -998) of each row (Fortran
+    # lines 66–84). Suspected bug (see the page): a row with none keeps its
+    # earlier values (0 at first), and the loop below then reads GLs out of
+    # bounds (here gls[0] and, through index -1, the array's last element).
     for i in range(1, nteff + 1):
         for j in range(1, ngl + 1):
             if a1.pls[i, j] > -998.0:
@@ -49,7 +52,8 @@ def altabinit():
                 break
         # label 110
 
-    # The allowed range of log g in each row, and over all rows.
+    # The allowed range of log g in each row, and over all rows (Fortran
+    # lines 86–99).
     a2.glxmin = 999.0
     a2.glxmax = -999.0
     for i in range(1, nteff + 1):
@@ -63,7 +67,8 @@ def altabinit():
         if a2.glmax[i] > a2.glxmax:
             a2.glxmax = a2.glmax[i]
 
-    # Question (see the page): only PLs is checked, not P100Ls or T100Ls.
+    # (a) No invalid entry inside a row's valid range; only PLs is checked
+    # (Fortran lines 101–116).
     lbadtable = False
     for i in range(1, nteff + 1):
         j1 = a2.iglmin[i]
@@ -74,10 +79,12 @@ def altabinit():
                 w(ishort, "ALTABINIT: Bad input Allard Table: TEFF, GL: "
                           f"{10.0 ** a1.teffls[i]:5.0f}{a1.gls[j]:7.2f}")  # 900
 
+    # (b) At least 4 rows and 4 valid entries per row (Fortran lines
+    # 118–135).
     if nteff < 4:
         lbadtable = True
-        # Question (see the page): FORMAT 910, (A,I3), has one A for two
-        # strings; the Fortran would stop here with a run-time format error.
+        # Suspected bug (see the page): FORMAT 910, (A,I3), has one A for
+        # two strings; the Fortran stops here with a run-time format error.
         w(ishort, "ALTABINIT: Bad input Allard Table: ")
         raise SystemExit("Fortran run-time error: FORMAT 910 expects an "
                          "integer, got a string")
@@ -92,13 +99,14 @@ def altabinit():
                       f"{10.0 ** a1.teffls[i]:7.2f}{a2.glmin[i]:7.2f}"
                       f"{a2.glmax[i]:7.2f}")  # 920
 
+    # Fortran lines 137–139.
     if not lbadtable:
         return
 
-    # label 9999: error exit.
+    # label 9999: error exit (Fortran lines 141–150).
     for unit_write in (print, lambda text: w(ishort, text)):
         unit_write("")
         unit_write(" ******** ALTABINIT: Program Terminated ********")
         unit_write("")
     alprint()
-    raise SystemExit
+    raise SystemExit(3)    # STOP 3, the input-error code

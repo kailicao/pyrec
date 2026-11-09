@@ -1,4 +1,4 @@
-"""Python version of kemcom.f (YREC development, 09c3b9b): the implicit
+"""Python version of kemcom.f (YREC development, 7be4133): the implicit
 solution of the CNO and pp burning network for one shell or one convection
 zone."""
 
@@ -17,8 +17,9 @@ w = np.zeros(8)
 xsum = np.zeros(12)
 
 
-def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
-           hr10, hr11, hr12, hf1, hs2, hcomp, ddage):
+def kemcom(ht: np.ndarray, ibegin: int, iend: int, hr1: np.ndarray, hr2: np.ndarray, hr3: np.ndarray, hr4: np.ndarray,
+           hr5: np.ndarray, hr6: np.ndarray, hr7: np.ndarray, hr8: np.ndarray, hr10: np.ndarray, hr11: np.ndarray,
+           hr12: np.ndarray, hf1: np.ndarray, hs2: np.ndarray, hcomp: np.ndarray, ddage: float) -> None:
     """New abundances of H, 3He, 4He, 12C, 13C, 14N and 16O after one step.
 
     Solves the network implicitly by Newton iteration (VandenBerg's
@@ -26,7 +27,7 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
     (mass-weighted means of abundances and rates); 18O is updated
     explicitly afterwards.
 
-    Translates: kemcom.f#KEMCOM (09c3b9b)
+    Translates: kemcom.f#KEMCOM (7be4133)
 
     Parameters
     ----------
@@ -43,10 +44,14 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
         Abundances; elements 1-7, 9 and 11 set for shells IBEGIN..IEND.
     ddage : float
         Time step (years).
+
     """
+
     nml = nmlpar_mod
     hcompp = oldmod_mod.hcompp
-    # Abundances at the start of the step, mixed over a zone.
+
+    # Abundances at the start of the step, mixed over a zone (Fortran lines
+    # 97–119).
     if ibegin != iend:
         wtsum = 0.0
         for j in range(1, 12):                           # label 1
@@ -60,13 +65,15 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
     else:
         for j in range(1, 12):                           # label 9
             xsum[j] = hcompp[j, ibegin]
-    # Too cool to burn: homogenize only.
+
+    # Too cool to burn: homogenize only (Fortran lines 121–128).
     if ht[ibegin] < nml.tcut[1]:
         for i in range(ibegin, iend + 1):                # labels 13, 11
             for j in range(1, 12):
                 hcomp[j, i] = xsum[j]
         return                                           # GOTO 200
 
+    # The step in Gyr, times the species' masses (Fortran lines 134–143).
     delt = ddage * 1.0e-9
     delt3 = 3.0 * delt
     delt4 = 4.0 * delt
@@ -76,9 +83,13 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
     delt16 = 16.0 * delt
     dcmin = nml.cmin
     icon = 0
-    gr9 = 0.0
-    gr13 = 0.0
-    # The rates: the shell's, or the zone's mass-weighted means.
+
+    # Fortran lines 148–149.
+    gr9 = 0.0  # noqa: F841  (unused in the Fortran too)
+    gr13 = 0.0  # noqa: F841  (unused in the Fortran too)
+
+    # The rates: the shell's, or the zone's mass-weighted means, summed in
+    # the Fortran's order (Fortran lines 150–223).
     if ibegin == iend:
         k = ibegin
         gr1, gr2, gr3, gr4 = hr1[k], hr2[k], hr3[k], hr4[k]
@@ -87,23 +98,38 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
         f3 = hf1[ibegin]
         f4 = 1.0 - f3
     else:
-        sl = slice(ibegin, iend + 1)
-        wm = hs2[sl]
-        gr1 = np.sum(wm * hr1[sl]) / wtsum               # label 15
-        gr2 = np.sum(wm * hr2[sl]) / wtsum
-        gr3 = np.sum(wm * hr3[sl]) / wtsum
-        gr4 = np.sum(wm * hr4[sl]) / wtsum
-        gr5 = np.sum(wm * hr5[sl]) / wtsum
-        gr6 = np.sum(wm * hr6[sl]) / wtsum
-        gr7 = np.sum(wm * hr7[sl]) / wtsum
-        gr8 = np.sum(wm * hr8[sl]) / wtsum
-        gr10 = np.sum(wm * hr10[sl]) / wtsum
-        gr11 = np.sum(wm * hr11[sl]) / wtsum
-        gr12 = np.sum(wm * hr12[sl]) / wtsum
-        f3 = np.sum(wm * hf1[sl]) / wtsum
+        gr1 = gr2 = gr3 = gr4 = gr5 = gr6 = gr7 = gr8 = 0.0
+        gr10 = gr11 = gr12 = 0.0
+        f3 = 0.0
+        for i in range(ibegin, iend + 1):                # label 15
+            gr1 = gr1 + hs2[i] * hr1[i]
+            gr2 = gr2 + hs2[i] * hr2[i]
+            gr3 = gr3 + hs2[i] * hr3[i]
+            gr4 = gr4 + hs2[i] * hr4[i]
+            gr5 = gr5 + hs2[i] * hr5[i]
+            gr6 = gr6 + hs2[i] * hr6[i]
+            gr7 = gr7 + hs2[i] * hr7[i]
+            gr8 = gr8 + hs2[i] * hr8[i]
+            gr10 = gr10 + hs2[i] * hr10[i]
+            gr11 = gr11 + hs2[i] * hr11[i]
+            gr12 = gr12 + hs2[i] * hr12[i]
+            f3 = f3 + hs2[i] * hf1[i]
+        gr1 = gr1 / wtsum
+        gr2 = gr2 / wtsum
+        gr3 = gr3 / wtsum
+        gr4 = gr4 / wtsum
+        gr5 = gr5 / wtsum
+        gr6 = gr6 / wtsum
+        gr7 = gr7 / wtsum
+        gr8 = gr8 / wtsum
+        gr10 = gr10 / wtsum
+        gr11 = gr11 / wtsum
+        gr12 = gr12 / wtsum
+        f3 = f3 / wtsum
         f4 = 1.0 - f3
+
     # Starting abundances (note the order of w: X, 3He, Y, 12C, 13C, 14N,
-    # 16O = HCOMP elements 1, 4, 2, 5, 6, 7, 9).
+    # 16O = HCOMP elements 1, 4, 2, 5, 6, 7, 9) (Fortran lines 227–233).
     xpr = xsum[1]
     y3r = xsum[4]
     ypr = xsum[2]
@@ -111,7 +137,9 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
     x3r = xsum[6]
     x4r = xsum[7]
     x6r = xsum[9]
-    # First guess: the shell below, or the shell itself for the first one.
+
+    # First guess: the shell below, or the shell itself for the first one
+    # (Fortran lines 238–254).
     # Question (see the page): the comment's ITLVL no longer exists.
     k = ibegin - 1 if ibegin != 1 else ibegin
     w[1] = hcomp[1, k]
@@ -123,7 +151,7 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
     w[7] = hcomp[9, k]
 
     while True:                                          # label 10
-        # Residuals G_k.
+        # Residuals G_k (Fortran lines 264–284).
         a[50] = w[1] - xpr - delt * (-3.0 * gr1 * w[1] ** 2 + 2.0 * gr2 * w[2] ** 2
                                      - gr3 * w[2] * w[3] - gr4 * w[1] * w[4]
                                      - gr5 * w[1] * w[5]
@@ -144,7 +172,9 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
                                        - gr6 * w[1] * w[6] - gr11 * w[3] * w[6])
         a[56] = w[7] - x6r - delt16 * (f4 * gr6 * w[1] * w[6] + gr10 * w[3] * w[4]
                                        - gr7 * w[1] * w[7] + gr8 * w[3] * w[5])
-        # The Jacobian, column by column (A(1..7) is d G / d X, ...).
+
+        # The Jacobian, column by column (A(1..7) is d G / d X, ...)
+        # (Fortran lines 290–346).
         a[1] = 1.0 + delt * (6.0 * gr1 * w[1] + gr4 * w[4] + gr5 * w[5]
                              + 2.0 * (gr6 * w[6] + gr7 * w[7]))
         a[2] = -2.0 * delt3 * gr1 * w[1]
@@ -204,7 +234,8 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
         a[49] = 1.0 + delt16 * gr7 * w[1]
 
         # Zero small off-diagonal entries (the diagonal is every 8th, from
-        # 1); solve only if any off-diagonal entry is left.
+        # 1); solve only if any off-diagonal entry is left (Fortran lines
+        # 349–360).
         j1j = 0
         j2j = 1
         for i in range(1, 50):                           # label 20
@@ -218,7 +249,8 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
         # residual itself, not divided by the diagonal.
         if j1j != 0:
             simeqc(a, 8, 7)
-        # Newton update and the convergence test.
+
+        # Newton update (Fortran lines 362–373).
         bigb = 0.0
         bigd = 0.0
         for i in range(1, 8):                            # label 30
@@ -231,27 +263,35 @@ def kemcom(ht, ibegin, iend, hr1, hr2, hr3, hr4, hr5, hr6, hr7, hr8,
                 xb = abs(a[49 + i] / w[i])
                 if xb >= bigb:
                     bigb = xb
+
+        # The convergence test (Fortran lines 374–389).
         if bigd >= nml.abstol or bigb >= nml.reltol:
             icon = icon + 1
             if icon >= nml.kemmax:
-                # Question (see the page): the message says 50, the limit
-                # is KEMMAX.
+                # Suspected bug (see the page): the message says 50, the
+                # limit is KEMMAX.
                 iounits_mod.write(iounits_mod.ishort,
                                   " " + ">" * 39 + "<" * 40 + "\n"
                                   " ERROR IN SUBROUTINE KEMCOM\n"
                                   f" UNABLE TO SOLVE FOR NEW ABUNDANCES IN SHELL{ibegin:4d}\n"
                                   " RUN STOPPED AFTER 50 ATTEMPTS")  # format 1000
-                raise SystemExit
+                raise SystemExit(1)    # STOP 1, the run-time error code
             continue                                     # GOTO 10
         break
 
-    # 18O explicitly. Question (see the page): production only.
+    # 18O explicitly (Fortran line 393). Question (see the page): production
+    # only.
     xo18 = xsum[11] + 18.0 * delt * gr11 * w[3] * w[6]
+
+    # Z: reset, or the zone's mean (Fortran lines 395–399).
     # Question (see the page): the threshold 5e-7 is hard-coded.
     if hcompp[1, iend] < 5.0e-7:
         z = 1.0 - w[1] - w[2] - w[3]
     else:
         z = xsum[3]
+
+    # The new abundances for every shell of the zone (Fortran lines
+    # 400–410). Question (see the page): elements 8 and 10 are not mixed.
     for iu in range(ibegin, iend + 1):                   # label 40
         hcomp[1, iu] = w[1]
         hcomp[4, iu] = w[2]

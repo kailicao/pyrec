@@ -1,4 +1,4 @@
-"""Python version of getw.f (YREC development, 09c3b9b): the evolution of
+"""Python version of getw.f (YREC development, 7be4133): the evolution of
 the internal rotation over one model step."""
 
 import math
@@ -65,11 +65,15 @@ nrzone = 0
 nzone = 0
 
 
-def _print_quad(bl, hl, hr, teffl, hstot, m, quad):
-    """Label 9999: with LPRT0, print the surface quadrupole term.
+def _print_quad(bl: float, hl: np.ndarray, hr: np.ndarray, teffl: float, hstot: float, m: int,
+                quad: np.ndarray) -> float:
+    """Label 9999: with LPRT0, print the surface quadrupole term (Fortran
+    lines 470–480).
 
-    Returns BL, which is overwritten (Question 2 on the page).
+    Returns BL, overwritten with log10 HL(M), as CRRECT sets it.
+
     """
+
     c = constants_mod
     bl = math.log10(hl[m])
     rl = 0.5 * (bl + c.clsunl - 4.0 * teffl - c.c4pil - c.csigl)
@@ -81,9 +85,11 @@ def _print_quad(bl, hl, hr, teffl, hstot, m, quad):
     return bl
 
 
-def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
-         hs1, hs2, hstot, ht, lc, ljdot, m, smass,
-         teffl, eta2, hg, hi, omega, qiw, r0, jenv0, cmixl, lprt0):
+def getw(bl: float, delts: float, dwmax: float, fp: np.ndarray, ft: np.ndarray, hcomp: np.ndarray, hd: np.ndarray,
+         hjm: np.ndarray, hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, hs1: np.ndarray,
+         hs2: np.ndarray, hstot: float, ht: np.ndarray, lc: np.ndarray, ljdot: bool, m: int, smass: float, teffl: float,
+         eta2: np.ndarray, hg: np.ndarray, hi: np.ndarray, omega: np.ndarray, qiw: np.ndarray, r0: np.ndarray,
+         jenv0: int, cmixl: float, lprt0: bool) -> tuple[float, float, bool, int]:
     """Evolve the angular momentum distribution over one model step.
 
     Enforces local conservation of angular momentum in radiative regions
@@ -92,7 +98,7 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
     associated mixing in substeps, with the wind loss (LJDOT0) and, with
     LEXCOM, lithium and beryllium burning (Pinsonneault et al. 1989).
 
-    Translates: getw.f#GETW (09c3b9b)
+    Translates: getw.f#GETW (7be4133)
 
     Parameters
     ----------
@@ -123,32 +129,43 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
     Returns
     -------
     bl, dwmax, ljdot, jenv0
+
     """
+
     global nrzone, nzone
     c = constants_mod
     nml = nmlpar_mod
     o2 = oldrot2_mod
-    # Question (see the page): LBURS is never changed, so BURSMIX and
-    # LIBURN2 are never used.
+
+    # LBURS is never changed, so BURSMIX and LIBURN2 are unused? (see the
+    # page) (Fortran line 140).
     lburs = False
-    # The number of species tracked.
+
+    # The number of species tracked (Fortran lines 143–144).
     nspec = 11
     if nml.lexcom:
         nspec = 15
-    # Shells convective for angular momentum (convection plus overshoot).
+
+    # Shells convective for angular momentum (convection plus overshoot)
+    # (Fortran lines 158–159).
     nrzone, nzone = ovrot(hcomp, hd, hp, hr, hs, ht, lc, m, lcz, mrzone,
                           mxzone, nrzone, nzone)
-    # Disk locking.
+
+    # Disk locking (Fortran lines 161–162).
     lock = False
     if nml.ldisk and disk_mod.sage <= nml.tdisk:
         lock = True
 
+    # Without instabilities: solid-body option and Omega from j (Fortran
+    # lines 163–176).
     if not nml.linstb:
-        # Without instabilities.
         omegas = omega[m]
         if nml.lsolid or nml.impjmod == 1:
             lcz[1:m + 1] = True
         getrot(hd, hjm, hr, hs, hs2, lcz, m, eta2, hi, omega, qiw, r0)
+
+        # The wind over the whole step, from the surface convection zone
+        # (or the whole star) (Fortran lines 181–217).
         if not lock and nml.ljdot0 and lc[m]:
             hicz = 0.0
             if nml.lsolid or nml.impjmod == 1:
@@ -170,10 +187,14 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
             iend = m
             wczimp(hd, hjm, hr, hs, hs2, imax, iend, eta2, hi, omega,
                    qiw, r0, m)
+
+        # GOTO 9999 (Fortran line 218).
         if lprt0:
             bl = _print_quad(bl, hl, hr, teffl, hstot, m, quadru_mod.quad)
         return bl, dwmax, ljdot, jenv0
 
+    # Omega from j, and the exit without instabilities or without a step
+    # (Fortran lines 223–225).
     getrot(hd, hjm, hr, hs, hs2, lcz, m, eta2, hi, omega, qiw, r0)
     lskip = not nml.linstb and not ljdot
     if lskip or delts <= 0.0:
@@ -181,7 +202,7 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
             bl = _print_quad(bl, hl, hr, teffl, hstot, m, quadru_mod.quad)
         return bl, dwmax, ljdot, jenv0
 
-    # The number of diffusion substeps.
+    # The number of diffusion substeps (Fortran lines 228–235).
     if dwmax == 0.0:
         dwmax = nml.dtwind
     nstep = int(dwmax / nml.dtdif)
@@ -193,25 +214,34 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
     nstep = min(nstep, nstep2)
     dt = delts / float(nstep)
 
-    # Physics and the overturn time, once per step.
+    # Physics and the overturn time, once per step; ENVR, GETTAU's RBCZ,
+    # is never read: unused? (see the page) (Fortran lines 240–244).
     physic(fp, ft, hcomp, hd, hg, hl, hp, hr, hs, ht, lc, m, teffl, cmixl)
-    # Question (see the page): ENVR is a scalar local standing for RBCZ.
     envr = 0.0
-    envr = gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl,
+    envr = gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl,  # noqa: F841  (unused in the Fortran too)
                   hstot, bl, m, lc, envr, cmixl)
+
+    # The substeps (Fortran lines 250–251).
     sumdt = 0.0
     lfirstit = True
 
     while True:                                          # label 30
         iredo = 0
         while True:                                      # label 40
+            # The substep's end, without a near-zero last step (Fortran
+            # lines 262–268).
             test = delts - delts * 1.0e-6
             if sumdt + dt >= test:
                 dt = delts - sumdt
                 sumdt = delts
             else:
                 sumdt = sumdt + dt
-            # Time change of theta, for the d theta/dt term of the circulation (MHP 06/02).
+
+            # Time change of theta, for the d theta/dt term of the
+            # circulation (MHP 06/02) (Fortran lines 271–290).
+            # Suspected bug (see the page): after the first substep, THP and
+            # WMST come from omega, which is not updated until the end of
+            # the step.
             if lfirstit:
                 o2.thp[1] = o2.tho[1]
                 o2.wmst[1] = oldrot_mod.wold[1]
@@ -228,9 +258,11 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
                     o2.thp[i] = o2.thm[i] * wmid * qw
                     o2.qwrmst[i] = qw
                     o2.wmst[i] = omega[i]
+
+            # The structure in the middle of the substep (Fortran lines
+            # 291–301).
             fx = sumdt / delts
             ovrtrn_mod.fracstep = fx
-            # The structure in the middle of the substep.
             (fx, hicz, hsbot, hstop, imin, imax, lallcz, lczsur,
              nrzone, nzone) = midmod(
                 delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
@@ -238,8 +270,10 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
                 hlm, hpm, hrm, 0.0, 0.0, htm, 0, 0, False, lcm,
                 lczm, False, omegam, r0m, qiwm, mrzone, mxzone, nrzone,
                 nzone, hcomps)
+
             # The wind, here only for a fully convective star (or without
-            # instabilities); otherwise SECULR calls MWIND.
+            # instabilities); otherwise SECULR calls MWIND (Fortran lines
+            # 304–319).
             if not lock and ljdot and lczsur:
                 omegas = omegam[m]
                 if lallcz or not nml.linstb:
@@ -248,9 +282,11 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
                     iend = m
                     wczimp(hdm, hjm, hrm, hs, hs2, imax, iend, eta2m, him,
                            omegam, qiwm, r0m, m)
-            # Instabilities in radiative regions.
+
+            # Instabilities in radiative regions: mix the convection zones,
+            # then SECULR (Fortran lines 321–350).
             if nml.linstb and not lallcz:
-                limix = False       # set but no longer used (G Somers 6/14)
+                limix = False  # noqa: F841  (unused in the Fortran too)
                 mixcz(hcomp, hs2, lczm, m)
                 for i in range(1, m + 1):                # label 60
                     hjmsav[i] = hjm[i]
@@ -261,9 +297,10 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
                     hstot, smass, teffl, False, iredo,
                     hicz, hsbot, hstop, omegas, lczsur,
                     cod2, hv, False, hcomps)
+
+                # Redo the substep (DT already halved): restore j, the
+                # composition and mu (Fortran lines 354–365).
                 if lredo:
-                    # Redo the substep (DT already halved): restore j, the
-                    # composition and mu.
                     fx = 2.0 * dt / delts
                     sumdt = sumdt - 2.0 * dt
                     for i in range(1, m + 1):            # label 80
@@ -276,26 +313,36 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
                     continue                             # GOTO 40
             break
 
-        # The composition at the start of the next substep.
+        # The composition at the start of the next substep (Fortran lines
+        # 372–379).
         if not lburs:
             for i in range(1, m + 1):
                 for j in range(1, 12):
                     oldmod_mod.hcompp[j, i] = hcomp[j, i]
         lfirstit = False
 
-        # Light elements.
+        # Light elements: the convection zone's depth (Fortran lines
+        # 383–387).
         if nml.lexcom:
             jcore1, jenv1, nrzone, nzone, nzone0 = convec(
                 hcomp, hdm, hpm, hrm, hs, htm, lcm, m, mrzone, mxzone,
                 mxzon0, 0, 0, nrzone, nzone, 0)
-            # Overshoot depth alpha_e H_P, H_P = P r**2 / (rho G m).
+
+            # Overshoot depth alpha_e H_P, H_P = P r**2 / (rho G m)
+            # (Fortran lines 389–394).
             if nml.lovste and lcm[m]:
                 liov_mod.pscal1 = nml.alphae * math.exp(
                     c.clndp * (hpm[jenv1] + 2.0 * hrm[jenv1] - hdm[jenv1]
                                - c.cgl - hs[jenv1]))
             else:
                 liov_mod.pscal1 = 0.0
-            lirate88(hcomp, hdm, htm, m, 2)
+
+            # J=1: the end-of-step rates on the model passed in (since
+            # 7be4133) (Fortran line 398).
+            lirate88(hcomp, hdm, htm, m, 1)
+
+            # Burning, and the rates stored for the next step (Fortran lines
+            # 403–418).
             if not nml.linstb or not lburs or lallcz:
                 liburn(dt, hcomp, hrm, hs1, hs2, htm, jenv1, jenv0, m)
                 jenv0 = jenv1
@@ -306,31 +353,42 @@ def getw(bl, delts, dwmax, fp, ft, hcomp, hd, hjm, hl, hp, hr, hs,
                     oldrat_mod.rbe90[i] = newrat_mod.rbe9[i]
             else:
                 liburn2(dt, hcomp, hrm, hs1, hs2, htm, jenv1, jenv0, m)
-            limix = False
+
+            # Mix the convection zones (Fortran lines 426–428).
+            limix = False  # noqa: F841  (unused in the Fortran too)
             mixcz(hcomp, hs2, lczm, m)
-            # Zero out low abundances.
+
+            # Zero out low abundances (Fortran lines 431–435).
             for i in range(1, m + 1):                    # labels 100, 90
                 for j in range(12, 16):
                     if hcomp[j, i] < 1.0e-24:
                         hcomp[j, i] = 0.0
+
+            # The light elements at the start of the next substep (Fortran
+            # lines 439–451).
             if not nml.linstb or lallcz:
                 oldmod_mod.hcompp[12:16, 1:m + 1] = hcomp[12:16, 1:m + 1]
             elif not lburs:
                 oldmod_mod.hcompp[12:16, 1:m + 1] = hcomp[12:16, 1:m + 1]
 
-        # Bulirsch-Stoer mixing plus burning (never reached: LBURS false).
+        # Bulirsch-Stoer mixing plus burning (never reached: LBURS false)
+        # (Fortran lines 455–461).
         if nml.linstb and not lallcz:
             if lburs:
                 jenv0 = bursmix(cod2, dt, hcomp, hdm, hlm, hpm, hrm, hs, hs1,
                                 hs2, hstot, htm, hv, imax, imin, jenv0, jenv1,
                                 lok, lczm, m, mrzone, mxzone, nrzone, nzone)
 
+        # The next substep (Fortran line 463).
         if not sumdt < delts:
             break                                        # else GOTO 30
 
+    # The new Omega from the final j (Fortran lines 465–469).
     for i in range(1, m + 1):                            # label 110
         omega[i] = omegam[i]
     getrot(hd, hjm, hr, hs, hs2, lcz, m, eta2, hi, omega, qiw, r0)
+
+    # The surface quadrupole term (Fortran lines 470–480).
     if lprt0:                                            # label 9999
         bl = _print_quad(bl, hl, hr, teffl, hstot, m, quadru_mod.quad)
     return bl, dwmax, ljdot, jenv0

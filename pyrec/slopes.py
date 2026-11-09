@@ -1,30 +1,37 @@
-"""Python version of slopes.f (YREC 09c3b9b): the derivatives at the nodes
+"""Python version of slopes.f (YREC 7be4133): the derivatives at the nodes
 for the shape-preserving quadratic splines of McAllister and Roulier, and
 KC's SAFEDIVIDE."""
 
+import numpy as np
 
-def slopes(xtab, ytab, mtab, num):
+
+def slopes(xtab: np.ndarray, ytab: np.ndarray, mtab: np.ndarray, num: int) -> None:
     """The derivative mtab[i] at each node, chosen so that the osculatory
     quadratic spline has one extra knot per interval and keeps convexity
     and monotonicity where the data allow.
 
-    Translates: slopes.f#SLOPES (09c3b9b)
+    Translates: slopes.f#SLOPES (7be4133)
 
     Arguments: xtab[1..num], ytab[1..num] (num >= 3); mtab[1..num], set in
     place; num. None is returned.
+
     """
+
+    # The first three points' chords (Fortran lines 50–62).
+    # Question (see the page): at least three points.
+    # Question (see the page): unprotected divisions remain.
     num1 = num - 1
     im1 = 1
     i = 2
     i1 = 3
-    # Question (see the page): unprotected divisions remain.
     ydif1 = ytab[2] - ytab[1]
     ydif2 = ytab[3] - ytab[2]
     m1 = ydif1 / (xtab[2] - xtab[1])
     m1s = m1
     m2 = ydif2 / (xtab[3] - xtab[2])
     m2s = m2
-    # The interior nodes.
+
+    # The interior nodes (Fortran lines 66–97).
     while True:
         if m1 == 0.0 or m2 == 0.0 or (m1 * m2) <= 0.0:  # label 10
             mtab[i] = 0.0  # label 20
@@ -44,9 +51,10 @@ def slopes(xtab, ytab, mtab, num):
         ydif1 = ytab[i] - ytab[im1]
         ydif2 = ytab[i1] - ytab[i]
         m1 = ydif1 / (xtab[i] - xtab[im1])
+        # Question (see the page): where the denominator can be zero.
         m2 = safedivide(ydif2, (xtab[i1] - xtab[i]), m2)
 
-    # The last node (label 60).
+    # The last node (label 60, Fortran lines 100–110).
     if (m1 * m2) < 0.0:
         mtab[num] = 2.0 * m2  # label 80
     else:
@@ -57,7 +65,7 @@ def slopes(xtab, ytab, mtab, num):
         if (mtab[num] * m2) < 0.0:
             mtab[num] = 0.0  # label 70
 
-    # The first node (label 90).
+    # The first node (label 90, Fortran lines 113–121).
     if (m1s * m2s) < 0.0:
         mtab[1] = 2.0 * m1s  # label 110
         return
@@ -68,13 +76,16 @@ def slopes(xtab, ytab, mtab, num):
         mtab[1] = 0.0  # label 100
 
 
-def safedivide(numerator, denominator, result):
+def safedivide(numerator: float, denominator: float, result: float) -> float:
     """numerator / denominator, or 0 when either is zero (KC 2025-05-31).
 
-    Translates: slopes.f#SAFEDIVIDE (09c3b9b)
+    Translates: slopes.f#SAFEDIVIDE (7be4133)
 
     Arguments: numerator, denominator; result, set only. Returns result.
+
     """
+
+    # Fortran lines 135–138.
     result = 0.0
     if numerator != 0.0 and denominator != 0.0:
         result = numerator / denominator

@@ -1,4 +1,4 @@
-"""Python version of midmod.f (YREC 09c3b9b): the structure at an
+"""Python version of midmod.f (YREC 7be4133): the structure at an
 intermediate time of a model step, for the angular-momentum transport
 loop."""
 
@@ -36,18 +36,21 @@ dratem = np.zeros(JSON + 1)
 dratem0 = np.zeros(JSON + 1)
 
 
-def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
-           hs2, hstot, ht, lc, lfirstit, m, eta2m, hdm, hgm, hicz, him,
-           hlm, hpm, hrm, hsbot, hstop, htm, imin, imax, lallcz, lcm,
-           lczm, lczsur, omegam, r0m, qiwm, mrzone, mxzone, nrzone,
-           nzone, hcomps):
+def midmod(delts: float, dt: float, fx: float, hcomp: np.ndarray, hd: np.ndarray, hg: np.ndarray, hjm: np.ndarray,
+           hl: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, hs1: np.ndarray, hs2: np.ndarray,
+           hstot: float, ht: np.ndarray, lc: np.ndarray, lfirstit: bool, m: int, eta2m: np.ndarray, hdm: np.ndarray,
+           hgm: np.ndarray, hicz: float, him: np.ndarray, hlm: np.ndarray, hpm: np.ndarray, hrm: np.ndarray,
+           hsbot: float, hstop: float, htm: np.ndarray, imin: int, imax: int, lallcz: bool, lcm: np.ndarray,
+           lczm: np.ndarray, lczsur: bool, omegam: np.ndarray, r0m: np.ndarray, qiwm: np.ndarray, mrzone: np.ndarray,
+           mxzone: np.ndarray, nrzone: int, nzone: int, hcomps: np.ndarray) -> tuple[float, float, float, float, int,
+           int, bool, bool, int, int]:
     """Build the structure at the fraction fx of the model step delts by
     linear interpolation in time between the old model (the *_mod arrays)
     and the new one (the arguments); burn and mix the composition over the
     diffusion step dt; find the convection-zone edges; and solve for the
     rotation consistent with the specific angular momentum hjm.
 
-    Translates: midmod.f#MIDMOD (09c3b9b)
+    Translates: midmod.f#MIDMOD (7be4133)
 
     Arguments: the new model (hcomp[k, j], hd, hg, hjm, hl, hp, hr, hs, hs1,
     hs2, ht, lc; log total mass hstot; m shells); lfirstit, True on the
@@ -64,7 +67,9 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
     bottom and top, the edges imin and imax, whether the star is all
     convective, whether a surface zone exists, and the numbers of radiative
     and mixed zones.
+
     """
+
     c = constants_mod
     nml = nmlpar_mod
     om_ = oldmod_mod
@@ -72,11 +77,15 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
     md = mdphy_mod
     sc = scrtch_mod
     tp = temp_mod
+
+    # The number of species (Fortran lines 118–119).
     iend = 11
     if nml.lexcom:
         iend = 15
+
     # On the first diffusion step, start from the old composition; save the
-    # radius, convective state and DELA - DELR of the prior step (MHP 06/02).
+    # radius, convective state and DELA - DELR of the prior step (MHP 06/02)
+    # (Fortran lines 125–141).
     if lfirstit:
         for j in range(1, m + 1):  # DO 20
             lcp[j] = om_.lco[j]
@@ -90,9 +99,11 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
             hrp[j] = hrm[j]
             ddelp[j] = ddeln[j]
             lcp[j] = lcm[j]
+
+    # Interpolate in the model variables and the auxiliary physics; AMUM is
+    # incremented, which comes to the same (see the page) (Fortran lines
+    # 142–169).
     lnewcz = False
-    # Interpolate in the model variables and the auxiliary physics.
-    # Question (see the page): AMUM is incremented, not interpolated.
     fac2 = dt / delts
     for j in range(1, m + 1):  # DO 40
         hdm[j] = om_.hdo[j] + fx * (hd[j] - om_.hdo[j])
@@ -114,8 +125,10 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
         # The total energy generation: nuclear plus the gravitational terms (MHP 6/00).
         temp = sc.sesum[j] + sc.seg[6, j] + sc.seg[7, j]
         md.epsm[j] = op.epso[j] + fx * (temp - op.epso[j])
+
     # Shells that change state over the step are convective if
-    # DELA < DELR at the intermediate time.
+    # DELA < DELR at the intermediate time (Fortran lines 174–191).
+    # Question (see the page): the Schwarzschild criterion here.
     for i in range(1, m + 1):  # DO 50
         ddeln[i] = md.delam[i] - md.delrm[i]
         if lc[i] == lcp[i]:
@@ -131,20 +144,28 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
             else:
                 lcm[i] = False
                 md.velm[i] = 0.0
-    # Question (see the page): this reset makes the block below dead code.
+
+    # Receding convection zones: unused? (see the page), since this reset
+    # comes first (Fortran lines 192–318).
     lnewcz = False
     if lnewcz:
         fx = _receding_cz(m, fx, hjm, hr, hs2, lcm)
-    # Convective overshoot applied to normal convection zones.
+
+    # Convective overshoot applied to normal convection zones (Fortran
+    # lines 320–321).
     nrzone, nzone = ovrot(hcomp, hdm, hpm, hrm, hs, htm, lcm, m, lczm,
                           mrzone, mxzone, nrzone, nzone)
-    # Reburn the original mixture for the short step, at the current T (MHP 6/00).
+
+    # Reburn the original mixture for the short step, at the current T
+    # (MHP 6/00), and save the composition (Fortran lines 326–333).
     rotmix(dt, hcomp, hs2, htm, m, mrzone, mxzone, nrzone, nzone,
            hstot, hdm, hs, hrm, hpm, lczm, hs1)
     for i in range(1, m + 1):
         for j in range(1, iend + 1):
             hcomps[j, i] = hcomp[j, i]
-    # Deuterium burning (MHP 05/02).
+
+    # Deuterium burning (MHP 05/02): the rates over the substep (Fortran
+    # lines 335–347).
     if om_.hcompp[12, m] > 1.0e-14:
         dr = deuter_mod
         if lfirstit:
@@ -155,8 +176,10 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
             for i in range(1, m + 1):
                 dratem0[i] = dratem[i]
                 dratem[i] = dratem[i] + fac2 * (dr.drate[i] - dr.drate0[i])
-        # Radiative zones, shell by shell, until T drops below the cutoff.
-        # Question (see the page): the first cool shell ends both loops.
+
+        # Radiative zones, shell by shell, until T drops below the cutoff;
+        # the zones run outward, so no hotter shell is skipped (Fortran
+        # lines 350–360).
         done = False
         for k in range(1, nrzone + 1):
             for j in range(mrzone[k, 1], mrzone[k, 2] + 1):
@@ -169,12 +192,14 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
                        fac2)
             if done:
                 break
-        # label 190. Convection zones, zone by zone.
+
+        # label 190. Convection zones, zone by zone (Fortran lines 365–370).
         for k in range(1, nzone + 1):
             ibegin = mxzone[k, 1]
             iend = mxzone[k, 2]
             dburnm(ibegin, iend, m, hs2, hcomp, dt, dratem, dratem0, fac2)
-    # Extent of a central convection zone.
+
+    # Extent of a central convection zone (Fortran lines 375–383).
     # Question (see the page): IMIN is the last convective shell.
     if lczm[1]:
         i = m + 1
@@ -185,7 +210,8 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
         imin = max(2, i - 1)  # label 65
     else:
         imin = 2
-    # Extent of a surface convection zone.
+
+    # Extent of a surface convection zone (Fortran lines 385–413).
     lallcz = False
     if lczm[m]:
         i = 0
@@ -210,23 +236,29 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
     else:
         imax = m
         lczsur = False
-    # A local convective overturn time is not computed here (MHP 3/09).
-    # IMPJMOD = 1 is the same as LSOLID (JNT 09/25).
+
+    # The rotation: a first guess from thin spherical shells, I/M = 2/3 r**2,
+    # Omega = J/I, then GETROT (Fortran lines 486–500). A local convective
+    # overturn time is not computed here (MHP 3/09). IMPJMOD = 1 is the same
+    # as LSOLID (JNT 09/25).
     if not nml.lsolid and nml.impjmod != 1:
-        # First guess: thin spherical shells, I/M = 2/3 r**2, Omega = J/I.
         for i in range(1, m + 1):
             him[i] = c.cc23 * math.exp(c.cln * 2.0 * hrm[i])
             omegam[i] = hjm[i] / him[i]
             him[i] = hs2[i] * him[i]
         getrot(hdm, hjm, hrm, hs, hs2, lczm, m, eta2m, him, omegam, qiwm,
                r0m)
-        # Moment of inertia of the surface convection zone.
+
+        # Moment of inertia of the surface convection zone (Fortran lines
+        # 502–509).
         if lczsur:
             hicz = him[m]
             for i in range(m - 1, 0, -1):
                 if not lczm[i]:
                     break  # GOTO 110
                 hicz = hicz + him[i]
+
+    # Solid rotation (Fortran lines 510–521).
     else:
         jstart = 1
         jend = m
@@ -237,17 +269,24 @@ def midmod(delts, dt, fx, hcomp, hd, hg, hjm, hl, hp, hr, hs, hs1,
             hicz = him[1]
             for i in range(2, m + 1):
                 hicz = hicz + him[i]
+
     return (fx, hicz, hsbot, hstop, imin, imax, lallcz, lczsur, nrzone,
             nzone)
 
 
-def _receding_cz(m, fx, hjm, hr, hs2, lcm):
-    # Correct the specific angular momentum of shells that left a convection
-    # zone during the step (MHP 06/02). Never run (LNEWCZ is reset first);
-    # translated as written, its apparent bugs included (question 1 of the
-    # page). Returns FX, which the Fortran overwrites.
+def _receding_cz(m: int, fx: float, hjm: np.ndarray, hr: np.ndarray, hs2: np.ndarray, lcm: np.ndarray) -> float:
+    """Correct the specific angular momentum of shells that left a
+    convection zone during the step (MHP 06/02; Fortran lines 197–318).
+    Never run (LNEWCZ is reset first): unused? (see the page); translated
+    as written, its defects included. Returns FX, which the Fortran
+    overwrites.
+
+    """
+
     c = constants_mod
     hro = oldmod_mod.hro
+
+    # The changed regions (Fortran lines 198–233).
     lcc = False
     ldo = False
     for i in range(1, m):
@@ -271,6 +310,8 @@ def _receding_cz(m, fx, hjm, hr, hs2, lcm):
                         ldo = False
                 else:
                     ldo = False
+
+        # Correct J in a receding zone (Fortran lines 234–316).
         if ldo:
             ldo = False
             if ind < 0:

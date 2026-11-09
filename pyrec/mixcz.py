@@ -1,4 +1,4 @@
-"""Python version of mixcz.f (YREC 09c3b9b): every convection zone
+"""Python version of mixcz.f (YREC 7be4133): every convection zone
 homogenized, then light clean-ups of the composition."""
 
 import numpy as np
@@ -12,24 +12,26 @@ mxzone = np.zeros(25, dtype=int)
 xsum = np.zeros(16)
 
 
-def mixcz(hcomp, hs2, lcz, m):
+def mixcz(hcomp: np.ndarray, hs2: np.ndarray, lcz: np.ndarray, m: int) -> None:
     """Mix each convection zone to its mass-weighted mean composition
     (species 1..11, or 1..15 with LEXCOM), then at every shell floor X at
     zero, cap Z at 1 - X and floor O16 (row 9) at 0.99e-3 (Z - ZENVM).
 
-    Translates: mixcz.f#MIXCZ (09c3b9b)
+    Translates: mixcz.f#MIXCZ (7be4133)
 
     Arguments: the model hcomp[k, j], the shell masses hs2 and the
     convective flags lcz, with m shells (arrays with index 0 unused; lcz
     needs room for the sentinel lcz[m + 1]).
 
     Sets in place: hcomp, and lcz[m + 1] = False. Returns nothing.
+
     """
-    # The standard convection zones.
+
+    # The standard convection zones (Fortran lines 62–85).
     j = 1
     lcc = False
     mp1 = m + 1
-    # Question (see the page): the sentinel is written past the model.
+    # Suspected bug (see the page): the sentinel is written past the model.
     lcz[mp1] = False
     i1 = 0
     full = False
@@ -45,17 +47,19 @@ def mixcz(hcomp, hs2, lcz, m):
             mxzone[j] = i1
             mxzone[j + 1] = i - 1
             j = j + 2
-            # Question (see the page): more than 12 zones are ignored.
+            # More than 12 zones are ignored, without a message.
             if j >= 24:
                 full = True
                 break                                    # GOTO 12
     if not full:
         mxzone[j] = 0
-    # label 12
+
+    # label 12. The species mixed (Fortran lines 86–87).
     iend = 11
     if nmlpar_mod.lexcom:
         iend = 15
-    # Mix all convective zones.
+
+    # Mix all convective zones (Fortran lines 88–116).
     for j in range(1, 25, 2):                            # loop 100
         if mxzone[j] <= 0:
             break                                        # GOTO 110
@@ -76,7 +80,9 @@ def mixcz(hcomp, hs2, lcz, m):
         for jj in range(i1, i2 + 1):
             for i in range(1, iend + 1):
                 hcomp[i, jj] = xsum[i]
-    # label 110: renormalize the composition if necessary.
+
+    # label 110: renormalize the composition if necessary (Fortran lines
+    # 117–122).
     # Question (see the page): Y is not recomputed after these.
     for i in range(1, m + 1):                            # loop 140
         hcomp[1, i] = max(hcomp[1, i], 0.0)
@@ -84,5 +90,6 @@ def mixcz(hcomp, hs2, lcz, m):
         # Question (see the page): the oxygen floor.
         hcomp[9, i] = max(hcomp[9, i],
                           0.99e-3 * (hcomp[3, i] - comp_mod.zenvm))
+
     # The convective turnover time is not computed here: it comes from
-    # OVRTRN_MOD (G. Somers 3/17).
+    # OVRTRN_MOD (G. Somers 3/17) (Fortran lines 124–245, commented out).

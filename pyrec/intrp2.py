@@ -1,13 +1,15 @@
-"""Python version of intrp2.f (YREC development, 09c3b9b)."""
+"""Python version of intrp2.f (YREC development, 7be4133)."""
+
+import numpy as np
 
 
-def intrp2(a, b, x):
+def intrp2(a: np.ndarray, b: np.ndarray, x: float) -> None:
     """Weights of 4-point Lagrange interpolation at ``x``, no derivatives.
 
     The same as INTERP without its derivative weights. Used by the opacity
     tables, the diffusion regridding and PHYSIC.
 
-    Translates: intrp2.f#INTRP2 (09c3b9b)
+    Translates: intrp2.f#INTRP2 (7be4133)
 
     Parameters
     ----------
@@ -18,8 +20,11 @@ def intrp2(a, b, x):
         ``f(x) ~ sum_i b[i] f(a[i])``.
     x : float
         The point of interpolation.
+
     """
+
     # SAVE in the Fortran is harmless: every local is set before use.
+    # The node differences and the denominators (Fortran lines 18–27).
     a43 = a[4] - a[3]
     a42 = a[4] - a[2]
     a41 = a[4] - a[1]
@@ -30,6 +35,8 @@ def intrp2(a, b, x):
     d2 = a21 * a32 * a42
     d3 = -a31 * a32 * a43
     d4 = a41 * a42 * a43
+
+    # The interpolation weights (Fortran lines 28–35).
     xa1 = x - a[1]
     xa2 = x - a[2]
     xa3 = x - a[3]

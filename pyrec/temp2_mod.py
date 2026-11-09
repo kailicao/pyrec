@@ -1,6 +1,7 @@
-"""Python version of temp2_mod.f (YREC 09c3b9b): the velocities of rotational mixing at each interface, formerly COMMON/TEMP2/.
+"""Python version of temp2_mod.f (YREC 7be4133): the velocities of
+rotational mixing at each interface, formerly COMMON/TEMP2/.
 
-Translates: temp2_mod.f#TEMP2_MOD (09c3b9b)
+Translates: temp2_mod.f#TEMP2_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE TEMP2_MOD import this module and write ``temp2_mod.<name>``.
@@ -13,6 +14,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# Fortran lines 28–35.
 ves = np.zeros(_JSON + 1)     # Eddington-Sweet circulation velocity
 ves0 = np.zeros(_JSON + 1)    # its value at the previous iteration
 vss = np.zeros(_JSON + 1)     # secular-shear velocity

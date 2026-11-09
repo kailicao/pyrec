@@ -1,4 +1,4 @@
-"""Python version of microdiff_run.f (YREC 09c3b9b): one species diffused
+"""Python version of microdiff_run.f (YREC 7be4133): one species diffused
 over one step on the equally spaced grid, for MICRODIFF."""
 
 import numpy as np
@@ -33,16 +33,18 @@ b = np.zeros(JSON + 1)
 c = np.zeros(JSON + 1)
 
 
-def microdiff_run(dr, dt, stot, npt, em, er, eden, etem, ehqpr, edelr,
-                  espec, edxdr, em_h, er_h, eden_h, etem_h, ehqpr_h,
-                  edelr_h, espec_h, edxdr_h, thea, thez, j):
+def microdiff_run(dr: float, dt: float, stot: float, npt: int, em: np.ndarray, er: np.ndarray, eden: np.ndarray,
+                  etem: np.ndarray, ehqpr: np.ndarray, edelr: np.ndarray, espec: np.ndarray, edxdr: np.ndarray,
+                  em_h: np.ndarray, er_h: np.ndarray, eden_h: np.ndarray, etem_h: np.ndarray, ehqpr_h: np.ndarray,
+                  edelr_h: np.ndarray, espec_h: np.ndarray, edxdr_h: np.ndarray, thea: float, thez: float,
+                  j: int) -> None:
     """Diffuse species column j over one step on the equal grid: the
     advective term by the two-step Lax-Wendroff scheme, then the diffusive
     term implicitly (a tridiagonal solve, iterated up to NITER_GS times to
     the tolerance GRTOL). Replaces espec[j, 1..npt] by the change in the
     abundance.
 
-    Translates: microdiff_run.f#MICRODIFF_RUN (09c3b9b)
+    Translates: microdiff_run.f#MICRODIFF_RUN (7be4133)
 
     Arguments: the spacing dr; dt and stot in Bahcall and Loeb's units;
     npt grid points; the grid variables em, er, eden, etem, ehqpr, edelr
@@ -53,59 +55,89 @@ def microdiff_run(dr, dt, stot, npt, em, er, eden, etem, ehqpr, edelr,
 
     Sets in place: espec[j, i] (the change), espec_h[j, i] (the half-step
     abundances), edxdr, edxdr_h. Returns nothing.
+
     """
-    # Dummy vectors for the diffusing element, and its original run.
+
+    # Dummy vectors for the diffusing element (Fortran lines 73–80).
     for i in range(1, npt):
         ed[i] = espec[j, i]
         ed_h[i] = espec_h[j, i]
     ed[npt] = espec[j, npt]
+
+    # Its original run (Fortran lines 82–91).
+    # Question (see the page): the comments name light elements.
     for i in range(1, npt):
         ed_orig[i] = ed[i]
         ed_orig_h[i] = ed_h[i]
     ed_orig[npt] = ed[npt]
-    # LDOLI: the Lax-Wendroff routines do not use the old metal vectors.
+
+    # LDOLI: the Lax-Wendroff routines do not use the old metal vectors
+    # (Fortran lines 93–95).
     ldoli = True
-    # Coefficients at the grid points.
+
+    # Coefficients at the grid points (Fortran lines 97–102).
     microdiff_cod(npt, espec, er, eden, etem, ehqpr, edelr, ecod1, ecod2,
                   edxdr, thea, thez, j)
-    # Lax-Wendroff, first half step: the change at the midpoints.
+
+    # Lax-Wendroff, first half step: the change at the midpoints, and the
+    # half-step abundances (Fortran lines 104–117).
     lax_wendrof1(dt, ecod1, em, npt, stot, ed_h, ldoli)
     for i in range(1, npt):
         espec_h[j, i] = ed_orig_h[i] + ed_h[i]
-    # Coefficients at the npt - 1 midpoints, from the provisional solution.
+
+    # Coefficients at the npt - 1 midpoints, from the provisional solution
+    # (Fortran lines 119–125).
     npt2 = npt - 1
     microdiff_cod(npt2, espec_h, er_h, eden_h, etem_h, ehqpr_h, edelr_h,
                   ecod1_h, ecod2_h, edxdr_h, thea, thez, j)
-    # Lax-Wendroff, full step at the points.
+
+    # Lax-Wendroff, full step at the points (Fortran lines 127–133).
     lax_wendrof2(dt, ecod1_h, em_h, ed, npt, stot, ldoli)
+
     # The implicit term: ed_p is the abundance at the start of the step,
-    # ed_prime the abundance without the second term.
+    # ed_prime the abundance without the second term (Fortran lines
+    # 135–143).
     for i in range(1, npt + 1):
         ed_p[i] = ed_orig[i]
         ed_prime[i] = ed[i]
+
+    # ALPHA, the factor in front of the diffusion coefficients (Fortran
+    # lines 144–150).
     fac = constants_mod.c4pi * dt / dr
     alpha[1] = fac / em_h[1]
     for i in range(2, npt):
         alpha[i] = fac / (em_h[i] - em_h[i - 1])
     alpha[npt] = fac / (stot - em_h[npt - 1])
+
+    # The iteration for the new run of abundances (Fortran lines 151–197).
+    # Question (see the page): every iteration solves the same system.
+    # Suspected bug (see the page): with NITER_GS = 0 the Fortran prints
+    # DXMAX and IMAX left from an earlier call; here they are 0.
     ishort = iounits_mod.ishort
     converged = False
     dxmax = 0.0
     imax = 0
     for it in range(1, nmlpar_mod.niter_gs + 1):        # loop 100
-        # Question (see the page): midpoint i is taken between points i-1
-        # and i here, between i and i+1 in MICRODIFF_MTE.
+        # The change at the midpoints (Fortran lines 153–157).
+        # Suspected bug (see the page): midpoint i is taken between points
+        # i-1 and i here, between i and i+1 in MICRODIFF_MTE.
         for i in range(2, npt + 1):
             ed_h[i] = 0.5 * (ed[i] + ed[i - 1] - ed_p[i] - ed_p[i - 1])
-        # Question (see the page): eqcod2x_h is zeroed, so every iteration
-        # solves the same system.
+
+        # Store the current run in ed_p, and zero eqcod2x_h, used only by
+        # GRSETT (Fortran lines 158–166).
         for i in range(1, npt):
             ed_p[i] = ed[i]
             eqcod2x_h[i] = 0.0
         ed_p[npt] = ed[npt]
+
+        # The tridiagonal system and its solution (Fortran lines 167–174).
         get_imp_diffco(alpha, ecod2_h, ed_h, eqcod2x_h, a, b, c, npt)
         tridiag_gs(a, b, c, ed_prime, npt, ed)
-        # Question (see the page): the largest signed change, not |change|.
+
+        # The convergence test (Fortran lines 176–190).
+        # Suspected bug (see the page): the largest signed change, not
+        # |change|.
         dxmax = 0.0
         imax = 0
         for i in range(1, npt + 1):
@@ -118,6 +150,8 @@ def microdiff_run(dr, dt, stot, npt, em, er, eden, etem, ehqpr, edelr,
         if dxmax < nmlpar_mod.grtol:
             converged = True
             break                                           # GOTO 120
+
+    # Not converged (Fortran lines 192–196).
     if not converged:
         text = (f" MICRODIFF FAILED TO CONVERGE TO WITHIN "
                 f"{nmlpar_mod.grtol:9.3E} IN {nmlpar_mod.niter_gs:3d}"
@@ -125,6 +159,8 @@ def microdiff_run(dr, dt, stot, npt, em, er, eden, etem, ehqpr, edelr,
                 f" IN EQUALLY SPACED SHELL {imax:5d}")     # format 110
         iounits_mod.write(iounits_mod.iowr, text)
         iounits_mod.write(ishort, text)
-    # label 120: the change in the diffused element.
+
+    # Label 120: the change in the diffused element (Fortran lines
+    # 199–202).
     for i in range(1, npt + 1):
         espec[j, i] = ed[i] - ed_orig[i]

@@ -1,7 +1,7 @@
-"""Python version of nmlbypass_mod.f (YREC 09c3b9b): the namelist variables
+"""Python version of nmlbypass_mod.f (YREC 7be4133): the namelist variables
 that only set other quantities, formerly COMMON/NMLBYPASS/.
 
-Translates: nmlbypass_mod.f#NMLBYPASS_MOD (09c3b9b)
+Translates: nmlbypass_mod.f#NMLBYPASS_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case, with the
 module's initializers (the defaults of the PHYSICS and CONTROL namelists,
@@ -9,6 +9,7 @@ read by parmin). Routines that USE NMLBYPASS_MOD import this module and
 write ``nmlbypass_mod.<name>``.
 """
 
+# The members, in the module's order (Fortran lines 34–116).
 flag_dx = 0.05
 flag_dw = 0.1
 flag_dz = 0.05

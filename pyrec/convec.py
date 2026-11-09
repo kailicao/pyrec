@@ -1,13 +1,15 @@
-"""Python version of convec.f (YREC 09c3b9b): the convection zones (without
+"""Python version of convec.f (YREC 7be4133): the convection zones (without
 and with overshoot), the radiative regions, JCORE and JENV."""
 
 from pyrec import iounits_mod
+import numpy as np
 from pyrec import nmlpar_mod
 from pyrec.oversh import oversh
 
 
-def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
-           jcore, jenv, nrzone, nzone, nzone0):
+def convec(hcomp: np.ndarray, hd: np.ndarray, hp: np.ndarray, hr: np.ndarray, hs: np.ndarray, ht: np.ndarray,
+           lc: np.ndarray, m: int, mrzone: np.ndarray, mxzone: np.ndarray, mxzon0: np.ndarray, jcore: int, jenv: int,
+           nrzone: int, nzone: int, nzone0: int) -> tuple[int, int, int, int, int]:
     """Find the convection zones, without overshoot (mxzon0, nzone0) and
     with it (mxzone, nzone, merging zones that overlap), the radiative
     regions between them (mrzone, nrzone), the edge of the convective
@@ -15,7 +17,7 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
     overshoot). Overshoot is overmixing: the overshoot shells are mixed
     with the zone but keep the radiative gradient.
 
-    Translates: convec.f#CONVEC (09c3b9b)
+    Translates: convec.f#CONVEC (7be4133)
 
     Arguments: the model hcomp, hd, hp, hr, hs, ht (used only by oversh);
     lc[1..m], convective or not (lc[m+1] is set to False here); m, the
@@ -24,10 +26,13 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
     nzone0, passed in (with any value).
 
     Returns (jcore, jenv, nrzone, nzone, nzone0).
+
     """
+
     n = nmlpar_mod
 
-    # The standard convection zones; a run of a single shell is ignored.
+    # The standard convection zones; a run of a single shell is ignored
+    # (Fortran lines 83–109).
     # Question (see the page): one-shell zones treated as radiative.
     j = 1
     lcc = False
@@ -54,7 +59,7 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
         break  # GOTO 12
     # label 12
 
-    # No convection zone (MHP 5/91).
+    # No convection zone (MHP 5/91) (Fortran lines 111–122).
     if j == 1:
         jcore = 1
         jenv = m
@@ -64,6 +69,8 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
         mrzone[1, 1] = 1
         mrzone[1, 2] = m
         return jcore, jenv, nrzone, nzone, nzone0  # GOTO 9999
+
+    # The zones without overshoot (Fortran lines 123–128).
     nzone = j - 1
     for i in range(1, nzone + 1):
         mxzon0[i, 1] = mxzone[i, 1]
@@ -71,7 +78,8 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
     nzone0 = nzone
 
     # The outer edge of the convective core (JCORE) and the inner edge of
-    # the convective envelope (JENV), before overshoot.
+    # the convective envelope (JENV), before overshoot (Fortran lines
+    # 129–150).
     if mxzone[1, 1] == 1:
         if mxzone[1, 2] == m:
             # A fully convective star (MRZONE is left as it was).
@@ -89,7 +97,7 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
         jenv = m
 
     # Overshoot, if any switch is on: oversh moves the edges in mxzone;
-    # then merge zones whose edges now meet.
+    # then merge zones whose edges now meet (Fortran lines 151–182).
     if n.lovstc or n.lovste or n.lovstm:
         oversh(hcomp, hd, hp, hr, hs, ht, m, mxzone, mxzon0, nzone)
         if nzone != 1:
@@ -115,7 +123,8 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
                 if j <= nzone - 1:
                     continue  # GOTO 85
                 break
-    # label 100: the radiative regions.
+
+    # label 100: the radiative regions (Fortran lines 183–205).
     # Below the first convection zone.
     if mxzone[1, 1] > 1:
         nrzone = 1
@@ -133,7 +142,8 @@ def convec(hcomp, hd, hp, hr, hs, ht, lc, m, mrzone, mxzone, mxzon0,
     if mxzone[nzone, 2] < m:
         nrzone = nrzone + 1
         mrzone[nrzone, 1] = mxzone[nzone, 2] + 1
-        # Question (see the page): MRZONE(1,2), not MRZONE(NRZONE,2).
+        # Suspected bug (see the page): MRZONE(1,2), not MRZONE(NRZONE,2).
         mrzone[1, 2] = m
+
     # label 9999
     return jcore, jenv, nrzone, nzone, nzone0

@@ -1,7 +1,8 @@
-"""Python version of checkc.f (YREC 09c3b9b): the composition checked after
+"""Python version of checkc.f (YREC 7be4133): the composition checked after
 rotational mixing, and the mean molecular weight recomputed."""
 
 from pyrec import comp2_mod
+import numpy as np
 from pyrec import comp_mod
 from pyrec import iounits_mod
 from pyrec import mdphy_mod
@@ -12,12 +13,13 @@ from pyrec import oldmod_mod
 ATOMWT = (None, 1.007825, 4.002603, 12.0, 3.01603)
 
 
-def checkc(hcomp, it, lprt, m, dt, iredo, lok, lredo):
+def checkc(hcomp: np.ndarray, it: int, lprt: bool, m: int, dt: float, iredo: int, lok: bool,
+           lredo: bool) -> tuple[float, int, bool, bool]:
     """Check abundances after a step of rotational mixing: repair tiny
     anomalies, halve the time step otherwise (stop after 3 cuts), and
     recompute the mean molecular weight AMUM of a fully ionized gas.
 
-    Translates: checkc.f#CHECKC (09c3b9b)
+    Translates: checkc.f#CHECKC (7be4133)
 
     Arguments: hcomp[species, shell] (changed in place where repaired); it,
     the iteration on the diffusion coefficients; lprt, print the largest
@@ -26,10 +28,14 @@ def checkc(hcomp, it, lprt, m, dt, iredo, lok, lredo):
 
     Returns (dt, iredo, lok, lredo): dt halved, iredo increased and
     lok = False, lredo = True after an anomaly that is not repaired.
+
     """
+
     hcompp = oldmod_mod.hcompp
-    # Before the last iteration only X, Y and 3He.
-    jend = 11 if it == nmlpar_mod.itdif2 else 4
+
+    # X, Y and 3He on every iteration (species 5-11 are mixed after
+    # SECULR's iteration loop) (Fortran lines 98–141).
+    jend = 4
     lredo = False
     for j in range(1, jend + 1):  # label 20
         if j == 3:  # Z is not diffused as a unit.
@@ -39,7 +45,7 @@ def checkc(hcomp, it, lprt, m, dt, iredo, lok, lredo):
                 # Question (see the page): the threshold is relative to the
                 # surface value, which may be zero.
                 if abs(hcomp[j, i]) < 1.0e-5 * hcomp[j, m]:
-                    # Question (see the page): never true in this loop.
+                    # Never true in this loop (unused?, as in the Fortran).
                     if i == 1 or i == m:
                         hcomp[j, i] = 0.0
                     else:
@@ -55,7 +61,7 @@ def checkc(hcomp, it, lprt, m, dt, iredo, lok, lredo):
                            "RUN STOPPED")  # format 1010
                     print(msg)
                     iounits_mod.write(iounits_mod.ishort, msg)
-                    raise SystemExit
+                    raise SystemExit(1)    # STOP 1, the run-time error code
                 lredo = True
                 lok = False
                 dt = 0.5 * dt
@@ -68,7 +74,7 @@ def checkc(hcomp, it, lprt, m, dt, iredo, lok, lredo):
                 # GOTO 100: the end, without recomputing mu.
                 return dt, iredo, lok, lredo
 
-    # The largest fractional change over the step.
+    # The largest fractional change over the step (Fortran lines 142–166).
     if it == nmlpar_mod.itdif2 and lprt:
         delc = 0.0
         icmax = 0
@@ -91,7 +97,7 @@ def checkc(hcomp, it, lprt, m, dt, iredo, lok, lredo):
             print(f"     NEW SURFACE LI{hcomp[14, m]:14.4E}"
                   f"OLD VALUE{hcompp[14, m]:14.4E}")  # format 60
 
-    # Mean molecular weight of a fully ionized gas.
+    # Mean molecular weight of a fully ionized gas (Fortran lines 170–184).
     if it > 1:
         for i in range(1, m + 1):  # label 90
             dfx1 = hcomp[1, i] - comp_mod.xenv
@@ -107,4 +113,5 @@ def checkc(hcomp, it, lprt, m, dt, iredo, lok, lredo):
                     + 0.5 * hcomp[3, i])
             emu2 = 1.0 / temp
             mdphy_mod.amum[i] = amu2 * emu2 / (amu2 + emu2)
+
     return dt, iredo, lok, lredo

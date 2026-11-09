@@ -1,20 +1,23 @@
-"""Python version of hra.f (YREC 09c3b9b): the Harvard Reference
+"""Python version of hra.f (YREC 7be4133): the Harvard Reference
 Atmosphere's T(tau) relation."""
 
 import math
 
 
-def hra(tau):
+def hra(tau: float) -> float:
     """Return log10 T at optical depth tau from a ninth-degree polynomial
     in log10 tau (a fit to the Harvard Reference Atmosphere).
 
-    Translates: hra.f#HRA (09c3b9b)
+    Translates: hra.f#HRA (7be4133)
 
     Arguments: tau.
 
     Returns log10 T.
+
     """
+
     # Question (see the page): the range of tau the fit is valid for.
+    # The polynomial in log10 tau (Fortran lines 13–33).
     tl = math.log10(tau)
     x = 3.81152046471
     x = x + 0.146133736471 * tl

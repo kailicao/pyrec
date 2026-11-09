@@ -1,7 +1,7 @@
-"""Python version of nmlpar_mod.f (YREC a8a5950): the settings of the
+"""Python version of nmlpar_mod.f (YREC 7be4133): the settings of the
 CONTROL and PHYSICS namelists read by the physics, formerly COMMON/NMLPAR/.
 
-Translates: nmlpar_mod.f#NMLPAR_MOD (a8a5950)
+Translates: nmlpar_mod.f#NMLPAR_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case and in its
 order, with its initializers (the namelists' defaults; parmin reads the
@@ -12,6 +12,7 @@ initializer start at zero, as Fortran's static storage does in practice.
 
 import numpy as np
 
+# The members, in the module's order (Fortran lines 37–277).
 alatm_feh = 0.0  # no initializer
 alatm_alpha = 0.0  # no initializer
 laltptau100 = False  # no initializer
@@ -79,7 +80,8 @@ lcodm = False
 dmdt0 = -1e-14
 fczdmdt = 0.1
 ftotdmdt = 0.01
-compacc = np.array([0.0, 0.71668, 0.265721, 0.01757, 2.9e-05, 0.003013, 3.385e-05, 0.0009346, 0.0, 0.008462, 0.0, 1.696e-05, 0.0, 2e-09, 2e-09, 3e-11])
+compacc = np.array([0.0, 0.71668, 0.265721, 0.01757, 2.9e-05, 0.003013, 3.385e-05, 0.0009346, 0.0, 0.008462, 0.0,
+                    1.696e-05, 0.0, 2e-09, 2e-09, 3e-11])
 creim = -4e-13
 lreimer = False
 lmdot = False
@@ -123,7 +125,8 @@ fgsfc = 1.0
 ies = 1
 igsf = 1
 imu = 1
-vnew = np.array([0.0, 0.001999, 0.003238, 0.037573, 0.071794, 0.04052, 0.173285, 0.0, 0.482273, 0.053152, 0.005379, 0.098668, 0.0])
+vnew = np.array([0.0, 0.001999, 0.003238, 0.037573, 0.071794, 0.04052, 0.173285, 0.0, 0.482273, 0.053152, 0.005379,
+                 0.098668, 0.0])
 weakscreening = 0.03
 kttau = 0
 kttau0 = 0  # no initializer
@@ -150,7 +153,8 @@ lnew0 = False
 nmodls = np.full(51, 0, dtype=int)  # index 0 unused
 lfirst = np.full(51, True, dtype=bool)  # index 0 unused
 numrun = 1
-sstandard = np.array([0.0, 0.9828, 1.0485, 0.9815, 0.9241, 1.3818, 1.0542, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0108, 0.7819, 0.2875])
+sstandard = np.array([0.0, 0.9828, 1.0485, 0.9815, 0.9241, 1.3818, 1.0542, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                      1.0108, 0.7819, 0.2875])
 atime = np.array([0.0, 0.001, 0.02, 0.5, 0.02, 0.3, 0.0015, 0.1, 0.02, 0.04, 0.02, 0.02, 0.25, 1.5, 0.25])
 tcut = np.array([0.0, 6.5, 6.5, 6.82, 7.7, 7.5])
 tscut = 6.0
@@ -158,7 +162,8 @@ tenv0 = 3.0
 tenv1 = 9.0
 tgcut = 6.9
 htoler = np.zeros((6, 3))
-htoler[1:, 1:] = np.array([6e-05, 4.5e-05, 3e-05, 9e-05, 3e-05, 0.9, 0.5, 0.5, 2.0, 2.5e-06]).reshape((2, 5)).T  # RESHAPE, column order
+htoler[1:, 1:] = np.array([6e-05, 4.5e-05, 3e-05, 9e-05, 3e-05, 0.9, 0.5,
+                           0.5, 2.0, 2.5e-06]).reshape((2, 5)).T  # RESHAPE, column order
 fcorr0 = 0.8
 fcorri = 0.1
 hpttol = np.array([0.0, 1e-08, 0.08, 0.05, 0.05, 1.0, 1.0, 0.0, 0.05, 0.02, 0.05, 0.05, 0.1])
@@ -192,7 +197,7 @@ lovste = False
 lovstm = False
 lsemic = False
 ladov = False
-lovmax = False
+lovmax = True
 atmstp = 0.5
 envstp = 0.5
 lsolwind = False

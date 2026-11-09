@@ -1,4 +1,4 @@
-"""Python version of main.f (YREC a8a5950): YREC's main program, which reads
+"""Python version of main.f (YREC 7be4133): YREC's main program, which reads
 the run's settings, sets up the tables, and evolves the starting model of
 each kind card model by model."""
 
@@ -56,16 +56,18 @@ from pyrec.wrtout import wrtout
 JSON = dimensions_mod.json
 
 
-def main():
+def main() -> None:
     """YREC's main program: settings and tables, then for each kind card
     the starting model and the evolution loop (mass loss, mixing and
     burning, rezoning, four levels of CRRECT, rotation, light elements,
     time step, output), with the solar and stellar calibrations around it.
 
-    Translates: main.f#(file level) (a8a5950)
+    Translates: main.f#(file level) (7be4133)
 
     No arguments; it ends with STOP (SystemExit).
+
     """
+
     c = constants_mod
     nml = nmlpar_mod
     io = iounits_mod
@@ -102,19 +104,18 @@ def main():
     mxzone = np.zeros((13, 3), dtype=int)
     mxzon0 = np.zeros((13, 3), dtype=int)
     mrzone = np.zeros((14, 3), dtype=int)
-    lcz = np.zeros(JSON + 1, dtype=bool)
 
     # Scalars passed before any routine sets them, or set by the callees
-    # (GL by WRTOUT; LATMO, LDERIV, LMIX, LOCOND by CRRECT; QDT, QDP by
-    # STARIN). Fortran leaves them undefined; 0 or False here.
+    # (GL by WRTOUT; LATMO, LDERIV, LMIX, LOCOND by CRRECT). Fortran
+    # leaves them undefined; 0 or False here.
     bl = dage = ddage = delts = deltsh = ftri = hstot = smass = teffl = 0.0
-    dwmax = gl = qdt = qdp = sjtot = skerot = senvold = vel = 0.0
+    dwmax = gl = sjtot = skerot = senvold = vel = 0.0
     ikut = istore = jcore = jenv = jxbeg = jxend = jxmid = m = model = 0
     nrzone = nzone = nzone0 = itdone = jenv0 = 0
     latmo = lderiv = lmix = locond = lnew = lshell = lnewfit = False
     lprt0 = False
     compmix = ''
-    # Question (see the page): IU is never set, but passed to ENGEB.
+    # IU is never set in the Fortran, but passed to ENGEB (unused block).
     iu = 0
     # DATA DLDX,DRDX,DLDA,DRDA,LSOL/4*0.0D0,.FALSE./ (explicit, since
     # SETCAL may never run while LSOL is still tested at the end).
@@ -134,26 +135,30 @@ def main():
             trit, tril, cfenv, ps, ts, rs, ftri, istore, estore,
             hstot, bl, teffl, hd, hha, hhb, hhc, hl, hmax, hp,
             hpp, hr, hs, hs1, hs2, hsrf, ht, htt, hcomp, lc,
-            nhmax, tlumx, latmo, lderiv, lmix, locond, qdt, qdp,
+            nhmax, tlumx, latmo, lderiv, lmix, locond,
             fp, ft, eta2, omega, r0, itdone, hg, hi, hjm, itlvl,
-            lcz, mxzone, qiw, hkerot, hkeroto, cmixl)
+            mxzone, qiw, hkerot, hkeroto, cmixl)
 
-    # Start.
+    # Start: the version; IOWR (PARMIN sets it again) (Fortran lines 351–355).
     yrecver, githash = setversion('', '')
     io.iowr = 9
     # LPUNCH is true once the first model is calculated.
     lpunch = False
-    # Read the run's parameters; it returns the table files' names.
+
+    # Read the run's parameters; it returns the table files' names (Fortran lines 357–359).
     (falex06, fallard, fatm, ffermi, fliv95, fpatm, fpenv, fpmod, fpurez,
      fscvh, fscvhe, fscvz) = parmin('', '', '', '', '', '', '', '', '', '',
                                     '', '', yrecver, githash)
-    # Constants and tables.
+
+    # Constants and tables (Fortran lines 362–363).
     setups(falex06, fallard, fatm, ffermi, fliv95, fpurez, fscvh, fscvhe,
            fscvz)
-    # The Monte Carlo option is removed: one pass, the age factor 1.
+
+    # The Monte Carlo option is removed: one pass, the age factor 1 (Fortran lines 369–372).
     facage = 1.0
     lsavpu = nml.lpulse
-    # Automatic solar calibration: starting estimates of alpha and X.
+
+    # Automatic solar calibration: starting estimates of alpha and X (Fortran lines 378–387).
     if nml.lcals:
         lsol = setcal(facage, lsol)
         iconv = 1
@@ -163,11 +168,12 @@ def main():
         kttausv = nml.kttau
     else:
         iconv = 0
-    # Calibration of a star of given Teff and L.
+
+    # Calibration of a star of given Teff and L (Fortran lines 390–392).
     if nml.lcalst:
         alri, lstar, lpassr = setscal(alri, lstar, lpassr)
 
-    # The kind-card loop (DO 200).
+    # The kind-card loop (DO 200): the run's settings (Fortran lines 397–409).
     for nk in range(1, nml.numrun + 1):
         sound_mod.lsound = False
         label_mod.xenv0 = nml.xenv0a[nk]
@@ -179,20 +185,22 @@ def main():
         large = False
         sjtot = 0.0
         skerot = 0.0
-        # Read in (or keep) the starting model.
+
+        # Read in (or keep) the starting model (Fortran lines 413–428).
         (bl, dage, ddage, delts, deltsh, ftri, hstot, ikut, istore, lnew,
-         m, model, qdp, qdt, sjtot, skerot, smass, teffl, vel,
+         m, model, sjtot, skerot, smass, teffl, vel,
          compmix) = starin(
             bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft, ftri,
             hcomp, hd, hi, hjm, hkerot, hl, hp, hr, hs, hs1, hs2, hstot, ht,
             ikut, istore, jenv, large, lc, lnew, m, model, nk, omega, ps,
-            qdp, qdt, qiw, r0, rs, sjtot, skerot, smass, teffl, tlumx, tril,
+            qiw, r0, rs, sjtot, skerot, smass, teffl, tlumx, tril,
             trit, ts, vel, hg, v, cmixl, compmix)
         if omega[1] == 0 and nml.lrot:
             print('LROT set to TRUE, but OMEGA(1) = 0. Stopping.'
                   ' Initialize rotation rates or set LROT to FALSE.')
-            raise SystemExit
-        # Disable stop conditions the starting model already meets.
+            raise SystemExit(3)
+
+        # Disable stop conditions the starting model already meets (Fortran lines 430–460).
         if rl_.lendag[nk]:
             if nml.end_dcen[nk] > 0.0 and hcomp[12, 1] < nml.end_dcen[nk]:
                 nml.end_dcen[nk] = -nml.end_dcen[nk]
@@ -201,22 +209,19 @@ def main():
                 print(msg)
                 io.write(io.ishort, msg)
             if nml.end_xcen[nk] > 0.0 and hcomp[1, 1] < nml.end_xcen[nk]:
-                # Question (see the page): END_DCEN set, and D printed.
-                nml.end_dcen[nk] = -nml.end_xcen[nk]
-                msg = (f"STARTING X {hcomp[12, 1]:12.4E} BELOW STOP VALUE "
-                       f"{nml.end_dcen[nk]:12.4E} STOP DISABLED.")  # 102
+                nml.end_xcen[nk] = -nml.end_xcen[nk]
+                msg = (f"STARTING X {hcomp[1, 1]:12.4E} BELOW STOP VALUE "
+                       f"{nml.end_xcen[nk]:12.4E} STOP DISABLED.")  # 102
                 print(msg)
                 io.write(io.ishort, msg)
             if nml.end_ycen[nk] > 0.0 and hcomp[2, 1] < nml.end_ycen[nk]:
                 nml.end_ycen[nk] = -nml.end_ycen[nk]
-                # Question (see the page): prints D and END_DCEN.
-                msg = (f"STARTING Y {hcomp[12, 1]:12.4E} BELOW STOP VALUE "
-                       f"{nml.end_dcen[nk]:12.4E} STOP DISABLED.")  # 103
+                msg = (f"STARTING Y {hcomp[2, 1]:12.4E} BELOW STOP VALUE "
+                       f"{nml.end_ycen[nk]:12.4E} STOP DISABLED.")  # 103
                 print(msg)
                 io.write(io.ishort, msg)
 
-        # The neutrino table, switched off (MHP 2/04).
-        # Question (see the page): remove the block, or repair it?
+        # The neutrino table, switched off (MHP 2/04); unused (Fortran lines 461–550).
         lnutab = False
         if lnutab:
             # Weights and masses: HS1, the shell centres (g, unlogged);
@@ -231,8 +236,8 @@ def main():
                 hs2[i - 1] = 0.5 * (ds3 - ds1)
             hs1[m] = ds3
             hs2[m] = math.exp(c.cln * hstot) - 0.5 * (ds2 + ds3)
-            pdt = -1.0
-            pdp = 1.0
+            pdt = -1.0  # noqa: F841  (unused in the Fortran too)
+            pdp = 1.0  # noqa: F841  (unused in the Fortran too)
             for j in range(1, 11):
                 fluxes_mod.fluxtot[j] = 0.0
                 for k in range(1, m + 1):
@@ -244,14 +249,14 @@ def main():
                     break                                 # go to 666
                 x = hcomp[1, i]
                 y = hcomp[2, i]
-                z = hcomp[3, i]
+                z = hcomp[3, i]  # noqa: F841  (unused in the Fortran too)
                 xhe3 = hcomp[4, i]
                 xc12 = hcomp[5, i]
                 xc13 = hcomp[6, i]
                 xn14 = hcomp[7, i]
-                xn15 = hcomp[8, i]
+                xn15 = hcomp[8, i]  # noqa: F841  (unused in the Fortran too)
                 xo16 = hcomp[9, i]
-                xo17 = hcomp[10, i]
+                xo17 = hcomp[10, i]  # noqa: F841  (unused in the Fortran too)
                 xo18 = hcomp[11, i]
                 xh2 = 0.0  # Fortran: undefined here
                 (epp1, epp2, epp3, ecn, e3al, pep, pet, sum1,
@@ -290,58 +295,66 @@ def main():
                              fluxi0[3, i])))  # format 145
             # label 141
 
-        # Mass in solar units, kept for the output (formerly COMMON/PULSE/).
+        # Mass in solar units, kept for the output (formerly COMMON/PULSE/) (Fortran lines 552–555).
         xmsol = smass
         # Store the starting convection-zone properties (MHP 08/02).
         deuter_mod.jcz = jenv
         ovrtrn_mod.taucz = 0.0
-        # Headers of the output files.
+
+        # Headers of the output files (Fortran line 557).
         wrthead(smass, cmixl, nk)
-        # For deciding when to dump pulsation output.
+
+        # For deciding when to dump pulsation output (Fortran lines 560–563).
         pol1 = bl
         pot1 = teffl
         poa1 = dage
         polen = 0.0
+
+        # Time-step cutting needs a model in unit ILAST, or it will crash:
+        # copy the initial model there (Fortran lines 565–574).
         if nml.lkuthe:
-            # Time-step cutting needs a model in unit ILAST, or it will
-            # crash: copy the initial model there.
-            # Question (see the page): only if LPUNCH, and before FINDSH.
+            # Question (see the page): still needed? Only if LPUNCH, and before FINDSH.
             if lpunch:
                 iwrite = io.ilast
                 wrtlst(iwrite, hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril,
                        ps, ts, rs, cfenv, ftri, tlumx, jcore, jenv, model, m,
                        smass, teffl, bl, hstot, dage, ddage, omega, cmixl,
                        compmix)
-        # The H-burning shell and the convection-zone edges.
+
+        # The H-burning shell and the convection-zone edges (Fortran lines 578–579).
         jcore, jenv, jxbeg, jxend, jxmid, lshell = findsh(
             hcomp, hl, lc, m, jcore, jenv, jxbeg, jxend, jxmid, lshell)
-        # The first time step.
+
+        # The first time step (Fortran lines 584–588).
         delts, deltsh, ddage, dwmax = htimer(
             delts, deltsh, m, hd, hl, hs1, hs2, ht, hcomp, jcore, jxmid,
             tlumx, dage, ddage, nk, hp, hr, omega, dwmax, jxbeg, teffl)
         delts0 = delts
-        # Zero the rates of change for the first guess.
+
+        # Zero the rates of change for the first guess (Fortran lines 590–595).
         for i in range(1, m + 1):
             ent.htt0[i] = 0.0
             ent.hpp0[i] = 0.0
             ent.hll0[i] = 0.0
             ent.hrr0[i] = 0.0
-        # Light-element rates of the surface zone.
-        if nml.lexcom:
-            prevcz_mod.bli6old = 0.0
-            prevcz_mod.bli7old = 0.0
-            prevcz_mod.bbe9old = 0.0
 
-        # The model loop (DO 100): one evolutionary step each.
+        # Light-element rates of the surface zone: LIBURN recomputes the
+        # start rates until it has stored end rates (LBLIOLD) (Fortran lines 601–603).
+        if nml.lexcom:
+            prevcz_mod.lbliold = False
+
+        # The model loop (DO 100): one evolutionary step each (Fortran lines 608–612).
         goto200 = False
         for modeln in range(1, nml.nmodls[nk] + 1):
             if nml.lrwsh:
                 io.rewind(io.ishort)
-            # Pulsation output on the last model of the run.
+
+            # Pulsation output on the last model of the run (Fortran lines 614–616).
             if modeln == nml.nmodls[nk] and nk == nml.numrun:
                 nml.lpulse = lsavpu
+
             # Pulsation output at chosen ages (AGEOUT), for the steps before
-            # and after each (JVS 02/11).
+            # and after each (JVS 02/11) (Fortran lines 625–655).
             a = acdpth_mod
             if a.lacout:
                 a.ladon = True
@@ -367,11 +380,14 @@ def main():
                         a.lclcd = True
                         a.ljlast = True
                         a.ljwrt = True
-            # At the final age, pulsation output and sound speed (MHP 10/24).
+
+            # At the final age, pulsation output and sound speed (MHP 10/24) (Fortran lines 662–667).
             if (rl_.lendag[nk] and nml.endage[nk] > 0.0
                     and abs(nml.endage[nk] - dage * 1.0e9 - ddage) <= 1.0):
                 nml.lpulse = lsavpu
                 sound_mod.lsound = True
+
+            # Fortran lines 673–677.
             if nml.lpout:
                 pol1, pot1, poa1, polen = pdist(
                     pol1, pot1, poa1, polen, bl, teffl, modeln, nk, fpatm,
@@ -381,26 +397,29 @@ def main():
             # of the rotation iterations. GOTO 15 is `continue` below.
             while True:
                 # "STARIN called here for timestep cutting": with LARGE
-                # set, STARIN prints RUN STOPPED and stops.
+                # set, STARIN prints RUN STOPPED and stops (Fortran lines 680–697).
                 if large:
                     (bl, dage, ddage, delts, deltsh, ftri, hstot, ikut,
-                     istore, lnew, m, model, qdp, qdt, sjtot, skerot,
+                     istore, lnew, m, model, sjtot, skerot,
                      smass, teffl, vel, compmix) = starin(
                         bl, cfenv, dage, ddage, delts, deltsh, eta2, fp, ft,
                         ftri, hcomp, hd, hi, hjm, hkerot, hl, hp, hr, hs,
                         hs1, hs2, hstot, ht, ikut, istore, jenv, large, lc,
-                        lnew, m, model, nk, omega, ps, qdp, qdt, qiw, r0,
+                        lnew, m, model, nk, omega, ps, qiw, r0,
                         rs, sjtot, skerot, smass, teffl, tlumx, tril, trit,
                         ts, vel, hg, v, cmixl, compmix)
                     if omega[1] == 0 and nml.lrot:
                         print('LROT set to TRUE, but OMEGA(1) = 0. Stopping.'
                               ' Initialize rotation rates or set LROT to'
                               ' FALSE.')  # format 18
-                        raise SystemExit
+                        raise SystemExit(3)
                 lpunch = True
+
                 # Age the model, unless the kind card only relaxes a
                 # rescaled model (pre-main-sequence models, log Tc < 6.6,
-                # still age as a failsafe, unless L_ZERODT_PREMS is set).
+                # still age as a failsafe, unless L_ZERODT_PREMS is set)
+                # (Fortran lines 712–720).
+                # Question (see the page): the 6.6.
                 if rl_.iresca[nk] != 2 and model >= 0:
                     lage = True
                 elif (not nml.l_zerodt_prems and model >= 0
@@ -409,6 +428,8 @@ def main():
                 else:
                     lage = False
                 lnewfit = False
+
+                # Mass loss, mixing and the age (Fortran lines 721–741).
                 if lage:
                     # Mass loss.
                     delts, hstot, lnew, smass, senvold, lnewfit = massloss(
@@ -430,8 +451,9 @@ def main():
                         teffl, cmixl)
                     ddage = delts / c.csecyr
                     dage = dage + 1.0e-9 * ddage
+
                 # Rezone, except for He-flash runs, which only keep the old
-                # model for PTIME.
+                # model for PTIME (Fortran lines 763–790).
                 if not nml.lkuthe:
                     m, lreset, jcore, jenv, sjtot, skerot = hpoint(
                         m, hstot, hs, hs1, hs2, ht, hp, hr, lc, hl, hd,
@@ -447,11 +469,14 @@ def main():
                         old.hlo[i] = hl[i]
                         old.hdo[i] = hd[i]
                     old.tefflo = teffl
-                    old.mo = m
+                    old.hlsuro = hl[m]
+
+                # Fortran lines 792–796.
                 if nml.lrot:
                     for i in range(1, m + 1):
                         hkeroto[i] = hkerot[i]
-                # Light elements at the start of the step.
+
+                # Light elements at the start of the step (Fortran lines 799–816).
                 if nml.lexcom:
                     prevcz_mod.rbase0 = 0.0
                     jenv0 = jenv
@@ -461,9 +486,11 @@ def main():
                                        - c.cgl - hs[jenv]))
                     else:
                         liov_mod.pscal0 = 0.0
-                    lirate88(hcomp, hd, ht, m, 1)
+                    # J = 2: the start-of-step rates, from the saved model.
+                    lirate88(hcomp, hd, ht, m, 2)
+
                 # Flags for CRRECT: LNEW0, a new envelope triangle on the
-                # first iteration; LFINI, converged; LARGE, diverged.
+                # first iteration; LFINI, converged; LARGE, diverged (Fortran lines 824–829).
                 if nml.lnew0:
                     lnew = True
                 if not lage:
@@ -472,7 +499,8 @@ def main():
                 itdone = 0
                 large = False
                 lfini = False
-                # First guess of the structure.
+
+                # First guess of the structure (Fortran lines 830–859).
                 if not nml.lnews or delts <= 0.0:
                     for i in range(1, m + 1):
                         htt[i] = 0.0
@@ -497,25 +525,27 @@ def main():
                         hr[i] = hr[i] + dr
                         hhc[i] = 0.0
 
-                # Level 1: the previous envelope triangle.
+                # Level 1: the previous envelope triangle (Fortran lines 864–878).
                 niter = nml.niter1
                 lsbc = False
                 itlvl = 1
                 (lfini, large, lnew, lreset, lsbc, ftri, istore, bl, teffl,
-                 latmo, lderiv, lmix, locond, qdt, qdp, itdone) = _crrect(
+                 latmo, lderiv, lmix, locond, itdone) = _crrect(
                     niter, lsbc, itlvl)
                 if large:
                     continue                              # go to 15
-                # Level 2: check the surface boundary condition.
+
+                # Level 2: check the surface boundary condition (Fortran lines 879–890).
                 lsbc = True
                 niter = nml.niter2
                 itlvl = 2
                 (lfini, large, lnew, lreset, lsbc, ftri, istore, bl, teffl,
-                 latmo, lderiv, lmix, locond, qdt, qdp, itdone) = _crrect(
+                 latmo, lderiv, lmix, locond, itdone) = _crrect(
                     niter, lsbc, itlvl)
                 if large:
                     continue                              # go to 15
-                # Store the rates of change for the next step's guess.
+
+                # Store the rates of change for the next step's guess (Fortran lines 893–900).
                 if delts > 0.0:
                     for ii in range(1, m + 1):
                         ent.htt0[ii] = htt[ii] / delts
@@ -523,19 +553,21 @@ def main():
                         ent.hll0[ii] = (2.0 * (hl[ii] - old.hlo[ii])
                                         / (hl[ii] + old.hlo[ii]) / delts)
                         ent.hrr0[ii] = (hr[ii] - old.hro[ii]) / delts
-                # Level 3.
+
+                # Level 3 (Fortran lines 902–916).
                 lsbc = False
                 niter = nml.niter3
                 itlvl = 3
                 (lfini, large, lnew, lreset, lsbc, ftri, istore, bl, teffl,
-                 latmo, lderiv, lmix, locond, qdt, qdp, itdone) = _crrect(
+                 latmo, lderiv, lmix, locond, itdone) = _crrect(
                     niter, lsbc, itlvl)
                 if large:
                     continue                              # go to 15
                 if not nml.lrot:
                     nml.itdif1 = 1
+
                 # With rotation, iterate between structure and rotation
-                # ITDIF1 times from the start-of-step j and composition.
+                # ITDIF1 times from the start-of-step j and composition (Fortran lines 922–939).
                 if nml.itdif1 > 1:
                     for i in range(1, m + 1):
                         hjm0[i] = hjm[i]
@@ -547,26 +579,30 @@ def main():
                         for i in range(1, m + 1):
                             for j in range(1, 16):
                                 old.hcompp[j, i] = hcompp0[j, i]
+
                     # Level 4: repeats the iteration between mixing and
                     # structure (not for models where semiconvection matters,
                     # where it oscillates; for high-precision work such as
-                    # solar models) (7/91).
+                    # solar models) (7/91) (Fortran lines 940–964).
+                    # Question (see the page): what level 4 is for; operator splitting.
                     niter = nml.niter4
                     lsbc = False
                     itlvl = 4
                     (lfini, large, lnew, lreset, lsbc, ftri, istore, bl,
-                     teffl, latmo, lderiv, lmix, locond, qdt, qdp,
+                     teffl, latmo, lderiv, lmix, locond,
                      itdone) = _crrect(niter, lsbc, itlvl)
                     if not lfini:
                         # Not converged: treat as diverged.
                         large = True
                         goto15 = True
                         break
+
                     # Converged: fully mix the convection zones (LIMIX, so that
-                    # the correct gradients are used) (G. Somers 6/14).
-                    limix = True
+                    # the correct gradients are used) (G. Somers 6/14) (Fortran lines 975–977).
+                    limix = True  # noqa: F841  (unused in the Fortran too)
                     mixcz(hcomp, hs2, lc, m)
-                    # The total age, for disk locking (MHP 9/94).
+
+                    # The total age, for disk locking (MHP 9/94); rotation (Fortran lines 981–1010).
                     disk_mod.sage = dage
                     if nml.lrot:
                         if itrot > 1:
@@ -588,14 +624,16 @@ def main():
                             cmixl, lprt0)
                         # The distortion terms.
                         fpft(hd, hr, hs, m, omega, eta2, fp, ft, hg, r0)
+
                 if goto15:
                     continue                              # go to 15
                 break
 
-            # The H-burning shell and convection-zone edges again.
+            # The H-burning shell and convection-zone edges again (Fortran lines 1013–1014).
             jcore, jenv, jxbeg, jxend, jxmid, lshell = findsh(
                 hcomp, hl, lc, m, jcore, jenv, jxbeg, jxend, jxmid, lshell)
-            # Light-element burning (with rotational mixing, GETW does it).
+
+            # Light-element burning (with rotational mixing, GETW does it) (Fortran lines 1016–1036).
             if nml.lexcom and model >= 0 and delts > 0.0:
                 if not nml.lrot or not nml.linstb:
                     jcore, jenv, nrzone, nzone, nzone0 = convec(
@@ -608,9 +646,11 @@ def main():
                                        - c.cgl - hs[jenv]))
                     else:
                         liov_mod.pscal1 = 0.0
-                    lirate88(hcomp, hd, ht, m, 2)
+                    # J = 1: the end-of-step rates, from the new model.
+                    lirate88(hcomp, hd, ht, m, 1)
                     liburn(delts, hcomp, hr, hs1, hs2, ht, jenv1, jenv0, m)
-            # Restore the earlier fitting point after accretion (MHP 07/02).
+
+            # Restore the earlier fitting point after accretion (MHP 07/02) (Fortran lines 1039–1047).
             if lnewfit:
                 senvold, sjtot, skerot, m, lnew = getnewenv(
                     senvold, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot, ht,
@@ -618,34 +658,39 @@ def main():
                     teffl, m, lnew, cmixl)
                 fpft(hd, hr, hs, m, omega, eta2, fp, ft, hg, r0)
                 lnewfit = False
+
             # The time step for the next model (HTIMER also locates the
-            # H-burning shell).
+            # H-burning shell) (Fortran lines 1051–1057).
             delts = abs(delts)
             delts0 = delts
             delts, deltsh, ddage, dwmax = htimer(
                 delts, deltsh, m, hd, hl, hs1, hs2, ht, hcomp, jcore, jxmid,
                 tlumx, dage, ddage, nk, hp, hr, omega, dwmax, jxbeg, teffl)
-            # At a fixed final age, write the step just taken rather than a
-            # zero one, so that the sequence can be continued.
+
+            # At a fixed final age, write the previous step, floored at 1D-3
+            # of the age (DAGE in Gyr), rather than the clipped last one, so
+            # that the sequence can be continued (Fortran lines 1062–1075).
             if rl_.lendag[nk] and nml.endage[nk] > 0.0:
                 if nml.endage[nk] - dage * 1.0e9 <= 1.0:
-                    # Question (see the page): the floor never acts.
-                    delts = max(delts0, 1.0e-3 * dage * c.csecyr)
+                    delts = max(delts0, 1.0e-3 * dage * 1.0e9 * c.csecyr)
                     ddage = delts / c.csecyr
                 else:
                     delts0 = delts
             else:
                 delts0 = delts
+
+            # The model number, and the output driver (Fortran lines 1076–1082).
             if rl_.iresca[nk] != 2:
                 model = model + 1
-            # The output driver.
             gl, lpunch = wrtout(
                 hcomp, hd, hl, hp, hr, hs, hs1, ht, lc, m, model, dage,
                 ddage, smass, teffl, bl, gl, lshell, jxbeg, jxmid, jxend,
                 jcore, jenv, tlumx, trit, tril, ps, ts, rs, cfenv, ftri,
                 hstot, omega, lpunch, fp, ft, eta2, r0, hjm, hi, sjtot,
                 skerot, hs2, cmixl, xmsol, compmix)
-            # Stop conditions (MHP 10/24).
+
+            # Stop conditions (MHP 10/24) (Fortran lines 1087–1115).
+            # Suspected bug (see the page): LENDAG is set only for KINDRN = 1.
             if (rl_.lendag[nk] and nml.endage[nk] > 0.0
                     and (nml.endage[nk] - dage * 1.0e9) <= 1.0):
                 break                                     # go to 110
@@ -670,12 +715,13 @@ def main():
                 sound_mod.lsound = True
                 lprt0 = True
                 break                                     # go to 110
+
             # Is the model near the desired Teff and L? If not, rescale and
-            # try again.
+            # try again (Fortran lines 1117–1126).
             if nml.lcalst and not lstar:
                 if nk % 2 == 0:
                     if modeln == 1:
-                        teffi = 10.0**teffl  # unused
+                        teffi = 10.0**teffl  # noqa: F841  (unused in the Fortran too)
                     else:
                         alri, lstar, lpassr = chkscal(bl, teffl, dage, nk,
                                                       alri, lstar, lpassr)
@@ -686,14 +732,15 @@ def main():
         if goto200:
             continue                                      # go to 200
 
-        # Label 110: store the last model in ISTOR if asked.
+        # Label 110: store the last model in ISTOR if asked (Fortran lines 1133–1138).
         if nml.lstore and nml.lstpch and lpunch:
             putstore(hcomp, hd, hl, hp, hr, hs, ht, lc, trit, tril, ps, ts,
                      rs, cfenv, ftri, tlumx, jcore, jenv, model, m, smass,
                      teffl, bl, hstot, dage, ddage, omega, hs1, eta2, r0, fp,
                      ft, hjm, hi, cmixl, xmsol, compmix)
             lpunch = False
-        # The solar calibration, in three kind cards (MHP 1/93, 5/96).
+
+        # The solar calibration, in three kind cards (MHP 1/93, 5/96) (Fortran lines 1144–1183).
         if nml.lcals:
             acdpth_mod.ladon = False   # calcad off, for speed (JVS)
             if nk % 3 == 0:
@@ -709,7 +756,8 @@ def main():
                     break                                 # go to 250
                 else:
                     iconv = iconv + 1
-                    # Stop after 15 attempts (the Fortran comment still says 10) (MHP 6/97).
+                    # Stop after 15 attempts (the Fortran comment still says
+                    # 10) (MHP 6/97).
                     if iconv >= 15:
                         break                             # go to 250
                     if nml.lpulse:
@@ -717,11 +765,13 @@ def main():
                         io.rewind(io.iopmod)
                         io.rewind(io.iopenv)
                         io.rewind(io.iopatm)
-        # The star of given Teff and L is matched.
+
+        # The star of given Teff and L is matched (Fortran line 1186).
         if nml.lcalst and lstar and nk % 2 == 0:
             break                                         # go to 250
         # label 200
-    # Label 250: the solar calibration's summary.
+
+    # Label 250: the solar calibration's summary (Fortran lines 1195–1233).
     if nml.lcals and nml.lsnu and lsol:
         for unit in (io.ilast, io.ifirst, io.idebug, io.itrack, io.ishort,
                      io.imodpt, io.istor):
@@ -754,6 +804,8 @@ def main():
         # Energy generation fractions: pp I, II, III, CNO, gravitational.
         io.write(io.isnu, "".join(f"{tlumx[j]:10.3E}"
                                   for j in (1, 2, 3, 4, 7)))  # format 1523
+
+    # Fortran line 1235.
     raise SystemExit  # STOP
 
 

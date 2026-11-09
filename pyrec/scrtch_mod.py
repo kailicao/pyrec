@@ -1,6 +1,6 @@
-"""Python version of scrtch_mod.f (YREC 09c3b9b): the interior's local physics at each shell, formerly COMMON/SCRTCH/.
+"""Python version of scrtch_mod.f (YREC 7be4133): the interior's local physics at each shell, formerly COMMON/SCRTCH/.
 
-Translates: scrtch_mod.f#SCRTCH_MOD (09c3b9b)
+Translates: scrtch_mod.f#SCRTCH_MOD (7be4133)
 
 Module-level names, as in the Fortran module, in lower case. Routines that
 USE SCRTCH_MOD import this module and write ``scrtch_mod.<name>``.
@@ -14,6 +14,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# The local physics at each shell (Fortran lines 28–37).
 sesum = np.zeros(_JSON + 1)          # nuclear energy generation, EG(1)..EG(5)
 seg = np.zeros((8, _JSON + 1))       # 1-5: fractions of sesum; 6: neutrinos; 7: gravitational
 sbeta = np.zeros(_JSON + 1)          # beta, gas over total pressure

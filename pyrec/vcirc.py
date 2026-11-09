@@ -1,4 +1,4 @@
-"""Python version of vcirc.f (YREC 09c3b9b): the velocities of the
+"""Python version of vcirc.f (YREC 7be4133): the velocities of the
 rotational mixing processes (meridional circulation, the GSF instability,
 secular and dynamical shear) at each interface of a radiative region."""
 
@@ -33,31 +33,33 @@ wm = np.zeros(JSON + 1)
 vmup = np.zeros(JSON + 1)
 vmu2 = np.zeros(JSON + 1)
 
-# The speed of light. Question (see the page): its DATA statement is
+# The speed of light. Suspected bug (see the page): its DATA statement is
 # commented out, so the Fortran's CC is undefined; 0.0 stands for it here
 # (TKHS is then zero, and the division by it raises ZeroDivisionError
 # where the Fortran would give an infinity).
 CC = 0.0
 
 
-def _interp4(f, faci, i, j0):
-    # 4-point Lagrangian interpolation in the logarithm of f, from shells
-    # j0..j0+3 with the weights FACI(1..4, I).
+def _interp4(f: np.ndarray, faci: np.ndarray, i: int, j0: int) -> float:
+    """4-point Lagrangian interpolation in the logarithm of f, from shells
+    j0..j0+3 with the weights FACI(1..4, I)."""
+
     return math.exp(math.log(f[j0]) * faci[1, i]
                     + math.log(f[j0 + 1]) * faci[2, i]
                     + math.log(f[j0 + 2]) * faci[3, i]
                     + math.log(f[j0 + 3]) * faci[4, i])
 
 
-def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
-          cltot, dt, hp, faci):
+def vcirc(hr: np.ndarray, hru: np.ndarray, imin: int, imax: int, it: int, lcz: np.ndarray, m: int, omega: np.ndarray,
+          ldo: bool, qwlnr: np.ndarray, qwrmax: np.ndarray, hv: np.ndarray, cltot: float, dt: float, hp: np.ndarray,
+          faci: np.ndarray) -> bool:
     """Estimate the velocities of meridional circulation, the GSF
     instability and secular and dynamical shear at each radiative
     interface imin..imax (between shells i-1 and i), inhibited by mu
     gradients and scaled by the user's factors; their sum hv sets the
     diffusion coefficient for angular momentum and mixing.
 
-    Translates: vcirc.f#VCIRC (09c3b9b)
+    Translates: vcirc.f#VCIRC (7be4133)
 
     Arguments: log r hr and r hru, the range imin..imax, the iteration it,
     the convective flags lcz, the number of shells m, omega, ldo (set),
@@ -67,7 +69,9 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
     temp2_mod, difad2_mod, difad3_mod and quadd_mod.rat.
 
     Returns ldo: True if any hv is positive.
+
     """
+
     n = nmlpar_mod
     c = constants_mod
     cln = c.cln
@@ -88,7 +92,8 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
     rm = iv.rm
 
     ldo = False
-    # Store the old velocity estimates for later use.
+
+    # Store the old velocity estimates for later use (Fortran lines 136–149).
     if it > 1:
         for i in range(imin, imax + 1):  # label 5
             vmup[i] = vmu[i]
@@ -99,6 +104,8 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             for i in range(imin, imax + 1):
                 d2.vesa0[i] = d2.vesa[i]
                 d2.vesd0[i] = d2.vesd[i]
+
+    # Clear the velocities (Fortran lines 150–156).
     for i in range(1, m + 1):  # label 10
         hv[i] = 0.0
         ves[i] = 0.0
@@ -107,7 +114,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
         vmu[i] = 0.0
 
     # Viscosity and thermal diffusivity at the interfaces, by 4-point
-    # Lagrangian interpolation in their logarithms.
+    # Lagrangian interpolation in their logarithms (Fortran lines 163–191).
     # First interface.
     if imin < 3:
         viscmi[2] = _interp4(viscm, faci, 2, 1)
@@ -126,14 +133,17 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
     for i in range(i0, i1 + 1):  # label 20
         viscmi[i] = _interp4(viscm, faci, i, i - 2)
         thdifmi[i] = _interp4(thdifm, faci, i, i - 2)
-    # Linear interpolation for omega and mu.
+
+    # Linear interpolation for omega and mu (Fortran lines 193–196).
     for i in range(2, m + 1):
         amumi[i] = 0.5 * (amum[i] + amum[i - 1])
         wm[i] = 0.5 * (omega[i] + omega[i - 1])
 
-    # Meridional circulation.
+    # Meridional circulation (Fortran lines 202–275).
     if n.ies == 2:
         # Kippenhahn & Moellenhoff (1974), restored (MHP 4/26).
+        # Suspected bug (see the page): with LDIFAD, VESA, VESD, VESD2,
+        # VESD3, THN and EQQCOD keep the previous call's values.
         for i in range(imin, imax + 1):  # label 30
             if lcz[i] and lcz[i - 1]:
                 continue
@@ -147,7 +157,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             phi2 = (quad[i - 1] / gg[i - 1] - quad[i] / gg[i]) / dr
             rat[i] = (phis2 + phi2) / phistd
             # Question (see the page): overwritten at once, dropping the
-            # quadrupole term; VESA, VESD and THN are not set here.
+            # quadrupole term.
             rat[i] = phis2 / phistd
             ves[i] = abs(vf.fact1[i] * (vf.fact2[i] * rat[i] * wm[i]**2
                                         + tk.fact6[i] * dv))
@@ -189,7 +199,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
                           + vf.fact8[i] * ((omega[i] - omega[i - 1]) / dr)**2)
                 egridder_mod.eqqcod[i] = egridder_mod.qqcod[i] * wm[i]
 
-    # Inhibition by mu gradients.
+    # Inhibition by mu gradients (Fortran lines 280–337).
     if n.imu == 3:
         # Kippenhahn & Moellenhoff (1974): fictitious mu currents that oppose
         # the circulation, restored (MHP 4/26).
@@ -206,8 +216,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
     else:
         # Zahn & Maeder (1998): (del - del_ad) replaced by
         # (del + del_mu - del_ad).
-        # Question (see the page): convective interfaces are not skipped,
-        # and FESTIME and FV0 are rescaled at every call.
+        # Question (see the page): convective interfaces are not skipped.
         for i in range(imin, imax + 1):
             qmu = math.log(amum[i]) - math.log(amum[i - 1])
             qp = cln * (hp[i] - hp[i - 1])
@@ -224,12 +233,15 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             q1 = vf.fact7[i] * wm[i]**2 * qqq
             q0 = tk.fes3[i] * wm[i]**2 * qqq
             dr = hru[i] - hru[i - 1]
-            v2 = 0.2 * (q0 + q1) * (omega[i] - omega[i - 1]) / dr / wm[i]  # unused
+            v2 = 0.2 * (q0 + q1) * (omega[i] - omega[i - 1]) / dr / wm[i]  # noqa: F841  (unused in the Fortran too)
+            # Suspected bug (see the page): FESTIME's factor compounds over
+            # SECULR's iterations; FV0 is read nowhere.
             o2.festime[i] = o2.festime[i] * qqq
             d3.fv0[i] = d3.fv0[i] * qqq
 
     # GSF instability: the Kippenhahn (1980) estimate. IGSF = 0: inhibited
-    # by viscosity and mu gradients; 1: not inhibited; 2: by viscosity only.
+    # by viscosity and mu gradients; 1: not inhibited; 2: by viscosity only
+    # (Fortran lines 351–407).
     for i in range(imin, imax + 1):  # label 40
         if lcz[i] and lcz[i - 1]:
             continue
@@ -272,7 +284,8 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
                 / rmid
         vgsf[i] = abs(fxx * vgsf[i])
 
-    # Secular and dynamical shear (Endal & Sofia, paper II).
+    # Secular and dynamical shear (Endal & Sofia, paper II) (Fortran lines
+    # 441–532).
     for i in range(imin, imax + 1):  # label 60
         if abs(qwlnr[i]) > qwrmax[i]:
             # Dynamical shear: a (large) velocity, and the GSF velocity
@@ -282,27 +295,27 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             dr = hru[i] - hru[i - 1]
             rmid = 0.5 * (hru[i] + hru[i - 1])
             if omega[i] < omega[i - 1]:
-                wmin = omega[i] + qwrmax[i] * cln * (hr[i] - hr[i - 1])
-                wmid = omega[i] + qwrmax[i] * cln * (hr[i] - math.log10(rmid))  # unused
+                wmid = omega[i] + qwrmax[i] * cln * (hr[i] - math.log10(rmid))  # noqa: F841  (unused in the Fortran too)
             else:
-                wmin = omega[i] - qwrmax[i] * cln * (hr[i] - hr[i - 1])
-                wmid = omega[i] - qwrmax[i] * cln * (hr[i] - math.log10(rmid))  # unused
-            # Question (see the page): DLNWDR0 is zero if the two omegas
-            # are equal (ZeroDivisionError here, an infinity or NaN in the
-            # Fortran).
+                wmid = omega[i] - qwrmax[i] * cln * (hr[i] - math.log10(rmid))  # noqa: F841  (unused in the Fortran too)
+            # WMIN: the OMEGA(I-1) at which the centred gradient QWLNR
+            # equals QWRMAX, between OMEGA(I) and OMEGA(I-1) (since 7be4133).
+            wmin = omega[i] + (omega[i - 1] - omega[i]) * qwrmax[i] / qwr
+            # DLNWDR0 > 0: the branch runs only if the two omegas differ.
             dlnwdr0 = abs(math.log(omega[i]) - math.log(omega[i - 1])) / dr
             dlnjmdr0 = abs(2.0 / rmid + (math.log(omega[i])
                                          - math.log(omega[i - 1])) / dr)
             dlnjmdr = abs(2.0 / rmid + (math.log(omega[i])
                                         - math.log(wmin)) / dr)
             dlnwdr = abs(math.log(omega[i]) - math.log(wmin)) / dr
-            if omega[i] * hru[i]**2 < wmin * hru[i - 1]**2:
+            # The branch from the actual profile (since 7be4133).
+            if omega[i] * hru[i]**2 < omega[i - 1] * hru[i - 1]**2:
                 fx = max(2.0 * dlnjmdr, 0.25 * dlnwdr)
                 fx2 = max(2.0 * dlnjmdr0, 0.25 * dlnwdr0)
                 vgsf[i] = vgsf[i] * fx / fx2
             else:
                 vgsf[i] = vgsf[i] * dlnwdr / dlnwdr0
-            # Question (see the page): to unit 6 at every unstable interface.
+            # To unit 6 at every such interface, at every call.
             print(f" DYNAMICAL SHEAR-SHELL{i:5d} WTOP{omega[i]:11.3E}"
                   f" WBOT{omega[i - 1]:11.3E} LIMIT{wmin:11.3E}")  # 9911
             continue
@@ -326,14 +339,15 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
                     vss[i] = 8.0 / 4.5e1 * thdifmi[i] \
                         * (qwr / qwrmax[i])**2 / rm[i]
 
-    # The user's scale factors (and, with IMU = 3, the mu currents).
+    # The user's scale factors (and, with IMU = 3, the mu currents)
+    # (Fortran lines 540–599).
     if n.imu == 3:
         if it > 1:
             for i in range(1, m + 1):
                 vmu[i] = 0.5 * (vmu[i] + vmup[i])
         for i in range(imin, imax + 1):
-            # Question (see the page): VMU2 is stale at convective
-            # interfaces.
+            # VMU2 is stale at convective interfaces, where the velocities
+            # it divides are zero.
             fm = 1.0 + vmu2[i]
             rmid = 0.5 * (hru[i] + hru[i - 1])
             fcc = math.sqrt(n.fc * n.fesc)
@@ -351,7 +365,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             else:
                 vgsft = 0.0
             if vgsft <= 0.0:
-                # Question (see the page): FES, not FGSF.
+                # Suspected bug (see the page): FES, not FGSF.
                 vgsf[i] = abs(n.fes * vgsf[i] / fm)
             else:
                 vgsf[i] = vgsft
@@ -361,19 +375,25 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             ves[i] = abs(n.fes * ves[i])
             vgsf[i] = n.fgsf * vgsf[i]
             vss[i] = n.fss * vss[i]
+
+    # Repeat for the diffusive and advective parts (MHP 11/94) (Fortran
+    # lines 602–607).
+    # Question (see the page): VES is made positive, VESA keeps its sign.
     if n.ldifad:
         for i in range(imin, imax + 1):
             d2.vesd[i] = abs(n.fes * d2.vesd[i])
             d2.vesa[i] = n.fes * d2.vesa[i]
+
+    # The GSF and shear velocities, times r, join the diffusive part (MHP
+    # 05/02) (Fortran lines 619–647).
     if n.ldifad:
-        # The GSF and shear velocities, times r, join the diffusive part (MHP
-        # 05/02).
         for i in range(imin, imax + 1):
             d2.vesd[i] = d2.vesd[i] + rm[i] * (abs(vgsf[i]) + abs(vss[i]))
             d3.dss[i] = rm[i] * abs(vss[i])
             d3.dgsf[i] = rm[i] * abs(vgsf[i])
 
-    # Average the previous and new estimates after the first iteration.
+    # Average the previous and new estimates after the first iteration
+    # (Fortran lines 649–662).
     if it > 1:
         for i in range(imin, imax + 1):  # label 70
             vgsf[i] = 0.5 * (vgsf[i] + t2.vgsf0[i])
@@ -383,6 +403,8 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             for i in range(imin, imax + 1):
                 d2.vesa[i] = 0.5 * (d2.vesa[i] + d2.vesa0[i])
                 d2.vesd[i] = 0.5 * (d2.vesd[i] + d2.vesd0[i])
+
+    # The total velocity (Fortran lines 663–667).
     for i in range(imin, imax + 1):  # label 80
         hv[i] = vgsf[i] + ves[i] + vss[i]
         if hv[i] < 1.0e-20:
@@ -391,7 +413,7 @@ def vcirc(hr, hru, imin, imax, it, lcz, m, omega, ldo, qwlnr, qwrmax, hv,
             ldo = True
 
     # No transport in the core (L(r)/L < 0.99), to avoid numerical problems in
-    # the H-burning shell (9/93).
+    # the H-burning shell (9/93) (Fortran lines 671–687).
     # Question (see the page): the threshold is hard-coded.
     if n.lnoj:
         for i in range(imin, imax + 1):

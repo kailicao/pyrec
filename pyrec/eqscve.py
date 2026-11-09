@@ -1,4 +1,4 @@
-"""Python version of eqscve.f (YREC development, 09c3b9b): the SCV
+"""Python version of eqscve.f (YREC development, 7be4133): the SCV
 equation of state at the envelope composition."""
 
 import math
@@ -15,7 +15,7 @@ from pyrec.ksplint import ksplint
 
 NTS = 63                  # temperatures in the SCV tables
 TOLSP = 0.08              # smoothing zone in log P (DATA)
-TOLST = 0.032             # smoothing zone in log T (DATA)
+TOLST = 0.032             # smoothing zone in log T (DATA; Fortran line 43)
 
 
 def _stencil_spline(ismt, ismp, pp, tl):
@@ -24,6 +24,7 @@ def _stencil_spline(ismt, ismp, pp, tl):
     spline in log Pgas at each of the 4 temperatures, then one in log T,
     for columns 2-6 of TABLENV. The pressure abscissae always come from
     the row idtscv (unshifted), as in the Fortran. Returns tempt[1..5]."""
+
     scv = scveos_mod
     idt = scv.idtscv
     idp = scv.idp
@@ -32,7 +33,10 @@ def _stencil_spline(ismt, ismp, pp, tl):
     y2 = np.zeros(5)
     temp = np.zeros((5, 6))
     tempt = np.zeros(6)
-    # Interpolate in pressure at 4 different temperature points.
+
+    # Interpolate in pressure at 4 different temperature points (Fortran
+    # lines 162–178, and 194–210, 236–252, 278–294 for the shifted
+    # stencils).
     for i in range(1, 5):
         ii = idt + i - 1 + ismt
         for k in range(1, 5):
@@ -43,7 +47,9 @@ def _stencil_spline(ismt, ismp, pp, tl):
                 ytab[k] = scv.tablenv[ii, idp + k - 1 + ismp, j + 1]
             kspline(qr, ytab, y2)
             temp[i, j] = ksplint(qr, ytab, y2, pp, 0.0)
-    # Interpolate in temperature.
+
+    # Interpolate in temperature (Fortran lines 180–190, and 212–222,
+    # 254–264, 296–306).
     for k in range(1, 5):
         qr[k] = scv.tlogx[k + idt - 1 + ismt]
     for j in range(1, 6):
@@ -54,13 +60,15 @@ def _stencil_spline(ismt, ismp, pp, tl):
     return tempt
 
 
-def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
+def eqscve(tl: float, t: float, p: float, dl: float, d: float, x: float, z: float, beta: float, fxion: np.ndarray,
+           qdt: float, qdp: float, qcp: float, dela: float, lcalc: bool) -> tuple[float, float, float, float, float,
+           float, bool]:
     """Interpolate the Saumon-Chabrier-Van Horn equation of state in its
     table for the envelope composition (2D splines, smoothed where the
     stencil changes), add radiation, and get the H and He ionization
     fractions; any other composition goes to eqscvg.
 
-    Translates: eqscve.f#EQSCVE (09c3b9b)
+    Translates: eqscve.f#EQSCVE (7be4133)
 
     Arguments: tl, t (log T, T), p (total pressure), x, z, beta (Pgas/P);
     dl ... dela and lcalc are only set. Array changed in place: fxion (H+,
@@ -68,15 +76,20 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
 
     Returns (dl, d, qdt, qdp, qcp, dela, lcalc). Outside the table, lcalc
     is False and the others are returned as passed in.
+
     """
+
     c = constants_mod
     scv = scveos_mod
+
+    # Other compositions go to eqscvg (Fortran lines 45–50).
     if (abs(x - comp_mod.xenv) > 1.0e-5
             or abs(z - comp_mod.zenv) > 1.0e-5):
         dl, d, qdt, qdp, qcp, dela, lcalc = eqscvg(
             tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc)
         return dl, d, qdt, qdp, qcp, dela, lcalc
-    # The gas pressure is the tabulated quantity.
+
+    # The gas pressure is the tabulated quantity (Fortran lines 52–58).
     betm1 = 1.0 - beta
     pp = math.log10(beta * p)
     # Is the point within the table?
@@ -84,7 +97,8 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
         lcalc = False
         return dl, d, qdt, qdp, qcp, dela, lcalc
 
-    # Nearest 4 points in temperature, searching from the last stencil.
+    # Nearest 4 points in temperature, searching from the last stencil
+    # (Fortran lines 60–82).
     if tl < scv.tlogx[scv.idtscv + 1]:
         for i in range(scv.idtscv, 0, -1):
             if tl > scv.tlogx[i]:
@@ -102,7 +116,9 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     scv.idtscv = max(1, ii)
     scv.idtscv = min(NTS - 3, scv.idtscv)
     idt = scv.idtscv
-    # Smoothing in T near the edges of the middle interval.
+
+    # Smoothing in T near the edges of the middle interval (Fortran lines
+    # 83–100).
     lsmt = False
     ismt = 0
     fst = 0.0
@@ -121,7 +137,8 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
                 fst = 0.5 * dtbelow / TOLST
 
     # Nearest 4 points in pressure, searched in the row idt (the lowest
-    # temperature of the stencil, with the smallest range in P).
+    # temperature of the stencil, with the smallest range in P; Fortran
+    # lines 102–130).
     nptsx = scv.nptsx[idt]
     jjj = min(nptsx - 3, scv.idp)
     if pp < scv.tablenv[idt, jjj + 1, 1]:
@@ -145,7 +162,9 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
         scv.idp = min(nptsx - 3, jj)               # label 40
     idp = scv.idp
     lcalc = True
-    # Smoothing in P near the edges of the middle interval.
+
+    # Smoothing in P near the edges of the middle interval (Fortran lines
+    # 131–148).
     lsmp = False
     ismp = 0
     fsp = 0.0
@@ -163,11 +182,14 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
                 ismp = 1
                 fsp = 0.5 * dpbelow / TOLSP
 
-    y = 1.0 - x - z                                # set, never used
-    # Include radiation pressure in the equation of state.
+    # Radiation pressure (Fortran lines 157–160).
+    y = 1.0 - x - z  # noqa: F841  (unused in the Fortran too)
     prad = betm1 * p
-    pgas = beta * p                                # set, never used
-    # Columns 2-6 of TABLENV: log rho, Q_rhoT, Q_rhoP, cP, dU/dT.
+    pgas = beta * p  # noqa: F841  (unused in the Fortran too)
+
+    # Columns 2-6 of TABLENV: log rho, Q_rhoT, Q_rhoP, cP, dU/dT, on the
+    # stencil and, near its edges, on the shifted ones (Fortran lines
+    # 162–307).
     tempt = _stencil_spline(0, 0, pp, tl)
     tempt1t = np.zeros(6)
     tempt2p = np.zeros(6)
@@ -188,6 +210,8 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     if lsmp and lsmt:
         # Interpolate at the stencil shifted in both.
         tempt3 = _stencil_spline(ismt, ismp, pp, tl)
+
+    # Blend the shifted stencils' results (Fortran lines 308–358).
     if lsmt:
         if lsmp:
             # Blend in T at both pressures, then in P.
@@ -207,10 +231,12 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     elif lsmp:
         tempt[1:] = tempt2p[1:]
 
-    # Density.
+    # Density (Fortran lines 364–365).
     dl = tempt[1]
     d = math.exp(c.cln * dl)
-    # Q_rhoP: radiation adds pressure but no density, so divide by beta.
+    # Q_rhoP: radiation adds pressure but no density, so divide by beta;
+    # then Q_rhoT, c_P and nabla_ad with radiation (Fortran lines
+    # 369–394).
     qdp0 = tempt[3]
     qdp = qdp0 / beta
     # Q_rhoT = -chi_T Q_rhoP, with chi_T (qpt) corrected for radiation.
@@ -218,8 +244,7 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     qpt0 = -qdt0 / qdp0
     qpt = qpt0 * beta + 4.0 * betm1
     qdt = -qpt * qdp
-    # Question (see the page): the tabulated cP is not used.
-    qcp0 = tempt[4]
+    qcp0 = tempt[4]  # noqa: F841  (unused in the Fortran too)
     # dU/dT from the table, corrected for radiation.
     qut = tempt[5]
     ur = 3.0 * prad / d
@@ -229,7 +254,9 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     dela = -p * qdt / d / t / qcp
 
     # Ionization: particle fractions from the pure-H (TABLEX) and pure-He
-    # (TABLEY) tables, by 4-point Lagrange interpolation on the same stencil.
+    # (TABLEY) tables, by 4-point Lagrange interpolation on the same stencil
+    # (Fortran lines 403–445).
+    # Question (see the page): Lagrange here, splines above.
     qr = np.zeros(5)
     ft = np.zeros(5)
     ftd = np.zeros(5)
@@ -259,13 +286,16 @@ def eqscve(tl, t, p, dl, d, x, z, beta, fxion, qdt, qdp, qcp, dela, lcalc):
     xtf_h2, xtf_he = lagrange(2)
     # Column 3: fractions that are neutral H atoms, and He+.
     xtf_h1, xtf_hep = lagrange(3)
-    # Particle and charge conservation give the rest.
+
+    # Particle and charge conservation give the rest (Fortran lines
+    # 455–458).
     xtf_h_e = 0.5 * (1.0 - xtf_h2 - xtf_h1)
     xtf_hp = xtf_h_e
     xtf_he_e = (1.0 / 3.0) * (2.0 - 2.0 * xtf_he - xtf_hep)
     xtf_hepp = 1.0 - xtf_he - xtf_hep - xtf_he_e
-    # Fractions of H and He nuclei in each stage.
-    # Question (see the page): H2 counted once in the denominator.
+
+    # Fractions of H and He nuclei in each stage (Fortran lines 463–470).
+    # Suspected bug (see the page): H2 counted once in the denominator.
     xhp = xtf_hp / (xtf_h2 + xtf_h1 + xtf_hp)
     xhep = xtf_hep / (xtf_he + xtf_hep + xtf_hepp)
     xhepp = xtf_hepp / (xtf_he + xtf_hep + xtf_hepp)

@@ -1,4 +1,4 @@
-"""Python version of reduce.f (YREC 09c3b9b): one step of the Henyey
+"""Python version of reduce.f (YREC 7be4133): one step of the Henyey
 elimination, for the pair of shells (i-1, i)."""
 
 import numpy as np
@@ -9,24 +9,26 @@ from pyrec import constants_mod
 q = np.zeros((5, 5))
 
 
-def reduce(i, hha, hhb, hl, hmax, hp, hr, hs, ht, qp0, qp, qpr0, qpr,
-           qpp0, qpp, qt0, qt, qtr0, qtr, qtl0, qtl, qtp0, qtp, qtt0, qtt,
-           qr0, qr, qrr0, qrr, qrp0, qrp, qrt0, qrt, ql0, ql, qlp0, qlp,
-           qlt0, qlt):
+def reduce(i: int, hha: np.ndarray, hhb: np.ndarray, hl: np.ndarray, hmax: np.ndarray, hp: np.ndarray, hr: np.ndarray,
+           hs: np.ndarray, ht: np.ndarray, qp0: float, qp: float, qpr0: float, qpr: float, qpp0: float, qpp: float,
+           qt0: float, qt: float, qtr0: float, qtr: float, qtl0: float, qtl: float, qtp0: float, qtp: float,
+           qtt0: float, qtt: float, qr0: float, qr: float, qrr0: float, qrr: float, qrp0: float, qrp: float,
+           qrt0: float, qrt: float, ql0: float, ql: float, qlp0: float, qlp: float, qlt0: float, qlt: float) -> None:
     """Form the residuals of the four trapezoidal difference equations
     (P, T, R, L) between shells i-1 and i, and eliminate the unknowns of
     shell i-1, leaving x_k = HHB(k,i) - HHA(k,1,i) dP_i - HHA(k,2,i) dT_i
     for x = (dP_{i-1}, dT_{i-1}, dR_i, dL_i).
 
-    Translates: reduce.f#REDUCE (09c3b9b)
+    Translates: reduce.f#REDUCE (7be4133)
 
     Arguments: i, the shell; hha[4+1, 2+1, JSON+1], hhb[4+1, JSON+1], set
     in place at shell i (and read at i-1); hl, hp, hr, hs, ht, the model;
     hmax[1..4], the largest residuals, updated in place; then each
     equation's right-hand side at i-1 (…0) and i, and their derivatives
     (qpr is d f_P / d R, and so on). Returns nothing.
+
     """
-    # Residuals of the trapezoidal rule.
+    # Residuals of the trapezoidal rule (Fortran lines 31–41).
     sd05 = 0.5 * (hs[i] - hs[i - 1])
     hhb[1, i] = sd05 * (qp0 + qp) - (hp[i] - hp[i - 1])
     hmax[1] = max(hmax[1], abs(hhb[1, i]))
@@ -38,7 +40,8 @@ def reduce(i, hha, hhb, hl, hmax, hp, hr, hs, ht, qp0, qp, qpr0, qpr,
     hmax[4] = max(hmax[4], abs(hhb[4, i]))
     sd05 = sd05 * constants_mod.cln
 
-    # Columns 1 and 2: substitute dR_{i-1}, dL_{i-1} from the last call.
+    # Columns 1 and 2: substitute dR_{i-1}, dL_{i-1} from the last call
+    # (Fortran lines 42–58, 61–62).
     pivot = -sd05 * qpr0
     q[1, 1] = (-1.0 - sd05 * qpp0) - pivot * hha[3, 1, i - 1]
     q[1, 2] = - pivot * hha[3, 2, i - 1]
@@ -60,7 +63,7 @@ def reduce(i, hha, hhb, hl, hmax, hp, hr, hs, ht, qp0, qp, qpr0, qpr,
     hha[4, 1, i] = -sd05 * qlp
     hha[4, 2, i] = -sd05 * qlt
 
-    # Pivot on row 4 and column 6 (dL_i).
+    # Pivot on row 4 and column 6 (dL_i) (Fortran lines 63–68).
     pivot = -sd05 * qtl
     q[2, 1] = q[2, 1] - pivot * q[4, 1]
     q[2, 2] = q[2, 2] - pivot * q[4, 2]
@@ -68,7 +71,7 @@ def reduce(i, hha, hhb, hl, hmax, hp, hr, hs, ht, qp0, qp, qpr0, qpr,
     hha[2, 1, i] = -sd05 * qtp - pivot * hha[4, 1, i]
     hha[2, 2, i] = (1.0 - sd05 * qtt) - pivot * hha[4, 2, i]
 
-    # Pivot on row 3 and column 5 (dR_i).
+    # Pivot on row 3 and column 5 (dR_i) (Fortran lines 69–88).
     div = 1.0 / (1.0 - sd05 * qrr)
     q[3, 1] = q[3, 1] * div
     q[3, 2] = q[3, 2] * div
@@ -89,7 +92,7 @@ def reduce(i, hha, hhb, hl, hmax, hp, hr, hs, ht, qp0, qp, qpr0, qpr,
     hha[2, 1, i] = hha[2, 1, i] - pivot * hha[3, 1, i]
     hha[2, 2, i] = hha[2, 2, i] - pivot * hha[3, 2, i]
 
-    # Pivot on row 2 and column 4 (dT_{i-1}).
+    # Pivot on row 2 and column 4 (dT_{i-1}) (Fortran lines 89–101).
     # Question (see the page): no check for a zero pivot.
     div = 1.0 / q[2, 2]
     q[2, 1] = q[2, 1] * div
@@ -104,7 +107,7 @@ def reduce(i, hha, hhb, hl, hmax, hp, hr, hs, ht, qp0, qp, qpr0, qpr,
         hha[j, 1, i] = hha[j, 1, i] - q[j, 2] * hha[2, 1, i]
         hha[j, 2, i] = hha[j, 2, i] - q[j, 2] * hha[2, 2, i]
 
-    # Pivot on row 1 and column 3 (dP_{i-1}).
+    # Pivot on row 1 and column 3 (dP_{i-1}) (Fortran lines 102–111).
     div = 1.0 / q[1, 1]
     hhb[1, i] = hhb[1, i] * div
     hha[1, 1, i] = hha[1, 1, i] * div

@@ -1,4 +1,4 @@
-"""Python version of gettau.f (YREC development, 09c3b9b): the convective
+"""Python version of gettau.f (YREC development, 7be4133): the convective
 overturn timescale near the base of the surface convection zone."""
 
 import math
@@ -36,15 +36,16 @@ dum4 = np.zeros(4)
 lallcz = False
 
 
-def gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl, hstot, bl, m,
-           lc, rbcz, cmixl):
+def gettau(hcomp: np.ndarray, hr: np.ndarray, hp: np.ndarray, hd: np.ndarray, hs1: np.ndarray, ht: np.ndarray,
+           fp: np.ndarray, ft: np.ndarray, teffl: float, hstot: float, bl: float, m: int, lc: np.ndarray, rbcz: float,
+           cmixl: float) -> float:
     """Convective overturn time one pressure scale height above the base of
     the surface convection zone ("G Somers, 3/17").
 
     Uses the interior model, the envelope integration, or the two stitched
     together. Sets ``ovrtrn_mod.taucz`` and ``ovrtrn_mod.pphot``.
 
-    Translates: gettau.f#GETTAU (09c3b9b)
+    Translates: gettau.f#GETTAU (7be4133)
 
     Parameters
     ----------
@@ -64,22 +65,34 @@ def gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl, hstot, bl, m,
     Returns
     -------
     rbcz
+
     """
+
     global lallcz
     cln = constants_mod.cln
+    nml = nmlpar_mod
+
+    # Fortran lines 79–80.
     ovrtrn_mod.taucz = 0.0
     ovrtrn_mod.pphot = 0.0
 
-    # Base of the surface convection zone, scanning inward.
+    # Base of the surface convection zone, scanning inward (Fortran lines
+    # 88–93).
     for i in range(m - 1, 0, -1):                       # label 71
         if not lc[i]:
             break                                       # GOTO 81
     else:
-        lallcz = True        # Question (see the page): set but never used.
+        lallcz = True        # unused, as in the Fortran
         i = 0
     imax = i + 1                                        # label 81
+
+    # Keep the envelope's structure if one scale height above the base may
+    # lie in the envelope (Fortran lines 95–103).
+    # Question (see the page): "at least 3 PSCAS".
     chkprs = hp[imax] - hp[m]
-    ovrtrn_mod.lcalcenv = chkprs < 1.0 or not ovrtrn_mod.lnewtcz
+    nml.lcalcenv = chkprs < 1.0 or not nml.lnewtcz
+
+    # Integrate the envelope (Fortran lines 107–132).
     fpl = fp[m]
     ftl = ft[m]
     idum = 0
@@ -106,9 +119,12 @@ def gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl, hstot, bl, m,
     rl, idum, katm, kenv, ksaha = envint(
         b, fpl, ftl, gl, hstot, ixx, lprt, lsbc0, plim, rl, ateffl, x, z,
         dum1, idum, katm, kenv, ksaha, dum2, dum3, dum4, lpulpt, cmixl)
+
+    # The old method's TAUCZ, set in ENVINT, ends here (Fortran line 140).
     if ovrtrn_mod.taucz == 0.0:
         # The interior, with g = G m / r**2, velocities and gradients from
-        # the last physics pass.
+        # the last physics pass (Fortran lines 143–159).
+        # Question (see the page): stale interior velocities.
         mm = m
         for i in range(1, mm + 1):
             hcompf[1:16, i] = hcomp[1:16, i]
@@ -122,14 +138,15 @@ def gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl, hstot, bl, m,
             delf1[i] = scrtch_mod.sdel[1, i]
             delf2[i] = scrtch_mod.sdel[3, i]
             lcf[i] = lc[i]
-        # The envelope, points 2 to NUMENV.
-        if ovrtrn_mod.lcalcenv and ovrtrn_mod.lnewtcz:
+
+        # The envelope, points 2 to NUMENV (Fortran lines 161–182).
+        if nml.lcalcenv and nml.lnewtcz:
             es = envstruct_mod
             mm = m + es.numenv - 1
             for i in range(m + 1, mm + 1):
                 k = i - m + 1
-                # Question (see the page): HCOMP(J,M+1) is one point past
-                # the model.
+                # HCOMP(J,M+1) is one point past the model; hcompf is read
+                # nowhere (see the page).
                 hcompf[1:16, i] = hcomp[1:16, m + 1]
                 hrf[i] = es.envr[k]
                 hpf[i] = es.envp[k]
@@ -141,11 +158,14 @@ def gettau(hcomp, hr, hp, hd, hs1, ht, fp, ft, teffl, hstot, bl, m,
                 delf1[i] = es.edels[1, k]
                 delf2[i] = es.edels[2, k]
                 lcf[i] = es.lcenv[k]
-        if ovrtrn_mod.lnewtcz:
+
+        # The new or the old method (Fortran lines 184–194).
+        if nml.lnewtcz:
             rbcz = tauintnew(hsf, lcf, hrf, hpf, hdf, hgf, mm, m, hvf,
                              delf1, delf2, rbcz)
         else:
             tauint(hsf, lcf, hrf, hpf, hdf, hgf, mm, hvf, delf1, delf2)
-    # label 100
-    ovrtrn_mod.lcalcenv = True
+
+    # Fortran lines 196–197 (label 100).
+    nml.lcalcenv = True
     return rbcz

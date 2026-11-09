@@ -1,7 +1,7 @@
-"""Python version of comp_mod.f (YREC 09c3b9b): the envelope composition
+"""Python version of comp_mod.f (YREC 7be4133): the envelope composition
 and the star's total and envelope masses, formerly COMMON/COMP/.
 
-Translates: comp_mod.f#COMP_MOD (09c3b9b)
+Translates: comp_mod.f#COMP_MOD (7be4133)
 
 Module-level names, as in the Fortran module (all REAL*8). Routines that
 USE COMP_MOD import this module and write ``comp_mod.xenv``.
@@ -9,6 +9,7 @@ USE COMP_MOD import this module and write ``comp_mod.xenv``.
 
 import numpy as np
 
+# Fortran lines 24–32.
 xenv = 0.0              # envelope X (set in starin)
 zenv = 0.0              # envelope Z (starin; rscale, parmin may reset it)
 zenvm = 0.0             # envelope Z other than C, N, O (starin; read by mixcz)

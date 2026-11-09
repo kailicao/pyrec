@@ -1,7 +1,8 @@
-"""Python version of findsh.f (YREC 09c3b9b): the edges of the
+"""Python version of findsh.f (YREC 7be4133): the edges of the
 convective core, the surface convection zone and the hydrogen shell."""
 
 from pyrec import nmlpar_mod
+import numpy as np
 
 # DATA: the shell ends where L grows by less than dlmin * L_surf, or X is
 # within dxmin of its surface value.
@@ -9,25 +10,31 @@ dlmin = 1.0e-5
 dxmin = 1.0e-5
 
 
-def findsh(hcomp, hl, lc, m, jcore, jenv, jxbeg, jxend, jxmid, lshell):
+def findsh(hcomp: np.ndarray, hl: np.ndarray, lc: np.ndarray, m: int, jcore: int, jenv: int, jxbeg: int, jxend: int,
+           jxmid: int, lshell: bool) -> tuple[int, int, int, int, int, bool]:
     """Find the outermost point of the convective core, the innermost
     point of the surface convection zone and, once the central X is at
     most nmlpar_mod.atime[1], the start, middle and end of the hydrogen
     shell.
 
-    Translates: findsh.f#FINDSH (09c3b9b)
+    Translates: findsh.f#FINDSH (7be4133)
 
     Arguments: hcomp (abundances, row 1 is X), hl (luminosities), lc
     (convective flags), m (number of points); jcore, jenv, jxbeg, jxend,
     jxmid, lshell are only set.
 
     Returns (jcore, jenv, jxbeg, jxend, jxmid, lshell).
+
     """
+
+    # Fortran lines 74–78.
     jxbeg = 1
     jxmid = 1
     jxend = 1
     lshell = False
 
+    # The hydrogen shell, if the central X is below the threshold (Fortran
+    # lines 79–102).
     if hcomp[1, 1] <= nmlpar_mod.atime[1]:
         lshell = True
         xmid = 0.50 * hcomp[1, m]
@@ -49,7 +56,8 @@ def findsh(hcomp, hl, lc, m, jcore, jenv, jxbeg, jxend, jxmid, lshell):
                 break  # GOTO 20
         jxend = i  # label 20
 
-    # The core: the last point of the convective run from the centre.
+    # The core: the last point of the convective run from the centre
+    # (Fortran lines 103–111).
     i = m + 1  # Fortran's index after a loop that runs out
     for ii in range(1, m + 1):  # label 30
         if not lc[ii]:
@@ -60,7 +68,8 @@ def findsh(hcomp, hl, lc, m, jcore, jenv, jxbeg, jxend, jxmid, lshell):
     else:
         jcore = 1
 
-    # The envelope: the first point of the convective run from the surface.
+    # The envelope: the first point of the convective run from the surface
+    # (Fortran lines 112–120).
     i = 0
     for ii in range(m, 0, -1):  # label 50
         if not lc[ii]:
@@ -72,7 +81,9 @@ def findsh(hcomp, hl, lc, m, jcore, jenv, jxbeg, jxend, jxmid, lshell):
         jenv = m
 
     # Fully convective: JCORE is used in the nuclear time step, and
-    # putting it at the surface does strange things.
+    # putting it at the surface does strange things (Fortran lines
+    # 121–124).
     if jenv == 1:
         jcore = 1
+
     return jcore, jenv, jxbeg, jxend, jxmid, lshell

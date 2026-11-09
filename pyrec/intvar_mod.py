@@ -1,7 +1,7 @@
-"""Python version of intvar_mod.f (YREC 09c3b9b): the structure at the
+"""Python version of intvar_mod.f (YREC 7be4133): the structure at the
 interfaces between shells, formerly COMMON/INTVAR/.
 
-Translates: intvar_mod.f#INTVAR_MOD (09c3b9b)
+Translates: intvar_mod.f#INTVAR_MOD (7be4133)
 
 Routines that USE INTVAR_MOD import this module and write
 ``intvar_mod.<name>``. All set by setupv; index i is the interface between
@@ -14,6 +14,7 @@ from pyrec import dimensions_mod
 
 _JSON = dimensions_mod.json
 
+# The structure at the interfaces (Fortran lines 28–38).
 alm = np.zeros(_JSON + 1)       # luminosity (cgs)
 delami = np.zeros(_JSON + 1)    # adiabatic gradient
 delmi = np.zeros(_JSON + 1)     # radiative gradient

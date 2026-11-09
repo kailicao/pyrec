@@ -1,9 +1,9 @@
-"""Python version of zfermim12.f (YREC 09c3b9b): the Fermi-Dirac integral
+"""Python version of zfermim12.f (YREC 7be4133): the Fermi-Dirac integral
 of order -1/2 (Antia 1993)."""
 
 import math
 
-# DATA: Antia's coefficients (index 0 unused).
+# DATA: Antia's coefficients (index 0 unused; Fortran lines 20–40).
 M1, K1, M2, K2 = 7, 7, 11, 11
 A1 = [0.0, 1.71446374704454e7, 3.88148302324068e7, 3.16743385304962e7,
       1.14587609192151e7, 1.83696370756153e6, 1.14980998186874e5,
@@ -22,14 +22,17 @@ B2 = [0.0, -2.23310170962369e-15, -7.94193282071464e-13,
       4.16485970495288e-1]
 
 
-def zfermim12(x):
+def zfermim12(x: float) -> float:
     """F_{-1/2}(x) by Antia's two rational approximations, in exp(x) below
     x = 2 and in 1/x^2 above.
 
-    Translates: zfermim12.f#ZFERMIM12 (09c3b9b)
+    Translates: zfermim12.f#ZFERMIM12 (7be4133)
 
     Arguments: x, the degeneracy parameter. Returns the integral.
+
     """
+
+    # Below x = 2: a rational function of exp(x) (Fortran lines 44–54).
     if x < 2.0:
         xx = math.exp(x)
         rn = xx + A1[M1]
@@ -39,6 +42,8 @@ def zfermim12(x):
         for i in range(K1, 0, -1):
             den = den * xx + B1[i]
         return xx * rn / den
+
+    # From x = 2: a rational function of 1/x**2 (Fortran lines 56–66).
     xx = 1.0 / (x * x)
     rn = xx + A2[M2]
     for i in range(M2 - 1, 0, -1):

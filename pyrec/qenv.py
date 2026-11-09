@@ -1,4 +1,4 @@
-"""Python version of qenv.f (YREC 09c3b9b): the right-hand side of the
+"""Python version of qenv.f (YREC 7be4133): the right-hand side of the
 envelope integration in log P."""
 
 import math
@@ -17,14 +17,15 @@ from pyrec.getopac import getopac
 from pyrec.tpgrad import tpgrad
 
 
-def qenv(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
-         rl, teffl, x, z, kenv, ksaha):
+def qenv(x0: float, y: np.ndarray, dydx: np.ndarray, b: float, fpl: float, ftl: float, gl: float, latmo: bool,
+         lderiv: bool, locond: bool, lsave: bool, rl: float, teffl: float, x: float, z: float, kenv: int,
+         ksaha: int) -> tuple[float, int, int]:
     """Derivatives of log(m/M), log T and log r with respect to log P in
     the envelope, from hydrostatic equilibrium, mass conservation and the
     temperature gradient of tpgrad. Also stores the point in envprt_mod
     (always) and pulse2_mod (when saving).
 
-    Translates: qenv.f#QENV (09c3b9b)
+    Translates: qenv.f#QENV (7be4133)
 
     Arguments: x0 = log P; y (array of 3, index 0 unused) = log(m/M),
     log T, log r; the luminosity b, distortion factors fpl, ftl, teffl,
@@ -35,10 +36,14 @@ def qenv(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
 
     Returns (rl, kenv, ksaha): rl, set to y[3]; the envelope-call
     counter, incremented; the counter of Saha calls, from eqstat.
+
     """
+
     c = constants_mod
     fxion = np.zeros(4)   # index 0 unused
 
+    # The state, its equation of state, opacity and gradient (Fortran lines
+    # 58–71).
     pl = x0
     sl = y[1] + comp_mod.stotal
     tl = y[2]
@@ -54,13 +59,17 @@ def qenv(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
         tl, t, pl, p, d, rl, sl, b, o, qdt, qdp, qot, qod, qcp, 0.0,
         0.0, dela, qdtt, qdtp, qat, qap, 0.0, 0.0, 0.0, qcpt, qcpp,
         0.0, lderiv, False, fpl, ftl, teffl, qenvmix_mod.cmixlq)
+
+    # The derivatives (Fortran lines 72–75).
     dydx[1] = -math.exp(c.cln * (c.c4pil + 4.0 * rl + pl - c.cgl - sl - sl)) / fpl
     dydx[2] = dele
-    # Question (see the page): FPL multiplies here, where COEFFT's form
+    # Suspected bug (see the page): FPL multiplies here, where COEFFT's form
     # would divide.
     dydx[3] = -math.exp(c.cln * (pl + rl - c.cgl - sl - dl)) * fpl
     kenv = kenv + 1
-    # Always store the basic structure variables (07/02).
+
+    # Always store the basic structure variables (07/02) (Fortran lines
+    # 76–94).
     e = envprt_mod
     e.ep = pl
     e.et = tl
@@ -82,9 +91,10 @@ def qenv(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
     q.qqdt = qdt
     q.qqcp = qcp
 
+    # Store more for output (Fortran lines 96–130).
     if lsave or pulse1_mod.lpumod:
         e.eo = o
-        # Question (see the page): these repeat the assignments above.
+        # These repeat the assignments above.
         e.efxion[1] = fxion[1]
         e.efxion[2] = fxion[2]
         e.efxion[3] = fxion[3]
@@ -107,4 +117,5 @@ def qenv(x0, y, dydx, b, fpl, ftl, gl, latmo, lderiv, locond, lsave,
         q.qqcp = qcp
         q.qrmu = rmu
         q.qemu = emu
+
     return rl, kenv, ksaha

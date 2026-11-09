@@ -1,27 +1,31 @@
-"""Python version of setcal.f (YREC 09c3b9b): the 48 runs of an automatic
+"""Python version of setcal.f (YREC 7be4133): the 48 runs of an automatic
 solar calibration, from the first three."""
 
 from pyrec import nmlpar_mod
 from pyrec import runloop_mod
 
 
-def setcal(facage, lsol):
+def setcal(facage: float, lsol: bool) -> bool:
     """Fill the run list for a solar calibration: 16 repetitions of a
     three-run pattern (a new starting model, a run to 1e8 yr, a run to
     the solar age), copied from runs 1-3, with ages and steps scaled by
     facage.
 
-    Translates: setcal.f#SETCAL (09c3b9b)
+    Translates: setcal.f#SETCAL (7be4133)
 
-    Arguments: facage, the age factor (1 except in Monte Carlo runs);
+    Arguments: facage, the age factor (always 1 now; question on the page);
     lsol, the calibration's convergence flag (only set).
 
     Returns lsol, set to False.
+
     """
+
     n = nmlpar_mod
     r = runloop_mod
+
+    # Each calibration cycle takes 3 runs (kind cards) (mhp 5/96); run 1's
+    # composition and mixing length copied to all (Fortran lines 57–64).
     # Question (see the page): the comment says two runs and 24.
-    # Each calibration cycle takes 3 runs (kind cards) (mhp 5/96).
     n.numrun = 48
     for i in range(2, 49):
         n.xenv0a[i] = n.xenv0a[1]
@@ -29,7 +33,8 @@ def setcal(facage, lsol):
         n.cmixla[i] = n.cmixla[1]
         n.lsenv0a[i] = n.lsenv0a[1]
         n.senv0a[i] = n.senv0a[1]
-    # Runs 4, 7, ..., 46 repeat run 1 (a new starting model).
+
+    # Runs 4, 7, ..., 46 repeat run 1 (a new starting model) (Fortran lines 65–75).
     for i in range(4, 47, 3):
         r.iresca[i] = r.iresca[1]
         n.lfirst[i] = True
@@ -39,12 +44,15 @@ def setcal(facage, lsol):
         n.rsclzm2[i] = n.rsclzm2[1]
         for j in range(1, 5):
             r.rescal[j, i] = r.rescal[j, 1]
-    # Run 2 is hard-wired to 1e8 yr, run 3 to CALSOLAGE (MHP 06/13).
+
+    # Run 2 is hard-wired to 1e8 yr, run 3 to CALSOLAGE (MHP 06/13) (Fortran lines 76–82).
     # Question (see the page): the hard-wired 1e8 yr.
     n.endage[2] = 1.0e8 * facage
     n.setdt[2] = n.setdt[2] * facage
     n.endage[3] = n.calsolage * facage
     n.setdt[3] = n.setdt[3] * facage
+
+    # Runs 5, 8, ..., 47 repeat run 2, continuing the model (Fortran lines 83–91).
     # Question (see the page): END_DCEN, END_XCEN, END_YCEN not copied.
     for i in range(5, 48, 3):
         r.iresca[i] = 1
@@ -54,6 +62,8 @@ def setcal(facage, lsol):
         r.lendag[i] = r.lendag[2]
         n.setdt[i] = n.setdt[2]
         r.lsetdt[i] = r.lsetdt[2]
+
+    # Runs 6, 9, ..., 48 repeat run 3 (Fortran lines 92–100).
     for i in range(6, 49, 3):
         r.iresca[i] = 1
         n.lfirst[i] = False
@@ -62,5 +72,7 @@ def setcal(facage, lsol):
         r.lendag[i] = r.lendag[3]
         n.setdt[i] = n.setdt[3]
         r.lsetdt[i] = r.lsetdt[3]
+
+    # Fortran line 101.
     lsol = False
     return lsol

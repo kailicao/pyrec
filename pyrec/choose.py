@@ -1,32 +1,38 @@
-"""Python version of choose.f (YREC 09c3b9b): the case of the shape-
+"""Python version of choose.f (YREC 7be4133): the case of the shape-
 preserving quadratic spline (McAllister and Roulier) for one interval."""
 
 
-def choose(p1, p2, m1, m2, q1, q2, eps, ncase):
+def choose(p1: float, p2: float, m1: float, m2: float, q1: float, q2: float, eps: float, ncase: int) -> int:
     """Choose which of the four cases of McAllister and Roulier's
     quadratic spline the interval needs, from the end slopes and the
     slope of the chord.
 
-    Translates: choose.f#CHOOSE (09c3b9b)
+    Translates: choose.f#CHOOSE (7be4133)
 
     Arguments: (p1, p2), (q1, q2), the points of interpolation; m1, m2,
     the slopes there; eps, the tolerance for slopes close to the chord's
     slope or twice it; ncase, passed in (with any value).
 
     Returns ncase, 1 to 4.
+
     """
-    # The slope of the chord.
+
+    # The slope of the chord (Fortran line 52).
     # Question (see the page): no check that q1 != p1.
     spq = (q2 - p2) / (q1 - p1)
+
     # Modification by Marc Pinsonneault, to avoid a division by zero in
-    # CASES: a zero end slope gives case 2 at once.
+    # CASES: a zero end slope gives case 2 at once (Fortran line 57).
     if m1 == 0.0 or m2 == 0.0:
         return 2  # labels 9, 10
+
+    # A flat chord (Fortran lines 59–65).
     if spq == 0.0:
         if m1 * m2 >= 0.0:
             return 2  # label 10
         return 1
-    # label 20
+
+    # Label 20: the end slopes against the chord's (Fortran lines 67–91).
     prod1 = spq * m1
     prod2 = spq * m2
     mref = abs(spq)
@@ -43,7 +49,9 @@ def choose(p1, p2, m1, m2, q1, q2, eps, ncase):
         if prod < 0.0:
             # The two tangent lines meet between p1 and q1.
             return 1
-    # label 40: all three slopes have the same sign.
+
+    # Label 40: all three slopes have the same sign (Fortran lines
+    # 92–122).
     if mref1 > 2.0 * mref:
         # label 50
         if mref2 > (2.0 - eps) * mref:
@@ -58,9 +66,12 @@ def choose(p1, p2, m1, m2, q1, q2, eps, ncase):
     return 2
 
 
-def _opposite_signs(prod1, prod2, mref, mref1, mref2, eps):
+def _opposite_signs(prod1: float, prod2: float, mref: float, mref1: float, mref2: float, eps: float) -> int:
     """Label 80 of CHOOSE: at least one end slope has the sign opposite to
-    the chord's. Returns ncase."""
+    the chord's (Fortran lines 126–146). Returns ncase.
+
+    """
+
     if prod1 < 0.0 and prod2 < 0.0:
         return 2  # label 130
     if prod1 < 0.0:

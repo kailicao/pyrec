@@ -1,4 +1,4 @@
-"""Python version of bursmix.f (YREC 09c3b9b): burning and mixing over one
+"""Python version of bursmix.f (YREC 7be4133): burning and mixing over one
 time step in progressively smaller substeps, extrapolated to zero substep."""
 
 import numpy as np
@@ -18,7 +18,7 @@ JSON = dimensions_mod.json
 
 # Locals kept between calls (SAVE). ECOD2, EM, IBEG and IEND are filled
 # only by NDIFCOM (through MIXGRID) when LOK is true.
-# Question (see the page): with LOK false they are read as left here.
+# Suspected bug (see the page): with LOK false they are read as left here.
 ecod2 = np.zeros(JSON + 1)
 em = np.zeros(JSON + 1)
 ibeg = 0
@@ -26,18 +26,20 @@ iend = 0
 hcsav = np.zeros((16, JSON + 1))
 hkeep = np.zeros((4, JSON + 1))
 # DATA NSEQ: the substep numbers of the 11 sequences (index 0 unused).
+# Question (see the page): 1, 2, 4, 6, ..., unlike bsstep's 2, 4, 6, 8, 12, ...
 nseq = np.array([0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20])
 
 
-def bursmix(cod2, delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot, ht,
-            hv, imax, imin, jenv0, jenv1, lok, lcz, m, mrzone, mxzone,
-            nrzone, nzone):
+def bursmix(cod2: np.ndarray, delts: float, hcomp: np.ndarray, hd: np.ndarray, hl: np.ndarray, hp: np.ndarray,
+            hr: np.ndarray, hs: np.ndarray, hs1: np.ndarray, hs2: np.ndarray, hstot: float, ht: np.ndarray,
+            hv: np.ndarray, imax: int, imin: int, jenv0: int, jenv1: int, lok: bool, lcz: np.ndarray, m: int,
+            mrzone: np.ndarray, mxzone: np.ndarray, nrzone: int, nzone: int) -> int:
     """Alternate nuclear burning (with settling) and rotational mixing in
     sequences of 2, 4, ..., 20 substeps, and extrapolate the abundances
     from species 4 on to zero substep with bsrotmix; then restore X and Z
     to their values on entry and set Y = 1 - X - Z - X(He3).
 
-    Translates: bursmix.f#BURSMIX (09c3b9b)
+    Translates: bursmix.f#BURSMIX (7be4133)
 
     Arguments: the mixing coefficients cod2; the time step delts (s); the
     composition hcomp[species, shell] after the caller's full step
@@ -48,10 +50,14 @@ def bursmix(cod2, delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot, ht,
     composition.
 
     Returns jenv0: set to jenv1 when nmlpar_mod.lexcom, else as passed in.
+
     """
+
     global ibeg, iend
     n = nmlpar_mod
     hcompp = oldmod_mod.hcompp
+
+    # The species extrapolated, from He3 on (Fortran lines 64–71).
     if n.lexcom:
         nspec = 15
     else:
@@ -59,18 +65,22 @@ def bursmix(cod2, delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot, ht,
     jbeg = 4
     jend = nspec
     nburs = 11
+
     # Store all elements: HCOMPP is the start-of-step composition in
-    # KEMCOM, so it is overwritten during the substeps.
+    # KEMCOM, so it is overwritten during the substeps (Fortran lines 75–82).
     for i in range(1, m + 1):
         for j in range(1, nspec + 1):
             hcsav[j, i] = hcompp[j, i]
         for j in range(1, 4):
             hkeep[j, i] = hcomp[j, i]
-    # The caller's full step is the first entry of the extrapolation.
+
+    # The caller's full step is the first entry of the extrapolation (Fortran lines 85–86).
     iii = 1
     lconv = False
     lconv = bsrotmix(delts, hcomp, iii, m, jbeg, nspec, nseq, lconv)
     converged = False
+
+    # The sequences of substeps (Fortran lines 87–126).
     for iii in range(2, nburs + 1):
         # Reset the composition to its initial value.
         for i in range(1, m + 1):
@@ -83,7 +93,8 @@ def bursmix(cod2, delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot, ht,
             # Nuclear burning (and settling).
             rotmix(dt, hcomp, hs2, ht, m, mrzone, mxzone, nrzone, nzone,
                    hstot, hd, hs, hr, hp, lcz, hs1)
-            # Mixing.
+            # Mixing. Suspected bug (see the page): with lok False, ibeg, iend,
+            # ecod2 and em were never set.
             ibeg, iend = ndifcom(dt, cod2, ecod2, em, hd, hl, hp, hr, hs,
                                  hs1, hs2, hstot, hv, ibeg, iend, imax,
                                  imin, lcz, lok, m, hcomp, jbeg, jend)
@@ -99,15 +110,19 @@ def bursmix(cod2, delts, hcomp, hd, hl, hp, hr, hs, hs1, hs2, hstot, ht,
                     hcompp[j, i] = hcomp[j, i]
             converged = True
             break  # GOTO 10
+
+    # Failed to converge: the unextrapolated final composition is used (Fortran lines 129–130).
     if not converged:
-        # Failed to converge: the unextrapolated final composition is used.
         print(' WARNING - EXTRAPOLATION IN BSBURN DID NOT CONVERGE')
-    # label 10
+
+    # label 10. X and Z restored, Y by closure (Fortran lines 131–136).
     # Question (see the page): X and Z restored to their values on entry.
     for i in range(1, m + 1):
         hcomp[1, i] = hkeep[1, i]
         hcomp[3, i] = hkeep[3, i]
         hcomp[2, i] = 1.0 - hcomp[1, i] - hcomp[3, i] - hcomp[4, i]
+
+    # The light-element rates and envelope base for the next step (Fortran lines 137–145).
     if n.lexcom:
         for i in range(1, m + 1):
             oldrat_mod.rli60[i] = newrat_mod.rli6[i]

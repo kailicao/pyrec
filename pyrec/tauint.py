@@ -1,8 +1,9 @@
-"""Python version of tauint.f (YREC 09c3b9b): the convective overturn time
+"""Python version of tauint.f (YREC 7be4133): the convective overturn time
 at the base of the surface convection zone, on the interior profile (the
 older method; TAUINTNEW is the newer)."""
 
 import math
+import numpy as np
 
 from pyrec import constants_mod
 from pyrec import envstruct_mod
@@ -10,23 +11,28 @@ from pyrec import nmlpar_mod
 from pyrec import ovrtrn_mod
 
 
-def tauint(hs1, lcz, hr, hp, hd, hg, m, svel, del1, del2):
+def tauint(hs1: np.ndarray, lcz: np.ndarray, hr: np.ndarray, hp: np.ndarray, hd: np.ndarray, hg: np.ndarray, m: int,
+           svel: np.ndarray, del1: np.ndarray, del2: np.ndarray) -> None:
     """Set ovrtrn_mod.taucz: H_P / v one pressure scale height above the
     base of the surface convection zone (searching the envelope of the
     last ENVINT call when the profile ends first); for a fully convective
     star, H_P / v where H_P = r; 0 with no surface zone.
 
-    Translates: tauint.f#TAUINT (09c3b9b)
+    Translates: tauint.f#TAUINT (7be4133)
 
     Arguments: hs1 (masses), lcz (convective flags), hr, hp, hd (log r,
     log P, log rho), hg (gravity; changed in place where computed, when
     there is no rotation), m, svel (convective velocities), del1, del2
     (the radiative and adiabatic gradients). None is returned.
+
     """
+
     c = constants_mod
     env = envstruct_mod
     lrot = nmlpar_mod.lrot
     lallcz = False
+
+    # IMAX, the zone's mass range and LCZSUR (Fortran lines 68–97).
     if lcz[m] or lcz[m - 1]:
         # IMAX: the lowest shell of the convective run from the surface.
         for i in range(m - 1, 0, -1):
@@ -50,12 +56,14 @@ def tauint(hs1, lcz, hr, hp, hd, hg, m, svel, del1, del2):
         imax = m
         lczsur = False
 
+    # No surface zone (Fortran lines 99, 178–179).
     if not lczsur:
         ovrtrn_mod.taucz = 0.0
         return
 
     if not lallcz:
-        # A partly convective star: the base r_b and H_P there.
+        # A partly convective star: the base r_b and H_P there (Fortran
+        # lines 101–115).
         if not lrot:
             hg[imax] = hs1[imax] * math.exp(c.cln * (c.cgl - 2.0 * hr[imax]))
             hg[imax - 1] = hs1[imax - 1] * math.exp(
@@ -69,6 +77,9 @@ def tauint(hs1, lcz, hr, hp, hd, hg, m, svel, del1, del2):
         ps1 = math.exp(c.cln * (hp[imax - 1] - hd[imax - 1])) / hg[imax - 1]
         psca = ps1 + fx * (ps2 - ps1)
         rtestl = math.log10(envrc + psca)
+
+        # The velocity one scale height above the base (Fortran lines
+        # 117–136).
         found = False
         for k in range(imax + 1, m + 1):
             if hr[k] > rtestl:
@@ -91,7 +102,7 @@ def tauint(hs1, lcz, hr, hp, hd, hg, m, svel, del1, del2):
         ovrtrn_mod.taucz = psca / cvel  # label 85
         return
 
-    # A fully convective star: where H_P = r.
+    # A fully convective star: where H_P = r (Fortran lines 140–175).
     if not lrot:
         hg[1] = hs1[1] * math.exp(c.cln * (c.cgl - 2.0 * hr[1]))
     psca2 = math.exp(c.cln * (hp[1] - hd[1])) / hg[1]
